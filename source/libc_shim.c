@@ -48,6 +48,7 @@
 #include "rd_gcbridge.h"
 #include "rd_modimage.h"
 #include "unity_input_hook.h"   /* nx_input_icall_table */
+#include "rd_smoke.h"          /* rd_smoke_icall_table */
 #include "rd_log.h"
 
 // ---------------------------------------------------------------------------
@@ -596,6 +597,8 @@ static int fd_close_by_path(const char *path) {
  * guessing. Plain ints: single-writer per counter in practice and we only need magnitudes. */
 unsigned nx_stat_open = 0, nx_stat_commit = 0, nx_stat_mmap = 0, nx_stat_gcstop = 0;
 volatile unsigned long long nx_stat_read_bytes = 0, nx_stat_read_ns = 0;
+volatile unsigned long long nx_stat_swap_ns = 0, nx_stat_glwait_ns = 0;
+volatile unsigned long long nx_stat_dequeue_ns = 0, nx_stat_fence_ns = 0;
 
 #define WFD_MAX 4096
 static unsigned char g_write_fd[WFD_MAX];
@@ -2181,9 +2184,13 @@ void *dlsym_fake(void *handle, const char *symbol) {
   /* 1) a real export from a loaded module (il2cpp/unity/main) */
   void *p = so_resolve_external(symbol);
   /* Libunity registers engine icalls through il2cpp_add_internal_call; hand it
-   * our wrapper so UnityEngine.Input icalls are replaced by name (rd_icall.h). */
+   * our wrapper so UnityEngine.Input icalls are replaced and the particle Emit icall is
+   * wrapped by name (rd_icall.h). */
   if (p && !strcmp(symbol, "il2cpp_add_internal_call")) {
-    rd_icall_setup(nx_input_icall_table(), (rd_add_icall_fn)p);
+    static const rd_icall_override *tables[2];
+    tables[0] = nx_input_icall_table();
+    tables[1] = rd_smoke_icall_table();
+    rd_icall_setup(tables, 2, (rd_add_icall_fn)p);
     debugPrintf("[input] dlsym(il2cpp_add_internal_call) -> icall override wrapper\n");
     return (void *)rd_add_internal_call;
   }
@@ -2195,7 +2202,7 @@ void *dlsym_fake(void *handle, const char *symbol) {
   /* 3) the full GLES/EGL API (~150 entry points) lives in mesa, beyond our
    *    static table -- resolve any gl or egl symbol via eglGetProcAddress. */
   if (!strncmp(symbol, "gl", 2) || !strncmp(symbol, "egl", 3)) {
-    p = (void *)eglGetProcAddress(symbol);
+    p = egl_GetProcAddress_timed(symbol);
     if (p) { debugPrintf("dlsym(%s) -> %p [egl]\n", symbol, p); return p; }
   }
   debugPrintf("dlsym(%s) -> NULL\n", symbol);

@@ -8,10 +8,17 @@ static int ours_mouse(void) { return 2; }
 static int engine_fn(void) { return 3; }
 
 static const rd_icall_override TABLE[] = {
-  { "UnityEngine.Input::get_touchCount", (void *)ours_touch },
-  { "UnityEngine.Input::GetMouseButton", (void *)ours_mouse },
-  { NULL, NULL },
+  { "UnityEngine.Input::get_touchCount", (void *)ours_touch, NULL },
+  { "UnityEngine.Input::GetMouseButton", (void *)ours_mouse, NULL },
+  { NULL, NULL, NULL },
 };
+static int ours_emit(void) { return 4; }
+static void *g_orig_emit;
+static const rd_icall_override WRAPS[] = {
+  { "UnityEngine.ParticleSystem::Internal_EmitOld", (void *)ours_emit, &g_orig_emit },
+  { NULL, NULL, NULL },
+};
+static const rd_icall_override *const BOTH[] = { TABLE, WRAPS };
 
 static const char *g_name[8];
 static const void *g_fn[8];
@@ -27,7 +34,7 @@ static void test_lookup(void) {
 
 static void test_wrapper_substitutes_known_and_forwards_others(void) {
   g_n = 0;
-  rd_icall_setup(TABLE, fake_real);
+  rd_icall_setup(BOTH, 1, fake_real);
   rd_add_internal_call("UnityEngine.Input::get_touchCount", (void *)engine_fn);
   rd_add_internal_call("UnityEngine.Time::get_deltaTime", (void *)engine_fn);
   CHECK(g_n == 2);
@@ -38,13 +45,26 @@ static void test_wrapper_substitutes_known_and_forwards_others(void) {
 }
 
 static void test_without_real_does_not_crash(void) {
-  rd_icall_setup(TABLE, NULL);
+  rd_icall_setup(BOTH, 1, NULL);
   rd_add_internal_call("UnityEngine.Input::get_touchCount", (void *)engine_fn);
   CHECK(rd_icall_applied() == 1);
 }
 
+static void test_second_table_captures_the_original(void) {
+  g_n = 0;
+  g_orig_emit = NULL;
+  rd_icall_setup(BOTH, 2, fake_real);
+  rd_add_internal_call("UnityEngine.ParticleSystem::Internal_EmitOld", (void *)engine_fn);
+  rd_add_internal_call("UnityEngine.Input::get_touchCount", (void *)engine_fn);
+  CHECK(g_n == 2 && g_fn[0] == (void *)ours_emit && g_fn[1] == (void *)ours_touch);
+  CHECK(g_orig_emit == (void *)engine_fn);
+  CHECK(rd_icall_applied() == 2);
+  CHECK(rd_icall_find(WRAPS, "UnityEngine.ParticleSystem::Internal_EmitOld") == &WRAPS[0]);
+}
+
 int main(void) {
   RUN(test_lookup);
+  RUN(test_second_table_captures_the_original);
   RUN(test_wrapper_substitutes_known_and_forwards_others);
   RUN(test_without_real_does_not_crash);
   return g_failures != 0;

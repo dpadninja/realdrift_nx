@@ -50,6 +50,8 @@ CFLAGS  += -DLOAD_ADDRESS=0xC0000000
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
 ASFLAGS  := -g $(ARCH)
 LDFLAGS   = -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+# mesa's display/GPU waits, timed in source/rd_gpuwait.c
+LDFLAGS  += -Wl,--wrap=nwindowDequeueBuffer -Wl,--wrap=nvFenceWait -Wl,--wrap=nwindowSetSwapInterval
 
 # mesa GLES3 + EGL + nouveau (force the GLES path); SDL2 for window/HID/audio; zlib.
 LIBS := -lSDL2 -lGLESv2 -lEGL -lglapi -ldrm_nouveau -lpng -lz -lnx -lm

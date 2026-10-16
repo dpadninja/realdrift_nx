@@ -15,6 +15,14 @@ static const struct { const char *name; size_t off; } API[] = {
   { "il2cpp_array_new",                  offsetof(rd_il2cpp_api, array_new) },
   { "il2cpp_gchandle_new",               offsetof(rd_il2cpp_api, gchandle_new) },
   { "il2cpp_string_new",                 offsetof(rd_il2cpp_api, string_new) },
+  { "il2cpp_resolve_icall",              offsetof(rd_il2cpp_api, resolve_icall) },
+  { "il2cpp_class_get_type",             offsetof(rd_il2cpp_api, class_get_type) },
+  { "il2cpp_type_get_object",            offsetof(rd_il2cpp_api, type_get_object) },
+  { "il2cpp_array_length",               offsetof(rd_il2cpp_api, array_length) },
+  { "il2cpp_string_length",              offsetof(rd_il2cpp_api, string_length) },
+  { "il2cpp_string_chars",               offsetof(rd_il2cpp_api, string_chars) },
+  { "il2cpp_class_get_nested_types",     offsetof(rd_il2cpp_api, class_get_nested_types) },
+  { "il2cpp_class_get_name",             offsetof(rd_il2cpp_api, class_get_name) },
 };
 
 int rd_il2cpp_load(rd_il2cpp_api *api, rd_sym_fn sym, void *ctx,
@@ -38,6 +46,26 @@ void *rd_il2cpp_class(const rd_il2cpp_api *api, const char *assembly, const char
   void *as = dom ? api->domain_assembly_open(dom, assembly) : NULL;
   void *img = as ? api->assembly_get_image(as) : NULL;
   return img ? api->class_from_name(img, ns, name) : NULL;
+}
+
+void *rd_il2cpp_nested_class(const rd_il2cpp_api *api, void *outer, const char *name) {
+  if (!api->class_get_nested_types || !api->class_get_name || !outer || !name) return NULL;
+  void *iter = NULL, *k;
+  while ((k = api->class_get_nested_types(outer, &iter)) != NULL) {
+    const char *n = api->class_get_name(k);
+    if (n && !strcmp(n, name)) return k;
+  }
+  return NULL;
+}
+
+int rd_il2cpp_str_eq(const rd_il2cpp_api *api, void *str, const char *s) {
+  if (!api->string_length || !api->string_chars || !str || !s) return 0;
+  const int32_t n = api->string_length(str);
+  const uint16_t *c = api->string_chars(str);
+  if (!c || n < 0 || (size_t)n != strlen(s)) return 0;
+  for (int32_t i = 0; i < n; i++)
+    if (c[i] != (unsigned char)s[i]) return 0;
+  return 1;
 }
 
 int rd_il2cpp_field_offset(const rd_il2cpp_api *api, void *klass, const char *name,

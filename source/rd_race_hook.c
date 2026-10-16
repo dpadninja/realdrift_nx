@@ -5,6 +5,7 @@
  * every call, so swapping that pointer wraps Update. Field offsets are looked up by name. */
 #include <stdint.h>
 #include "rd_race.h"
+#include "rd_smoke.h"
 #include "rd_il2cpp.h"
 #include "rd_game_symbols.h"
 #include "rd_platform.h"
@@ -58,6 +59,7 @@ static void ui_update(void *self, const void *mi) {
   g_last_race_frame = port_frame_count();
 
   if (config.hide_touch_controls) hide_touch_controls(self);
+  rd_smoke_race_frame();
 
   uint64_t held = nxp_pad_held() & config.pause;
   int pressed = held && !g_pause_held_prev;
