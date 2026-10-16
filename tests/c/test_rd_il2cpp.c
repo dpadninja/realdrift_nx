@@ -74,7 +74,7 @@ static void on_missing(const char *name) { (void)name; g_missing_calls++; }
 static void test_load_and_helpers(void) {
   rd_il2cpp_api api;
   int missing = rd_il2cpp_load(&api, fake_sym, NULL, on_missing);
-  CHECK(missing == 4 && g_missing_calls == 4);   /* method, array, gchandle, string */
+  CHECK(missing == 12 && g_missing_calls == 12);  /* all but the six provided below */
   CHECK(api.domain_get == f_domain_get && api.field_get_offset == f_field_offset);
   CHECK(api.class_get_method_from_name == NULL && api.string_new == NULL);
   CHECK(rd_il2cpp_class(&api, "Assembly-CSharp", "", "UIManager") == &g_klass);
@@ -86,11 +86,61 @@ static void test_load_and_helpers(void) {
   uint32_t out[1] = { 0 };
   CHECK(rd_il2cpp_fields(&api, &g_klass, names, 1, out) && out[0] == 0x18);
   rd_il2cpp_api none;
-  CHECK(rd_il2cpp_load(&none, NULL, NULL, NULL) == 10);
+  CHECK(rd_il2cpp_load(&none, NULL, NULL, NULL) == 18);
   CHECK(rd_il2cpp_class(&none, "Assembly-CSharp", "", "UIManager") == NULL);
 }
 
+/* Il2CppString stand-in: length + UTF-16 chars */
+typedef struct { int32_t len; uint16_t ch[16]; } FakeStr;
+static int32_t f_str_len(void *s) { return ((FakeStr *)s)->len; }
+static const uint16_t *f_str_chars(void *s) { return ((FakeStr *)s)->ch; }
+
+static void test_str_eq(void) {
+  rd_il2cpp_api api = {0};
+  FakeStr smoke = { 9, { 'S','k','i','d','S','m','o','k','e' } };
+  FakeStr wide  = { 1, { 0x0410 } };                       /* Cyrillic A */
+  CHECK(!rd_il2cpp_str_eq(&api, &smoke, "SkidSmoke"));    /* API missing */
+  api.string_length = f_str_len; api.string_chars = f_str_chars;
+  CHECK(rd_il2cpp_str_eq(&api, &smoke, "SkidSmoke"));
+  CHECK(!rd_il2cpp_str_eq(&api, &smoke, "SkidSmok"));
+  CHECK(!rd_il2cpp_str_eq(&api, &smoke, "SkidSmokeX"));
+  CHECK(!rd_il2cpp_str_eq(&api, &smoke, "skidsmoke"));
+  CHECK(!rd_il2cpp_str_eq(&api, &wide, "\x10"));
+  CHECK(!rd_il2cpp_str_eq(&api, NULL, "x"));
+}
+
+/* nested types: an iterator over three fake classes */
+static const char *const NESTED[] = { "MainModule", "Particle", "EmitParams" };
+static void *f_nested(void *outer, void **iter) {
+  (void)outer;
+  uintptr_t i = (uintptr_t)*iter;
+  if (i >= 3) return NULL;
+  *iter = (void *)(i + 1);
+  return (void *)&NESTED[i];
+}
+static const char *f_class_name(void *k) { return *(const char *const *)k; }
+
+static void test_nested_class(void) {
+  rd_il2cpp_api api = {0};
+  int outer;
+  CHECK(rd_il2cpp_nested_class(&api, &outer, "Particle") == NULL);   /* API missing */
+  api.class_get_nested_types = f_nested; api.class_get_name = f_class_name;
+  CHECK(rd_il2cpp_nested_class(&api, &outer, "Particle") == (void *)&NESTED[1]);
+  CHECK(rd_il2cpp_nested_class(&api, &outer, "EmitParams") == (void *)&NESTED[2]);
+  CHECK(rd_il2cpp_nested_class(&api, &outer, "Missing") == NULL);
+  CHECK(rd_il2cpp_nested_class(&api, NULL, "Particle") == NULL);
+}
+
+static void test_array_at(void) {
+  int a, b;
+  struct { char hdr[RD_IL2CPP_ARRAY_DATA]; void *data[2]; } arr = { {0}, { &a, &b } };
+  CHECK(rd_il2cpp_array_at(&arr, 0) == &a && rd_il2cpp_array_at(&arr, 1) == &b);
+}
+
 int main(void) {
+  RUN(test_str_eq);
+  RUN(test_array_at);
+  RUN(test_nested_class);
   RUN(test_find_vtable_slot);
   RUN(test_resolve_fields);
   RUN(test_load_and_helpers);

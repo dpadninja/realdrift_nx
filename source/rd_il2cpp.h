@@ -19,6 +19,14 @@ typedef struct {
   void  *(*array_new)(void *klass, uintptr_t length);
   uint32_t (*gchandle_new)(void *obj, int pinned);
   void  *(*string_new)(const char *s);
+  void  *(*resolve_icall)(const char *name);           /* engine icall by registered name */
+  const void *(*class_get_type)(void *klass);
+  void  *(*type_get_object)(const void *type);         /* System.Type of an Il2CppType */
+  uint32_t (*array_length)(void *array);
+  int32_t (*string_length)(void *str);
+  const uint16_t *(*string_chars)(void *str);          /* UTF-16 */
+  void  *(*class_get_nested_types)(void *klass, void **iter);   /* NULL when done */
+  const char *(*class_get_name)(void *klass);
 } rd_il2cpp_api;
 
 extern rd_il2cpp_api g_il2cpp;
@@ -32,6 +40,21 @@ int rd_il2cpp_load(rd_il2cpp_api *api, rd_sym_fn sym, void *ctx,
 /* A class by assembly/namespace/name, or NULL (also if the API or assembly is missing). */
 void *rd_il2cpp_class(const rd_il2cpp_api *api, const char *assembly, const char *ns,
                       const char *name);
+
+/* il2cpp_field_get_offset of a value type's field counts the boxed object header. */
+#define RD_IL2CPP_OBJECT_HEADER 0x10
+
+/* A nested class of `outer` by name (e.g. ParticleSystem/Particle), or NULL. */
+void *rd_il2cpp_nested_class(const rd_il2cpp_api *api, void *outer, const char *name);
+
+/* Element i of a managed object array (Il2CppArray: header, bounds, max_length, data). */
+#define RD_IL2CPP_ARRAY_DATA 0x20
+static inline void *rd_il2cpp_array_at(void *array, uint32_t i) {
+  return ((void **)((char *)array + RD_IL2CPP_ARRAY_DATA))[i];
+}
+
+/* 1 if the managed string `str` equals the ASCII string `s`. */
+int rd_il2cpp_str_eq(const rd_il2cpp_api *api, void *str, const char *s);
 
 /* Field offset by name; 1 on success. */
 int rd_il2cpp_field_offset(const rd_il2cpp_api *api, void *klass, const char *name,

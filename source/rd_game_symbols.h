@@ -46,4 +46,19 @@
 #define RD_MTH_GET_ACTIVE_SELF "get_activeSelf"
 #define RD_MTH_SET_ACTIVE      "SetActive"
 
+/* ---- tyre smoke: Unity particle systems (rd_smoke_hook.c) ----------------------------- */
+#define RD_ASM_PARTICLES          "UnityEngine.ParticleSystemModule"
+#define RD_CLS_PARTICLE_SYSTEM    "ParticleSystem"
+#define RD_CLS_PARTICLE           "Particle"       /* nested: ParticleSystem/Particle (struct) */
+#define RD_FLD_PARTICLE_START_SIZE "m_StartSize"   /* Vector3 */
+#define RD_CLS_PARTICLE_RENDERER  "ParticleSystemRenderer"
+#define RD_SMOKE_MATERIAL         "SkidSmoke"      /* material of ParticleTrack / ParticleGrass */
+/* Engine icalls. Only the ones the game's own code uses are registered (the rest of the
+ * particle API, e.g. maxParticleSize / maxParticles, is not: il2cpp_resolve_icall fails). */
+#define RD_ICALL_EMIT_OLD         "UnityEngine.ParticleSystem::Internal_EmitOld"   /* wrapped */
+#define RD_ICALL_FIND_OBJECTS     "UnityEngine.Object::FindObjectsOfType"
+#define RD_ICALL_OBJECT_NAME      "UnityEngine.Object::GetName"
+#define RD_ICALL_GAME_OBJECT      "UnityEngine.Component::get_gameObject"
+#define RD_ICALL_SHARED_MATERIAL  "UnityEngine.Renderer::GetSharedMaterial"
+
 #endif

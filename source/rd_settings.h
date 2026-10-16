@@ -17,6 +17,7 @@
 #include "rd_drive.h"
 #include "rd_perf.h"
 #include "rd_log.h"
+#include "rd_smoke.h"
 
 #define RD_BTN_A      (1ull << 0)
 #define RD_BTN_B      (1ull << 1)
@@ -44,6 +45,8 @@ typedef struct {
   int         hide_touch_controls;   /* 1: hide on-screen driving buttons during a race */
   int         render_res;            /* RD_RES_AUTO / RD_RES_720 / RD_RES_1080 (rd_perf.h) */
   int         boost_loading;         /* 1: CPU boost while a loading frame runs (rd_perf.h) */
+  int         smoke_size;            /* percent of the smoke puffs' size (rd_smoke.h) */
+  int         smoke_amount;          /* percent of the smoke puffs emitted (rd_smoke.h) */
   int         debug_log;             /* RD_LOG_FULL / RD_LOG_MINIMAL (rd_log.h) */
   int         debug_fps_counter;     /* 1: FPS overlay in the top-left corner (rd_fps.h) */
 } rd_settings;
@@ -62,6 +65,8 @@ typedef struct {
   .hide_touch_controls = 1,                                           \
   .render_res = RD_RES_AUTO,                                          \
   .boost_loading = 1,                                                 \
+  .smoke_size = RD_SMOKE_PERCENT_ORIG,                                \
+  .smoke_amount = RD_SMOKE_PERCENT_ORIG,                              \
   .debug_log = RD_LOG_MINIMAL,                                        \
   .debug_fps_counter = 0,                                             \
 }

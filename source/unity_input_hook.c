@@ -92,14 +92,14 @@ static uint8_t ic_GetMouseButtonUp(int32_t b)      { return (b==0) ? (uint8_t)g_
 static uint8_t ic_true(void)                       { return 1; }
 
 static const rd_icall_override g_input_icalls[] = {
-  { "UnityEngine.Input::get_touchCount",             (void *)ic_touchCount },
-  { "UnityEngine.Input::GetTouch_Injected",          (void *)ic_GetTouch },
-  { "UnityEngine.Input::get_mousePosition_Injected", (void *)ic_mousePosition },
-  { "UnityEngine.Input::GetMouseButton",             (void *)ic_GetMouseButton },
-  { "UnityEngine.Input::GetMouseButtonDown",         (void *)ic_GetMouseButtonDown },
-  { "UnityEngine.Input::GetMouseButtonUp",           (void *)ic_GetMouseButtonUp },
-  { "UnityEngine.Input::get_touchSupported",         (void *)ic_true },
-  { NULL, NULL },
+  { "UnityEngine.Input::get_touchCount",             (void *)ic_touchCount, NULL },
+  { "UnityEngine.Input::GetTouch_Injected",          (void *)ic_GetTouch, NULL },
+  { "UnityEngine.Input::get_mousePosition_Injected", (void *)ic_mousePosition, NULL },
+  { "UnityEngine.Input::GetMouseButton",             (void *)ic_GetMouseButton, NULL },
+  { "UnityEngine.Input::GetMouseButtonDown",         (void *)ic_GetMouseButtonDown, NULL },
+  { "UnityEngine.Input::GetMouseButtonUp",           (void *)ic_GetMouseButtonUp, NULL },
+  { "UnityEngine.Input::get_touchSupported",         (void *)ic_true, NULL },
+  { NULL, NULL, NULL },
 };
 const rd_icall_override *nx_input_icall_table(void) { return g_input_icalls; }
 

@@ -12,7 +12,7 @@ Playable: menus, races, sound, controller driving and saving work on hardware.
 
 Known issues:
 - loading a scene takes a few seconds (the CPU is boosted while loading);
-- heavy smoke can drop the frame rate;
+- heavy tyre smoke can drop the frame rate (the GPU is the limit); `smoke_size` / `smoke_amount` in `config.txt` make it lighter.
 
 ## Features
 
@@ -21,6 +21,8 @@ Known issues:
 - **Touch driving controls hidden** during races (optional).
 - **Menus:** use the touchscreen, a USB mouse, or the on-screen cursor (`+` toggles it outside a race, the left stick moves it, `A` taps, `-` toggles gyro pointing).
 - **Render resolution:** 720p handheld / 1080p docked by default, or fixed.
+- **Lighter tyre smoke** (optional): smaller and fewer smoke puffs for a steady frame rate.
+- **FPS counter** (optional) in the top-left corner.
 - **Saves** are stored on the SD card (`prefs.kv` next to the game).
 - No per-version offsets: engine patch sites are found at runtime by instruction patterns, and game classes are found by name through the IL2CPP API.
 
@@ -88,7 +90,10 @@ A binding accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN LEFT RIGH
 | `hide_touch_controls` | `0` / `1` | hide the on-screen driving buttons in races |
 | `render_resolution` | `auto` / `720` / `1080` | `auto` = 720p handheld, 1080p docked |
 | `boost_loading` | `0` / `1` | raise the CPU clock while a scene loads |
+| `smoke_size` | `10`–`100` | size of the tyre smoke puffs in percent; `100` (default) = original. Lower it (e.g. `50`) if heavy smoke drops the frame rate |
+| `smoke_amount` | `10`–`100` | percent of the smoke puffs emitted; `100` (default) = original. `50` together with `smoke_size=50` keeps the frame rate steady in heavy smoke |
 | `debug_log` | `0` / `1` | `1` = full `debug.log` for bug reports; `0` (default) = only crashes, stalls and startup |
+| `debug_fps_counter` | `0` / `1` | show frames per second and the slowest frame (ms) in the top-left corner |
 
 When reporting a problem, set `debug_log=1`, reproduce it and attach `sdmc:/switch/realdrift_nx/debug.log`.
 

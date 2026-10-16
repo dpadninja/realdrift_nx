@@ -76,6 +76,12 @@ int rename_fake(const char *oldp, const char *newp);
 extern unsigned nx_stat_open, nx_stat_commit, nx_stat_mmap, nx_stat_gcstop;
 /* Bytes / time spent in read()+fread() (loading profile in [perf] lines). */
 extern volatile unsigned long long nx_stat_read_bytes, nx_stat_read_ns;
+/* Time spent in eglSwapBuffers (imports.c): large on slow frames = waiting for the GPU. */
+extern volatile unsigned long long nx_stat_swap_ns;
+/* Time spent in GL calls that can wait for the GPU (buffer uploads/maps, syncs; imports.c). */
+extern volatile unsigned long long nx_stat_glwait_ns;
+/* Time mesa waits for a free window buffer / for GPU fences (rd_gpuwait.c, --wrap). */
+extern volatile unsigned long long nx_stat_dequeue_ns, nx_stat_fence_ns;
 int fstat_fake(int fd, struct bionic_stat *st);
 int lstat_fake(const char *path, struct bionic_stat *st);
 void *readdir_fake(void *dirp);

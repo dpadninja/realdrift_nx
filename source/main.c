@@ -42,6 +42,7 @@
 #include "rd_icall.h"
 #include "rd_apkpath.h"
 #include "rd_perf.h"
+#include "rd_gpuwait.h"
 
 volatile uint64_t g_rd_frame_start_ns = 0;   /* Read by rd_patches.c clock thread */
 volatile int      g_rd_in_frame = 0;
@@ -547,7 +548,8 @@ int main(int argc, char *argv[]) {
 
     g_rd_frame_start_ns = t0;
     g_rd_in_frame = 1;                                     /* Boost_loading */
-    unsigned long long _rb0 = nx_stat_read_bytes, _rn0 = nx_stat_read_ns;
+    unsigned long long _rb0 = nx_stat_read_bytes, _rn0 = nx_stat_read_ns, _sw0 = nx_stat_swap_ns,
+                       _gw0 = nx_stat_glwait_ns, _dq0 = nx_stat_dequeue_ns, _fn0 = nx_stat_fence_ns;
     int _alive = Unity_nativeRender(fake_env, fake_unityplayer_thiz);
     g_rd_in_frame = 0;
     if (!_alive) break;
@@ -556,16 +558,21 @@ int main(int argc, char *argv[]) {
       long _ms = (long)((rd_now_ns() - t0) / RD_NS_PER_MS);
       if (_ms >= RD_SLOW_FRAME_MS) {
         debugPrintf("[perf] frame %d took %ldms  open=%u sd=%u mmap=%u gc=%u  touch=%d  "
-                    "read=%lluKB/%llums\n",
+                    "read=%lluKB/%llums swap=%llums gl=%llums deq=%llums fence=%llums\n",
                     frame, _ms,
                     nx_stat_open - _o0, nx_stat_commit - _c0,
                     nx_stat_mmap - _m0, nx_stat_gcstop - _g0,
                     nx_hook_touch_count(),
-                    (nx_stat_read_bytes - _rb0) >> 10, (nx_stat_read_ns - _rn0) / RD_NS_PER_MS);
+                    (nx_stat_read_bytes - _rb0) >> 10, (nx_stat_read_ns - _rn0) / RD_NS_PER_MS,
+                    (nx_stat_swap_ns - _sw0) / RD_NS_PER_MS,
+                    (nx_stat_glwait_ns - _gw0) / RD_NS_PER_MS,
+                    (nx_stat_dequeue_ns - _dq0) / RD_NS_PER_MS,
+                    (nx_stat_fence_ns - _fn0) / RD_NS_PER_MS);
       }
     }
     if (frame < RD_LOG_FIRST_FRAMES || (frame % RD_LOG_FRAME_EVERY) == 0) debugPrintf("[boot] frame %d rendered\n", frame);
     if (frame == 1) debugPrintf("[input] UnityEngine.Input icalls replaced: %d\n", rd_icall_applied());
+    if (frame == 1 || (frame > 0 && (frame % RD_CLOCK_LOG_FRAMES) == 0)) rd_log_clocks(frame == 1 ? "start" : "running");
     if ((frame % RD_DRIVE_RETRY_FRAMES) == 0) rd_drive_try_install();
     frame++;
     if ((frame % RD_SD_FLUSH_FRAMES) == 0) nx_sd_flush();   /* commit pending saves */

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <strings.h>
 #include "rd_settings.h"
+#include "rd_smoke.h"
 
 static const struct { const char *name; uint64_t bit; } BUTTONS[] = {
   { "A", RD_BTN_A }, { "B", RD_BTN_B }, { "X", RD_BTN_X }, { "Y", RD_BTN_Y },
@@ -18,15 +19,25 @@ typedef enum {
   T_BUTTONS,     /* uint64_t button mask */
   T_SWITCH,      /* int, 0 or 1 */
   T_DEADZONE,    /* float, 0 .. RD_DEADZONE_MAX */
+  T_SMOKE,       /* int percent, RD_SMOKE_PERCENT_MIN .. RD_SMOKE_PERCENT_ORIG */
   T_RESOLUTION,  /* int, auto | 720 | 1080 */
 } type;
+
+/* Range of a numeric type; 1 = float, 2 = int, 0 = not numeric. */
+static int range(type t, float *lo, float *hi) {
+  switch (t) {
+    case T_DEADZONE: *lo = 0.0f; *hi = RD_DEADZONE_MAX; return 1;
+    case T_SMOKE:    *lo = RD_SMOKE_PERCENT_MIN; *hi = RD_SMOKE_PERCENT_ORIG; return 2;
+    default:             return 0;
+  }
+}
 
 typedef struct {
   const char *key;
   type        type;
   size_t      offset, size;   /* the field in rd_settings */
-  const char *help;           /* comment lines above the key ("" = none); for T_DEADZONE a
-                                 printf format taking RD_DEADZONE_MAX */
+  const char *help;           /* comment lines above the key ("" = none); for a numeric type
+                                 a printf format taking its range (double / int, see range()) */
 } setting;
 
 #define F(field) offsetof(rd_settings, field), sizeof(((rd_settings *)0)->field)
@@ -45,7 +56,7 @@ static const setting SETTINGS[] = {
   { "bind_steer_left",  T_BUTTONS, F(binds.steer_left),               "" },
   { "bind_steer_right", T_BUTTONS, F(binds.steer_right),              "" },
   { "stick_deadzone",   T_DEADZONE, F(binds.deadzone),
-    "# left stick deadzone, 0.0 .. %.1f\n" },
+    "# left stick deadzone, %.1f .. %.1f\n" },
   { "bind_pause",       T_BUTTONS, F(pause),
     "# pause / resume the race (also closes the pause menu)\n" },
   { "hide_touch_controls", T_SWITCH, F(hide_touch_controls),
@@ -57,6 +68,12 @@ static const setting SETTINGS[] = {
     "#   Handheld shows 720p anyway; rendering 1080p there costs 2.25x pixels (smoke!).\n" },
   { "boost_loading", T_SWITCH, F(boost_loading),
     "# boost_loading: 1 raises the CPU clock (" RD_BOOST_CPU_MHZ " MHz) while a scene is loading.\n" },
+  { "smoke_size", T_SMOKE, F(smoke_size),
+    "# Heavy tyre smoke is what drops the frame rate (the GPU, not the CPU). Both keys at\n"
+    "# 100 = the original game.\n"
+    "# smoke_size: size of the smoke puffs in percent, %d .. %d (try 50).\n" },
+  { "smoke_amount", T_SMOKE, F(smoke_amount),
+    "# smoke_amount: percent of the smoke puffs that are emitted, %d .. %d (try 50).\n" },
   { "debug_log", T_SWITCH, F(debug_log),
     "# debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,\n"
     "#   stalls, GC and startup lines. The log is buffered either way.\n" },
@@ -134,10 +151,21 @@ static int parse(const setting *st, const char *value, void *field) {
       *(int *)field = v[0] == '1';
       return 0;
     case T_DEADZONE: {
+      float lo, hi;
+      range(st->type, &lo, &hi);
       char *end;
-      float dz = strtof(v, &end);
-      if (end == v || *end || dz < 0.0f || dz > RD_DEADZONE_MAX) return -1;
-      *(float *)field = dz;
+      float x = strtof(v, &end);
+      if (end == v || *end || x < lo || x > hi) return -1;
+      *(float *)field = x;
+      return 0;
+    }
+    case T_SMOKE: {
+      float lo, hi;
+      range(st->type, &lo, &hi);
+      char *end;
+      long x = strtol(v, &end, 10);
+      if (end == v || *end || x < (long)lo || x > (long)hi) return -1;
+      *(int *)field = (int)x;
       return 0;
     }
     case T_RESOLUTION:
@@ -155,6 +183,7 @@ static void format(const setting *st, const void *field, char *buf, size_t n) {
     case T_BUTTONS:  if (rd_format_buttons(*(const uint64_t *)field, buf, n)) snprintf(buf, n, "NONE"); break;
     case T_SWITCH:   snprintf(buf, n, "%d", *(const int *)field ? 1 : 0); break;
     case T_DEADZONE: snprintf(buf, n, "%.2f", (double)*(const float *)field); break;
+    case T_SMOKE:    snprintf(buf, n, "%d", *(const int *)field); break;
     case T_RESOLUTION: {
       int r = *(const int *)field;
       snprintf(buf, n, "%s", r == RD_RES_720 ? "720" : r == RD_RES_1080 ? "1080" : "auto");
@@ -194,8 +223,12 @@ void rd_settings_write(const rd_settings *s, FILE *f) {
   for (int i = 0; i < NSETTINGS; i++) {
     char buf[128];
     format(&SETTINGS[i], (const char *)s + SETTINGS[i].offset, buf, sizeof buf);
-    if (SETTINGS[i].type == T_DEADZONE) fprintf(f, SETTINGS[i].help, (double)RD_DEADZONE_MAX);
-    else                                fputs(SETTINGS[i].help, f);
+    float lo, hi;
+    switch (range(SETTINGS[i].type, &lo, &hi)) {
+      case 1:  fprintf(f, SETTINGS[i].help, (double)lo, (double)hi); break;
+      case 2:  fprintf(f, SETTINGS[i].help, (int)lo, (int)hi); break;
+      default: fputs(SETTINGS[i].help, f);
+    }
     fprintf(f, "%s=%s\n", SETTINGS[i].key, buf);
   }
 }

@@ -214,7 +214,7 @@ DynLibFunction unity_dynlib_functions[] = {
   { "eglGetCurrentContext", (uintptr_t)&eglGetCurrentContext },
   { "eglGetCurrentSurface", (uintptr_t)&eglGetCurrentSurface },
   { "eglGetError", (uintptr_t)&eglGetError },
-  { "eglGetProcAddress", (uintptr_t)&eglGetProcAddress },
+  { "eglGetProcAddress", (uintptr_t)&egl_GetProcAddress_timed },   /* imports.c: times GPU waits */
   { "eglQueryString", (uintptr_t)&eglQueryString },
   { "eglSurfaceAttrib", (uintptr_t)&eglSurfaceAttrib },
   { "eglSwapInterval", (uintptr_t)&eglSwapInterval },

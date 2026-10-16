@@ -24,6 +24,12 @@ hide_touch_controls=1
 render_resolution=auto
 # boost_loading: 1 raises the CPU clock (1785 MHz) while a scene is loading.
 boost_loading=1
+# Heavy tyre smoke is what drops the frame rate (the GPU, not the CPU). Both keys at
+# 100 = the original game.
+# smoke_size: size of the smoke puffs in percent, 10 .. 100 (try 50).
+smoke_size=100
+# smoke_amount: percent of the smoke puffs that are emitted, 10 .. 100 (try 50).
+smoke_amount=100
 # debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,
 #   stalls, GC and startup lines. The log is buffered either way.
 debug_log=0
