@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Porting the Android game **Real Drift** (`com.realdrift.sipon`, Unity 2018.4.14f1, IL2CPP) to Nintendo Switch homebrew. Project notes in `AGENTS.md` are in Russian; communicate with the user in Russian.
+Porting the Android game **Real Drift** (`com.realdrift.sipon`, Unity 2018.4.14f1, IL2CPP) to Nintendo Switch homebrew.
 
-**Chosen approach (A, so-loader):** load the original arm64 `libunity.so` / `libil2cpp.so` / `libmain.so` from the APK into a libnx process and emulate the Android environment with shims (bionic → newlib, NDK, EGL/GLES via switch-mesa, OpenSL ES, fake JNI). The loader is a fork of [badpiggies_nx](https://github.com/ChanseyIsTheBest/badpiggies_nx) (Unity 2020.3 port, MIT lineage). Rewriting the engine is only a fallback. See `analysis/research/02-porting-approach.md`.
+**It uses so-loader approach:** load the original arm64 `libunity.so` / `libil2cpp.so` / `libmain.so` from the APK into a libnx process and emulate the Android environment with shims (bionic → newlib, NDK, EGL/GLES via switch-mesa, OpenSL ES, fake JNI). The loader is a fork of [badpiggies_nx](https://github.com/ChanseyIsTheBest/badpiggies_nx) (Unity 2020.3 port, MIT lineage).
 
 ## Rules
 
