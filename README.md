@@ -13,7 +13,6 @@ Playable: menus, races, sound, controller driving and saving work on hardware.
 Known issues:
 - loading a scene takes a few seconds (the CPU is boosted while loading);
 - heavy smoke can drop the frame rate;
-- on every launch IL2CPP re-extracts its resource files into the game folder.
 
 ## Features
 
@@ -138,8 +137,11 @@ Real Drift and all of its files (code, assets, `.so` libraries, APK, OBB) belong
 | Project | Authors | Used for |
 |---|---|---|
 | [badpiggies_nx](https://github.com/ChanseyIsTheBest/badpiggies_nx) (commit `7726be3`) | ChanseyIsTheBest | the forked base: Unity/IL2CPP loader, fake JNI, libc/NDK shims, OpenSL ES over SDL2, pointer and touch input, fonts, diagnostics |
-| colorsheep_nx, laytonbmr_nx, vln_nx, cr3_nx, zookeeperdx_nx | see their repositories | the so-loader port lineage badpiggies_nx descends from |
-| so-loader (Android game ports to Vita/Switch) | Andy Nguyen (TheFloW), fgsfds, Rinnegatamante | ELF loading and relocation (`so_util.c`), import table (`imports.c`), `util.c`, `error.c` |
+| [cloverpit_nx](https://github.com/ChanseyIsTheBest/cloverpit_nx) | ChanseyIsTheBest | MIT license of the pointer/cursor module (`nx_pointer`, the GL overlay in `rd_overlay_gl.c`), the same code as in badpiggies_nx |
+| [laytonbmr_nx](https://github.com/NaGaa95/laytonbmr_nx) | naga | the stick cursor and its GL overlay, which badpiggies_nx ported |
+| [colorsheep_nx](https://github.com/ChanseyIsTheBest/colorsheep_nx), [zookeeperdx_nx](https://github.com/ChanseyIsTheBest/zookeeperdx_nx) | ChanseyIsTheBest | the so-loader port lineage badpiggies_nx descends from |
+| [vln_nx](https://github.com/NaGaa95/vln_nx), [cr3_nx](https://github.com/NaGaa95/cr3_nx) | naga | the so-loader port lineage badpiggies_nx descends from (cr3_nx: the OpenSL ES shim and fake fds) |
+| so-loader (Android game ports to Vita/Switch): [gtasa_vita](https://github.com/TheOfficialFloW/gtasa_vita), [max_nx](https://github.com/fgsfdsfgs/max_nx) | Andy Nguyen (TheFloW), fgsfds, Rinnegatamante | ELF loading and relocation (`so_util.c`), import table (`imports.c`), `util.c`, `error.c` |
 
 **Libraries linked into the `.nro`** (from devkitPro, not in this repository):
 

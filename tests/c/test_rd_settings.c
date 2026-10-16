@@ -33,7 +33,7 @@ static void test_defaults_put_gears_on_dpad(void) {
   CHECK(b.deadzone == RD_DEADZONE_DEFAULT);
   CHECK(s.pause == RD_BTN_PLUS && s.hide_touch_controls == 1);
   CHECK(s.render_res == RD_RES_AUTO && s.boost_loading == 1);
-  CHECK(s.debug_log == RD_LOG_MINIMAL);
+  CHECK(s.debug_log == RD_LOG_MINIMAL && s.debug_fps_counter == 0);
 }
 
 /* index of `key` in config.txt order */
@@ -67,7 +67,9 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "debug_log", "0") >= 0 && s.debug_log == 0);
   CHECK(rd_settings_set(&s, "debug_log", "full") == -1 && s.debug_log == 0);
   CHECK(rd_settings_set(&s, "language", "fr") == -2);           /* removed option */
-  CHECK(rd_settings_count() == 14 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_set(&s, "debug_fps_counter", "1") == idx("debug_fps_counter") && s.debug_fps_counter == 1);
+  CHECK(rd_settings_set(&s, "debug_fps_counter", "on") == -1 && s.debug_fps_counter == 1);
+  CHECK(rd_settings_count() == 15 && idx("bind_throttle") == 0);
 }
 
 static void test_write_then_read_roundtrip(const char *dir) {
@@ -81,6 +83,7 @@ static void test_write_then_read_roundtrip(const char *dir) {
   in.render_res = RD_RES_720;
   in.boost_loading = 0;
   in.debug_log = RD_LOG_FULL;
+  in.debug_fps_counter = 1;
   FILE *f = fopen(path, "w"); rd_settings_write(&in, f); fclose(f);
 
   rd_settings out = RD_SETTINGS_DEFAULT;

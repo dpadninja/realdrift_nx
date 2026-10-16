@@ -1,7 +1,19 @@
 /* nx_pointer.c -- see nx_pointer.h.
  *
  * Everything pointer-related for a Switch port of an Android game, in one file:
- * touchscreen, USB mouse, stick cursor, and the GL overlay that draws it.
+ * touchscreen, USB mouse and stick cursor. The cursor is drawn through rd_overlay.
+ *
+ * Origin: badpiggies_nx by ChanseyIsTheBest, https://github.com/ChanseyIsTheBest/badpiggies_nx
+ * (commit 7726be3); the same module ships in cloverpit_nx by ChanseyIsTheBest,
+ * https://github.com/ChanseyIsTheBest/cloverpit_nx. The stick cursor and its GL overlay were
+ * ported there from laytonbmr_nx by naga, https://github.com/NaGaa95/laytonbmr_nx.
+ *
+ * Copyright (c) 2026 cloverpit_nx contributors
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ *
+ * Modified for realdrift_nx: the GL drawing moved to rd_overlay_gl.c.
  */
 #include <switch.h>
 #include <GLES2/gl2.h>
@@ -18,6 +30,7 @@
 #include "rd_drive.h"   /* rd_drive_active */
 #include "rd_race.h"    /* rd_race_active */
 #include "rd_platform.h"
+#include "rd_overlay.h"
 
 /* ------------------------------------------------------------------ config */
 
@@ -721,10 +734,6 @@ int   nxp_mouse_connected(void)         { return s_mouse_connected; }
 
 /* ======================= GL overlay ====================================== */
 
-static GLuint s_prog = 0;
-static GLint  s_u_screen, s_u_origin, s_u_scale, s_u_colour, s_u_tex, s_u_use_tex;
-static int    s_gl_failed = 0;
-
 /* Built-in arrow: tip at (0,0), y down, drawn as a fan from the tip. */
 static const GLfloat s_arrow[] = {
    0.0f,  0.0f,   0.0f, 16.0f,   4.0f, 12.0f,   7.0f, 18.0f,
@@ -732,108 +741,8 @@ static const GLfloat s_arrow[] = {
 };
 #define ARROW_VERTS 7
 
-static GLuint mkshader(GLenum t, const char *src) {
-  GLuint s = glCreateShader(t);
-  glShaderSource(s, 1, &src, NULL);
-  glCompileShader(s);
-  GLint ok = 0;
-  glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
-  if (!ok) { glDeleteShader(s); return 0; }
-  return s;
-}
-
-static int gl_init(void) {
-  if (s_prog) return 1;
-  if (s_gl_failed) return 0;
-
-  static const char *vs =
-    "attribute vec2 aPos;\n"
-    "attribute vec2 aUV;\n"
-    "varying vec2 vUV;\n"
-    "uniform vec2 uScreen;\n"
-    "uniform vec2 uOrigin;\n"
-    "uniform float uScale;\n"
-    "void main() {\n"
-    "  vUV = aUV;\n"
-    "  vec2 p = uOrigin + aPos * uScale;\n"
-    "  gl_Position = vec4((p.x/uScreen.x)*2.0-1.0, 1.0-(p.y/uScreen.y)*2.0, 0.0, 1.0);\n"
-    "}\n";
-  static const char *fs =
-    "precision mediump float;\n"
-    "varying vec2 vUV;\n"
-    "uniform vec4 uColour;\n"
-    "uniform sampler2D uTex;\n"
-    "uniform float uUseTex;\n"
-    "void main() {\n"
-    /* Branch on a uniform (uniform control flow -- always safe in GLES2) so the
-     * built-in-arrow path never samples a texture. That means we don't have to
-     * bind or disturb ANY texture state unless a custom cursor.png is in use. */
-    "  if (uUseTex > 0.5) gl_FragColor = texture2D(uTex, vUV);\n"
-    "  else               gl_FragColor = uColour;\n"
-    "}\n";
-
-  GLuint v = mkshader(GL_VERTEX_SHADER, vs), f = mkshader(GL_FRAGMENT_SHADER, fs);
-  if (!v || !f) { s_gl_failed = 1; logf_("nxp: cursor shader compile failed\n"); return 0; }
-
-  GLuint p = glCreateProgram();
-  glAttachShader(p, v);
-  glAttachShader(p, f);
-  glBindAttribLocation(p, 0, "aPos");
-  glBindAttribLocation(p, 1, "aUV");
-  glLinkProgram(p);
-  glDeleteShader(v);
-  glDeleteShader(f);
-
-  GLint ok = 0;
-  glGetProgramiv(p, GL_LINK_STATUS, &ok);
-  if (!ok) { glDeleteProgram(p); s_gl_failed = 1; logf_("nxp: cursor link failed\n"); return 0; }
-
-  s_prog      = p;
-  s_u_screen  = glGetUniformLocation(p, "uScreen");
-  s_u_origin  = glGetUniformLocation(p, "uOrigin");
-  s_u_scale   = glGetUniformLocation(p, "uScale");
-  s_u_colour  = glGetUniformLocation(p, "uColour");
-  s_u_tex     = glGetUniformLocation(p, "uTex");
-  s_u_use_tex = glGetUniformLocation(p, "uUseTex");
-  return 1;
-}
-
-/* A vertex attribute's FULL state. Saving only the enabled flag (as we did at
- * first) is not enough: glVertexAttribPointer also records size/type/stride/
- * pointer AND which ARRAY_BUFFER was bound at the time. The engine sets its
- * attribute pointers once and reuses them across frames, so overwriting slot 0
- * with our arrow array left every subsequent engine draw reading garbage
- * geometry -- 25 draw calls a frame, and a black screen. */
-typedef struct {
-  GLint enabled, size, type, norm, stride, buf;
-  void *ptr;
-} AttribState;
-
-static void attrib_save(GLuint i, AttribState *a) {
-  glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &a->enabled);
-  glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_SIZE, &a->size);
-  glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_TYPE, &a->type);
-  glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_NORMALIZED, &a->norm);
-  glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &a->stride);
-  glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &a->buf);
-  glGetVertexAttribPointerv(i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &a->ptr);
-}
-
-static void attrib_restore(GLuint i, const AttribState *a) {
-  /* glVertexAttribPointer captures whatever ARRAY_BUFFER is bound right now, so
-   * re-bind the attribute's original buffer before restoring its pointer. */
-  glBindBuffer(GL_ARRAY_BUFFER, (GLuint)a->buf);
-  if (a->size > 0)
-    glVertexAttribPointer(i, a->size, (GLenum)a->type,
-                          (GLboolean)(a->norm ? GL_TRUE : GL_FALSE),
-                          a->stride, a->ptr);
-  if (a->enabled) glEnableVertexAttribArray(i);
-  else            glDisableVertexAttribArray(i);
-}
-
 void nxp_draw(void) {
   if (!s_ready || s_visible <= 0) return;
-  if (!gl_init()) return;
 
   /* decode + upload cursor.png on first draw (needs a live GL context) */
   if (!s_png_tried) {
@@ -844,90 +753,23 @@ void nxp_draw(void) {
     }
   }
 
-  /* ---- save every bit of state we touch ---- */
-  AttribState a0, a1;
-  attrib_save(0, &a0);
-  attrib_save(1, &a1);
-
-  GLint prev_prog = 0, prev_buf = 0;
-  GLint bs_rgb = 0, bd_rgb = 0, bs_a = 0, bd_a = 0;
-  glGetIntegerv(GL_CURRENT_PROGRAM, &prev_prog);
-  glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prev_buf);
-  glGetIntegerv(GL_BLEND_SRC_RGB, &bs_rgb);
-  glGetIntegerv(GL_BLEND_DST_RGB, &bd_rgb);
-  glGetIntegerv(GL_BLEND_SRC_ALPHA, &bs_a);
-  glGetIntegerv(GL_BLEND_DST_ALPHA, &bd_a);
-  const GLboolean was_blend   = glIsEnabled(GL_BLEND);
-  const GLboolean was_depth   = glIsEnabled(GL_DEPTH_TEST);
-  const GLboolean was_cull    = glIsEnabled(GL_CULL_FACE);
-  const GLboolean was_scissor = glIsEnabled(GL_SCISSOR_TEST);
-
-  glDisable(GL_DEPTH_TEST);
-  glDisable(GL_CULL_FACE);
-  glDisable(GL_SCISSOR_TEST);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);   /* honours PNG alpha */
-
-  glUseProgram(s_prog);
-  glUniform2f(s_u_screen, (GLfloat)s_cfg.screen_w, (GLfloat)s_cfg.screen_h);
-  glUniform2f(s_u_origin, s_cx, s_cy);
+  if (!rd_overlay_begin(s_cfg.screen_w, s_cfg.screen_h)) return;
 
   if (s_cursor_tex) {
     /* ---- custom PNG: textured quad, hotspot at the top-left ---- */
     const GLfloat w = (GLfloat)s_cursor_w, h = (GLfloat)s_cursor_h;
     const GLfloat quad[] = { 0,0,  w,0,  0,h,  w,h };
     const GLfloat uv[]   = { 0,0,  1,0,  0,1,  1,1 };
-
-    /* Texture units: read the ACTIVE unit first, then switch to unit 0 and read
-     * ITS binding. (Reading GL_TEXTURE_BINDING_2D before switching gives you the
-     * active unit's binding, and restoring that onto unit 0 corrupts unit 0.) */
-    GLint prev_active = 0, tex0 = 0;
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &prev_active);
-    glActiveTexture(GL_TEXTURE0);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);                  /* client-side arrays */
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, quad);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, uv);
-
-    glBindTexture(GL_TEXTURE_2D, s_cursor_tex);
-    glUniform1i(s_u_tex, 0);
-    glUniform1f(s_u_use_tex, 1.0f);
-    glUniform1f(s_u_scale, (GLfloat)s_cfg.screen_h / 1080.0f);
-    glUniform4f(s_u_colour, 1, 1, 1, 1);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-    glBindTexture(GL_TEXTURE_2D, (GLuint)tex0);        /* restore unit 0 */
-    glActiveTexture((GLenum)prev_active);              /* then the active unit */
+    rd_overlay_textured(RD_OVERLAY_STRIP, s_cursor_tex, quad, uv, 4,
+                        s_cx, s_cy, (GLfloat)s_cfg.screen_h / 1080.0f);
   } else {
     /* ---- built-in arrow: solid colour, no texture touched at all ---- */
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, s_arrow);
-    glUniform1f(s_u_use_tex, 0.0f);                    /* shader will not sample */
-
     const GLfloat sc = 2.4f * ((GLfloat)s_cfg.screen_h / 1080.0f);
-    glUniform1f(s_u_scale, sc * 1.22f);
-    glUniform4f(s_u_colour, 0.0f, 0.0f, 0.0f, 0.85f);  /* outline */
-    glDrawArrays(GL_TRIANGLE_FAN, 0, ARROW_VERTS);
-
-    glUniform1f(s_u_scale, sc);
-    glUniform4f(s_u_colour, 1.0f, 1.0f, 1.0f, 1.0f);   /* fill */
-    glDrawArrays(GL_TRIANGLE_FAN, 0, ARROW_VERTS);
+    rd_overlay_solid(RD_OVERLAY_FAN, s_arrow, ARROW_VERTS, s_cx, s_cy, sc * 1.22f,
+                     0.0f, 0.0f, 0.0f, 0.85f);                              /* outline */
+    rd_overlay_solid(RD_OVERLAY_FAN, s_arrow, ARROW_VERTS, s_cx, s_cy, sc,
+                     1.0f, 1.0f, 1.0f, 1.0f);                               /* fill */
   }
 
-  /* ---- restore ----
-   * Attributes first (each re-binds its own source buffer), then put the global
-   * ARRAY_BUFFER binding back, then the program and the fixed-function bits. */
-  attrib_restore(0, &a0);
-  attrib_restore(1, &a1);
-  glBindBuffer(GL_ARRAY_BUFFER, (GLuint)prev_buf);
-  glUseProgram((GLuint)prev_prog);
-  glBlendFuncSeparate((GLenum)bs_rgb, (GLenum)bd_rgb, (GLenum)bs_a, (GLenum)bd_a);
-  if (!was_blend) glDisable(GL_BLEND); else glEnable(GL_BLEND);
-  if (was_depth)   glEnable(GL_DEPTH_TEST);
-  if (was_cull)    glEnable(GL_CULL_FACE);
-  if (was_scissor) glEnable(GL_SCISSOR_TEST);
+  rd_overlay_end();
 }

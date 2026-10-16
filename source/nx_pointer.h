@@ -1,8 +1,21 @@
 /* nx_pointer.h -- reusable pointer input + on-screen cursor for Switch ports of
  * Android games.
  *
- * Self-contained: owns the pad, the touchscreen, a USB mouse, a stick-driven
- * virtual cursor, and the GL overlay that draws it. Drop nx_pointer.{c,h} into
+ * Origin: badpiggies_nx by ChanseyIsTheBest, https://github.com/ChanseyIsTheBest/badpiggies_nx
+ * (commit 7726be3); the same module ships in cloverpit_nx by ChanseyIsTheBest,
+ * https://github.com/ChanseyIsTheBest/cloverpit_nx. The stick cursor and its GL overlay were
+ * ported there from laytonbmr_nx by naga, https://github.com/NaGaa95/laytonbmr_nx.
+ *
+ * Copyright (c) 2026 cloverpit_nx contributors
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ *
+ * Modified for realdrift_nx: the GL drawing moved to rd_overlay (rd_overlay.h).
+ *
+ * Owns the pad, the touchscreen, a USB mouse and a stick-driven virtual cursor;
+ * the cursor is drawn through rd_overlay (rd_overlay.h, rd_overlay_gl.c). Drop
+ * nx_pointer.{c,h} and rd_overlay* into
  * any so-loader style port, call nxp_init() once, nxp_update() per frame,
  * nxp_poll() to drain events, and nxp_draw() right before eglSwapBuffers().
  *

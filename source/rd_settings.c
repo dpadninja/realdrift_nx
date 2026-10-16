@@ -60,6 +60,9 @@ static const setting SETTINGS[] = {
   { "debug_log", T_SWITCH, F(debug_log),
     "# debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,\n"
     "#   stalls, GC and startup lines. The log is buffered either way.\n" },
+  { "debug_fps_counter", T_SWITCH, F(debug_fps_counter),
+    "# debug_fps_counter: 1 shows frames per second and the slowest frame (ms) of the last\n"
+    "#   half second in the top-left corner.\n" },
 };
 #define NSETTINGS ((int)(sizeof SETTINGS / sizeof SETTINGS[0]))
 

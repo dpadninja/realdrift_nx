@@ -37,6 +37,8 @@ extern int z_strncasecmp(const char *, const char *, unsigned long);  /* NULL-sa
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include "nx_pointer.h"
+#include "rd_fps.h"
+#include "rd_platform.h"
 #include <switch.h>
 #include "diag.h"
 
@@ -489,10 +491,33 @@ static EGLBoolean egl_DestroySurface_keep(EGLDisplay d, EGLSurface s) {
 }
 
 
+/* config.txt debug_fps_counter: frame rate of the presented frames, top-left. The text is
+ * laid out again only when rd_fps publishes a new value (twice a second). */
+static void fps_overlay_draw(void) {
+  static rd_fps fps = RD_FPS_INIT;
+  static rd_rect glyphs[RD_OVERLAY_MAX_RECTS], panel;
+  static int nglyphs = -1;
+  if (rd_fps_frame(&fps, rd_now_ns(), RD_FPS_WINDOW_NS) || nglyphs < 0) {
+    char text[32];
+    rd_fps_format(&fps, text, sizeof text);
+    const float px = 3.0f * (float)screen_height / 720.0f;   /* 3 px at 720p, 4.5 at 1080p */
+    const float pad = px, margin = 2.0f * px;
+    panel = (rd_rect){ margin, margin, rd_fps_text_width(text, px) + 2.0f * pad,
+                       RD_FPS_GLYPH_H * px + 2.0f * pad };
+    nglyphs = rd_fps_layout(text, margin + pad, margin + pad, px, glyphs,
+                            (int)(sizeof glyphs / sizeof glyphs[0]));
+  }
+  if (!rd_overlay_begin(screen_width, screen_height)) return;
+  rd_overlay_rects(&panel, 1, 0.0f, 0.0f, 0.0f, 0.6f);
+  rd_overlay_rects(glyphs, nglyphs, 1.0f, 1.0f, 0.2f, 1.0f);
+  rd_overlay_end();
+}
+
 static EGLBoolean egl_SwapBuffers_log(EGLDisplay d, EGLSurface s) {
   /* Re-assert the nwindow transform for the first few frames while mesa settles its swapchain. */
   static unsigned frame = 0;
   if (frame < 5) { frame++; nx_window_reassert(); }
+  if (config.debug_fps_counter) fps_overlay_draw();
   nxp_draw();   /* on-screen cursor overlay; saves/restores all GL state */
   return eglSwapBuffers(d, s);
 }

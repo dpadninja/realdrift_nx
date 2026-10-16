@@ -27,3 +27,6 @@ boost_loading=1
 # debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,
 #   stalls, GC and startup lines. The log is buffered either way.
 debug_log=0
+# debug_fps_counter: 1 shows frames per second and the slowest frame (ms) of the last
+#   half second in the top-left corner.
+debug_fps_counter=0

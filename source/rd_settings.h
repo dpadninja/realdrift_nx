@@ -45,6 +45,7 @@ typedef struct {
   int         render_res;            /* RD_RES_AUTO / RD_RES_720 / RD_RES_1080 (rd_perf.h) */
   int         boost_loading;         /* 1: CPU boost while a loading frame runs (rd_perf.h) */
   int         debug_log;             /* RD_LOG_FULL / RD_LOG_MINIMAL (rd_log.h) */
+  int         debug_fps_counter;     /* 1: FPS overlay in the top-left corner (rd_fps.h) */
 } rd_settings;
 
 #define RD_SETTINGS_DEFAULT {                                         \
@@ -61,7 +62,8 @@ typedef struct {
   .hide_touch_controls = 1,                                           \
   .render_res = RD_RES_AUTO,                                          \
   .boost_loading = 1,                                                 \
-  .debug_log = RD_LOG_MINIMAL,                                           \
+  .debug_log = RD_LOG_MINIMAL,                                        \
+  .debug_fps_counter = 0,                                             \
 }
 
 /* Parses a button list. Returns 0 and *out on success, -1 on an unknown name. */

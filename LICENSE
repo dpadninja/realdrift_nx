@@ -4,10 +4,22 @@ Copyright (c) 2026 dpadninja (realdrift_nx) contributors
 
 Forked from badpiggies_nx by ChanseyIsTheBest
 (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3), which
-derives from the SoLoader lineage (colorsheep_nx, laytonbmr_nx, vln_nx) and
-from so-loader by Andy Nguyen (TheFloW), fgsfds and Rinnegatamante, all
-MIT-licensed; those files retain their upstream copyright notices. License
+derives from the SoLoader lineage (colorsheep_nx by ChanseyIsTheBest,
+https://github.com/ChanseyIsTheBest/colorsheep_nx; laytonbmr_nx and vln_nx by
+naga, https://github.com/NaGaa95/laytonbmr_nx, https://github.com/NaGaa95/vln_nx)
+and from so-loader by Andy Nguyen (TheFloW,
+https://github.com/TheOfficialFloW/gtasa_vita), fgsfds
+(https://github.com/fgsfdsfgs/max_nx) and Rinnegatamante, all MIT-licensed; those files retain their upstream copyright notices. License
 text below follows the sibling project cloverpit_nx by the same author.
+
+The pointer/cursor module (source/nx_pointer.c, source/nx_pointer.h) and the
+GL overlay code moved from it into source/rd_overlay_gl.c come from
+badpiggies_nx and cloverpit_nx by ChanseyIsTheBest
+(https://github.com/ChanseyIsTheBest/cloverpit_nx); the cursor was ported
+there from laytonbmr_nx by naga (https://github.com/NaGaa95/laytonbmr_nx).
+They are used under cloverpit_nx's MIT license, with the same terms as below:
+
+  Copyright (c) 2026 cloverpit_nx contributors
 
 This project contains NO game code or assets. Real Drift is (c) its
 respective owners and is not covered by this license.

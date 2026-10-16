@@ -25,6 +25,7 @@ static inline uint64_t rd_now_ns(void) {
 #define RD_LOG_FRAME_EVERY      120   /* ... and then every 2 s                           */
 #define RD_DRIVE_RETRY_FRAMES   30    /* retry the il2cpp hooks until the game is loaded  */
 #define RD_SD_FLUSH_FRAMES      120   /* commit pending SD writes (saves) ~every 2 s      */
+#define RD_FPS_WINDOW_NS        (RD_NS_PER_S / 2)  /* FPS overlay refresh (rd_fps.h) */
 /* A per-frame hook that ran within this many frames counts as "active" (in a race). */
 #define RD_ACTIVE_WINDOW_FRAMES 10u
 
