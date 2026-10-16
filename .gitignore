@@ -1,0 +1,14 @@
+/original
+/analysis
+/build
+*.nro
+*.nacp
+*.elf
+*.map
+/sd
+__pycache__/
+.pytest_cache/
+.idea
+.venv
+/build-host
+/dist

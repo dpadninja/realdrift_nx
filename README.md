@@ -1,0 +1,154 @@
+# realdrift_nx
+
+A Nintendo Switch homebrew loader that runs the **original Android build of [Real Drift](https://play.google.com/store/apps/details?id=com.realdrift.sipon)** (Unity 2018.4, IL2CPP) natively on the console.
+
+It does not emulate a phone and does not reimplement the game. The game's own arm64 libraries (`libunity.so`, `libil2cpp.so`, `libmain.so`) are loaded into a libnx process, and the Android environment they expect is provided by shims: bionic → newlib, the NDK, EGL/GLES via switch-mesa, OpenSL ES for FMOD audio, and a fake JNI/Java layer.
+
+> **This repository contains no game code or assets.** You need your own copy of Real Drift. The loader reads it from the original APK and OBB on your SD card.
+
+## Status
+
+Playable: menus, races, sound, controller driving and saving work on hardware.
+
+Known issues:
+- loading a scene takes a few seconds (the CPU is boosted while loading);
+- heavy smoke can drop the frame rate;
+- on every launch IL2CPP re-extracts its resource files into the game folder.
+
+## Features
+
+- **Controller driving.** Physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
+- **Pause** on a button (`+` by default).
+- **Touch driving controls hidden** during races (optional).
+- **Menus:** use the touchscreen, a USB mouse, or the on-screen cursor (`+` toggles it outside a race, the left stick moves it, `A` taps, `-` toggles gyro pointing).
+- **Render resolution:** 720p handheld / 1080p docked by default, or fixed.
+- **Saves** are stored on the SD card (`prefs.kv` next to the game).
+- No per-version offsets: engine patch sites are found at runtime by instruction patterns, and game classes are found by name through the IL2CPP API.
+
+## Supported game version
+
+| | |
+|---|---|
+| Game | Real Drift (full version), package `com.realdrift.sipon` |
+| Version | **5.0.8**, versionCode **76**, arm64-v8a |
+| Files | `base.apk` + `main.76.com.realdrift.sipon.obb` (~230 MB) |
+
+Other versions do not work as is. Real Drift Lite (`com.realdriftportnew.sipon`) is not supported. The version is defined in one place, [`source/rd_game.h`](source/rd_game.h).
+
+## Installing
+
+You need a Switch with homebrew (Homebrew Menu), a PC with Python 3.8+, and Real Drift **5.0.8** installed on an Android phone and started at least once (the first start downloads the OBB).
+
+**1. Download** `realdrift_nx-vX.Y.Z.zip` from [Releases](../../releases) and unpack it. It contains `realdrift_nx.nro`, `stage_sd.py` and `config.example.txt`.
+
+**2. Copy two files from the phone** into the unpacked folder:
+
+| File | Location on the phone |
+|---|---|
+| `base.apk` | `/data/app/…/com.realdrift.sipon-…/base.apk` (`adb shell pm path com.realdrift.sipon` prints the exact path) |
+| `main.76.com.realdrift.sipon.obb` | `/sdcard/Android/obb/com.realdrift.sipon/main.76.com.realdrift.sipon.obb` |
+
+With [adb](https://developer.android.com/tools/releases/platform-tools) and USB debugging enabled: `adb pull <path> .`
+
+**3. Run the script** in that folder:
+
+```sh
+python3 stage_sd.py base.apk main.76.com.realdrift.sipon.obb
+```
+
+It checks that both files are the supported version, takes the three game libraries out of the APK and creates `switch/realdrift_nx/`:
+
+```
+switch/realdrift_nx/
+├── realdrift_nx.nro
+├── libmain.so  libunity.so  libil2cpp.so
+├── base.apk
+└── main.76.com.realdrift.sipon.obb
+```
+
+**4. Copy the `switch` folder to the root of the SD card** and start *Real Drift* from the Homebrew Menu in title-takeover mode (hold `R` while starting any game). Applet mode (from the Album) has not been tested and most likely does not give the game enough memory.
+
+## Controls and configuration
+
+`config.txt` is created in the game folder on first launch. See [`config.example.txt`](config.example.txt) for every key, its default and a description.
+
+| Action | Default |
+|---|---|
+| Throttle / Brake | `ZR` / `ZL` |
+| Steering | left stick (or `LEFT` / `RIGHT`) |
+| Handbrake | `B` |
+| Gear up / down | D-pad `UP` / `DOWN` |
+| Camera | `Y` |
+| Pause | `+` |
+
+A binding accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN LEFT RIGHT LSTICK RSTICK`, comma separated, or `NONE`. Other keys:
+
+| Key | Values | Meaning |
+|---|---|---|
+| `stick_deadzone` | `0.0`–`0.9` | left stick deadzone |
+| `hide_touch_controls` | `0` / `1` | hide the on-screen driving buttons in races |
+| `render_resolution` | `auto` / `720` / `1080` | `auto` = 720p handheld, 1080p docked |
+| `boost_loading` | `0` / `1` | raise the CPU clock while a scene loads |
+| `debug_log` | `0` / `1` | `1` = full `debug.log` for bug reports; `0` (default) = only crashes, stalls and startup |
+
+When reporting a problem, set `debug_log=1`, reproduce it and attach `sdmc:/switch/realdrift_nx/debug.log`.
+
+## Building
+
+The build uses the official devkitPro Docker image, which already contains every library needed (libnx, switch-mesa, SDL2, libpng, zlib):
+
+```sh
+docker run --rm -u $(id -u):$(id -g) -v ./:/project -w /project devkitpro/devkita64:latest make
+# -> realdrift_nx.nro
+uv run python tools/stage_sd.py original/base.apk original/main.76.com.realdrift.sipon.obb \
+    --nro realdrift_nx.nro --out sd/switch/realdrift_nx      # SD folder from a source build
+```
+
+## Development
+
+```sh
+make test             # all unit tests: Python tools + host-side C tests (ASan/UBSan)
+make tools            # build-host/find_patch_sites: run the loader's pattern finders on .so files
+make config-example   # regenerate config.example.txt from the settings table
+```
+
+These targets need a host C compiler and uv, not devkitPro. Tests that need extracted game libraries in `analysis/` are skipped when those are missing.
+
+| Path | Contents |
+|---|---|
+| `source/` | the loader. Our modules are `rd_*`. Named values live in one place: `rd_game.h` (game identity and files), `rd_game_symbols.h` (C# names), `rd_platform.h`, `rd_device.h`, `rd_settings.c` (config keys) |
+| `tools/` | `stage_sd.py`, `release.py` (release package), `game.py`, `import_coverage.py`, `jni_natives.py`, `il2cpp_symbolize.py`, `find_patch_sites.c` |
+| `.github/workflows/release.yml` | on a `vX.Y.Z` tag: builds the `.nro`, runs the tests, publishes the release zip |
+| `tests/` | pytest suite; `tests/c/` host-side C unit tests |
+
+Game files (`original/`, `analysis/`, `sd/`) are git-ignored. Never commit them.
+
+To publish a release, push a version tag: `git tag v1.0.0 && git push origin v1.0.0`.
+
+## License
+
+The loader is released under the **MIT License**, see [LICENSE](LICENSE). Files that come from other projects keep their original copyright notices (also MIT).
+
+Real Drift and all of its files (code, assets, `.so` libraries, APK, OBB) belong to their respective owners. They are not covered by this license, are not included here, and must not be redistributed. This project is not affiliated with or endorsed by the developers of Real Drift or by Nintendo.
+
+## Credits
+
+**Loader base** (code included in `source/`, MIT):
+
+| Project | Authors | Used for |
+|---|---|---|
+| [badpiggies_nx](https://github.com/ChanseyIsTheBest/badpiggies_nx) (commit `7726be3`) | ChanseyIsTheBest | the forked base: Unity/IL2CPP loader, fake JNI, libc/NDK shims, OpenSL ES over SDL2, pointer and touch input, fonts, diagnostics |
+| colorsheep_nx, laytonbmr_nx, vln_nx, cr3_nx, zookeeperdx_nx | see their repositories | the so-loader port lineage badpiggies_nx descends from |
+| so-loader (Android game ports to Vita/Switch) | Andy Nguyen (TheFloW), fgsfds, Rinnegatamante | ELF loading and relocation (`so_util.c`), import table (`imports.c`), `util.c`, `error.c` |
+
+**Libraries linked into the `.nro`** (from devkitPro, not in this repository):
+
+| Library | License |
+|---|---|
+| [libnx](https://github.com/switchbrew/libnx) ([devkitPro](https://devkitpro.org)) | ISC |
+| [Mesa](https://mesa3d.org) for Switch (GLES/EGL), libdrm_nouveau | MIT |
+| [SDL2](https://libsdl.org) | zlib |
+| [libpng](http://www.libpng.org) | libpng license |
+| [zlib](https://zlib.net) | zlib |
+
+**Development tools** (not part of the build): [pyelftools](https://github.com/eliben/pyelftools), [UnityPy](https://github.com/K0lb3/UnityPy), [pytest](https://pytest.org), [uv](https://github.com/astral-sh/uv), and [Il2CppDumper](https://github.com/Perfare/Il2CppDumper) for research.

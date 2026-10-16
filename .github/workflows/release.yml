@@ -1,0 +1,55 @@
+# Builds realdrift_nx and publishes a release when a version tag (v1.2.3) is pushed:
+#   git tag v1.0.0 && git push origin v1.0.0
+# The release contains realdrift_nx.nro, stage_sd.py (prepares the SD folder from the user's
+# own APK + OBB) and config.example.txt. No game files are involved at any point.
+name: release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+
+jobs:
+  nro:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build realdrift_nx.nro
+        run: make APP_VERSION="${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nro
+          path: realdrift_nx.nro
+          if-no-files-found: error
+
+  release:
+    needs: nro
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: nro
+      - name: Tests
+        run: |
+          sudo apt-get install -y --no-install-recommends zlib1g-dev
+          uv run pytest -q
+      - name: Package
+        run: |
+          name="realdrift_nx-${GITHUB_REF_NAME}"
+          uv run python -m tools.release realdrift_nx.nro "dist/${name}"
+          (cd dist && zip -r "${name}.zip" "${name}")
+          echo "NAME=${name}" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: dist/${{ env.NAME }}/
+          if-no-files-found: error
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ env.NAME }}.zip
+          generate_release_notes: true

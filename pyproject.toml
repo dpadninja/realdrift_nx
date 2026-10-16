@@ -1,0 +1,17 @@
+[project]
+name = "ndrift"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "pyelftools>=0.33",
+    "unitypy>=1.25.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

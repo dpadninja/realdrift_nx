@@ -1,0 +1,29 @@
+# Real Drift (realdrift_nx) config
+
+# Driving controls (only while a car is driven; menus use touch / the cursor).
+# One or more of: A B X Y L R ZL ZR PLUS MINUS UP DOWN LEFT RIGHT LSTICK RSTICK,
+# separated by commas; NONE to unbind. The left stick always steers.
+bind_throttle=ZR
+bind_brake=ZL
+bind_handbrake=B
+bind_gear_up=UP
+bind_gear_down=DOWN
+bind_camera=Y
+bind_steer_left=LEFT
+bind_steer_right=RIGHT
+# left stick deadzone, 0.0 .. 0.9
+stick_deadzone=0.15
+# pause / resume the race (also closes the pause menu)
+bind_pause=PLUS
+# 1 hides the on-screen steering/throttle/brake/handbrake/gear buttons in races
+hide_touch_controls=1
+
+# Performance.
+# render_resolution: auto = 720 handheld / 1080 docked (picked at launch), or 720 / 1080.
+#   Handheld shows 720p anyway; rendering 1080p there costs 2.25x pixels (smoke!).
+render_resolution=auto
+# boost_loading: 1 raises the CPU clock (1785 MHz) while a scene is loading.
+boost_loading=1
+# debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,
+#   stalls, GC and startup lines. The log is buffered either way.
+debug_log=0
