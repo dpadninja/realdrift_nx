@@ -3,6 +3,8 @@
 #include "check.h"
 #include "rd_overlay.h"
 
+/* Each rectangle becomes two triangles covering exactly its corners, in the order the GL draw
+ * expects. */
 static void test_rect_to_two_triangles(void) {
   const rd_rect r[2] = { { 10, 20, 3, 4 }, { 0, 0, 1, 1 } };
   float v[2 * RD_OVERLAY_RECT_FLOATS] = {0};
@@ -12,6 +14,8 @@ static void test_rect_to_two_triangles(void) {
   CHECK(v[RD_OVERLAY_RECT_FLOATS + 8] == 1 && v[RD_OVERLAY_RECT_FLOATS + 9] == 1);  /* 2nd rect, far corner */
 }
 
+/* At most `max` rectangles are converted, nothing is written past the buffer, and zero or
+ * negative counts convert nothing. */
 static void test_capped_at_max(void) {
   const rd_rect r[3] = { { 0, 0, 1, 1 }, { 5, 5, 1, 1 }, { 9, 9, 1, 1 } };
   float v[3 * RD_OVERLAY_RECT_FLOATS];

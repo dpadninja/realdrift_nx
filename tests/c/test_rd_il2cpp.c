@@ -4,6 +4,8 @@
 #include "check.h"
 #include "rd_il2cpp.h"
 
+/* The vtable slot is found only as the full {methodPtr, method} pair (another method sharing
+ * the code pointer is not a match), never past the scanned length or for NULL inputs. */
 static void test_find_vtable_slot(void) {
   uint64_t klass[16] = {0};
   klass[3] = 0x7a09f8;           /* a different method using the same code: not a match */
@@ -27,6 +29,8 @@ static int fake_lookup(void *ctx, const char *name, uint32_t *off) {
 }
 
 
+/* Field offsets resolve all-or-nothing: one renamed field (a new game build) leaves the output
+ * untouched so the hook stays off instead of writing at a wrong offset. */
 static void test_resolve_fields(void) {
   const char *const ok[] = { "raceManager", "pausePanel" };
   uint32_t out[2] = { 7, 7 };
@@ -72,6 +76,8 @@ static void *fake_sym(void *ctx, const char *name) {
 static int g_missing_calls;
 static void on_missing(const char *name) { (void)name; g_missing_calls++; }
 
+/* The API table reports each missing il2cpp export, and the class/field helpers work with the
+ * functions that were found and return NULL/0 when the API is absent. */
 static void test_load_and_helpers(void) {
   rd_il2cpp_api api;
   int missing = rd_il2cpp_load(&api, fake_sym, NULL, on_missing);
@@ -96,6 +102,8 @@ typedef struct { int32_t len; uint16_t ch[16]; } FakeStr;
 static int32_t f_str_len(void *s) { return ((FakeStr *)s)->len; }
 static const uint16_t *f_str_chars(void *s) { return ((FakeStr *)s)->ch; }
 
+/* Managed strings compare exactly with ASCII names: case, length and non-ASCII characters all
+ * matter, and a missing API or NULL string is unequal rather than a crash. */
 static void test_str_eq(void) {
   rd_il2cpp_api api = {0};
   FakeStr smoke = { 9, { 'S','k','i','d','S','m','o','k','e' } };
@@ -121,6 +129,8 @@ static void *f_nested(void *outer, void **iter) {
 }
 static const char *f_class_name(void *k) { return *(const char *const *)k; }
 
+/* Nested classes (ParticleSystem/Particle) are found by name through the iterator; a missing
+ * name, outer class or API gives NULL. */
 static void test_nested_class(void) {
   rd_il2cpp_api api = {0};
   int outer;
@@ -132,6 +142,7 @@ static void test_nested_class(void) {
   CHECK(rd_il2cpp_nested_class(&api, NULL, "Particle") == NULL);
 }
 
+/* Element i of a managed array is read past the array header at RD_IL2CPP_ARRAY_DATA. */
 static void test_array_at(void) {
   int a, b;
   struct { char hdr[RD_IL2CPP_ARRAY_DATA]; void *data[2]; } arr = { {0}, { &a, &b } };

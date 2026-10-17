@@ -13,12 +13,18 @@ from tools.release import build, main, standalone_stage_sd
 
 
 def test_identity_block_is_replaced_by_literals():
+    """The released stage_sd.py contains the game identity as literals and no import of the
+    repository's tools package.
+    """
     src = standalone_stage_sd()
     assert "tools.game" not in src and "sys.path.insert" not in src
     assert repr(GAME.build_id) in src and repr(GAME.package) in src
 
 
 def test_released_script_runs_standalone(tmp_path: Path):
+    """The release folder holds exactly the .nro, stage_sd.py and config.example.txt, and the
+    script runs in isolated Python (no repository, no packages), as on a player's PC.
+    """
     nro = tmp_path / "realdrift_nx.nro"
     nro.write_bytes(b"NRO")
     rel = tmp_path / "release"
@@ -48,6 +54,7 @@ def test_released_script_runs_standalone(tmp_path: Path):
 
 
 def test_command_line(tmp_path: Path, capsys):
+    """The command line builds the release folder and says where."""
     nro = tmp_path / "realdrift_nx.nro"
     nro.write_bytes(b"NRO")
     assert main([str(nro), str(tmp_path / "out")]) == 0

@@ -10,6 +10,8 @@ static const rd_sigw PAT[] = {
   RD_SIG_ADD(0, 0),              /* add x0, x0, #<any> */
 };
 
+/* Patterns ignore immediates and branch offsets, so the same pattern matches both releases,
+ * whose code differs only in addresses. */
 static void test_masks_ignore_immediates(void) {
   const uint32_t code[] = { 0xd503201f, 0x7100401f, 0x5400032b, 0xf0004540, 0x91124000, 0xd503201f };
   size_t at = 99;
@@ -18,6 +20,8 @@ static void test_masks_ignore_immediates(void) {
   CHECK(rd_sig_scan(other_imm, 4, PAT, 4, &at) == 1 && at == 0);
 }
 
+/* Opcodes, condition codes and registers are still compared: b.ge or adrp x1 must not match a
+ * pattern for b.lt / adrp x0. */
 static void test_masks_keep_opcode_and_registers(void) {
   size_t at;
   const uint32_t wrong_cond[] = { 0x7100401f, 0x5400032a, 0xf0004540, 0x91124000 };   /* b.ge */
@@ -26,6 +30,8 @@ static void test_masks_keep_opcode_and_registers(void) {
   CHECK(rd_sig_scan(wrong_reg, 4, PAT, 4, &at) == 0);
 }
 
+/* The scan counts every match (callers require exactly one), returns the first, never reads
+ * past the code, and handles NULL code. */
 static void test_counts_duplicates_and_bounds(void) {
   const uint32_t twice[] = { 0x7100401f, 0x5400032b, 0xf0004540, 0x91124000,
                              0x7100401f, 0x5400032b, 0xf0004540, 0x91124000 };

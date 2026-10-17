@@ -35,7 +35,8 @@ checklist below is what reviews catch most often.
 
 ## Before you finish
 
-- New pure module → `tests/c/test_<module>.c` with `/* sources: ... */` on line 1.
+- New pure module → `tests/c/test_<module>.c` with `/* sources: ... */` on line 1; a comment
+  above every test function: the case it checks and why it matters.
 - `make test` (host, ASan/UBSan, `-Werror`), the devkitPro build (`-Werror`), `make coverage` above
   the threshold, `uv run python -m tools.doc_check` clean.
 - A new `config.txt` key goes into the `rd_settings.c` table; run `make config-example`.

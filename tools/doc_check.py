@@ -5,6 +5,8 @@
 2. Every function declared in a header under source/ has a comment right above it. A comment
    may cover a group: declarations that follow it on consecutive lines (no blank line) count
    as documented.
+3. Every test function in tests/c/ (test_*) has a comment right above it: the case it checks
+   and why. (Python tests: ruff's docstring rules.)
 
     python -m tools.doc_check            # whole repository
     python -m tools.doc_check source/game/rd_smoke.h
@@ -115,12 +117,31 @@ def check_header_functions(path: Path, text: str) -> list[Problem]:
     return problems
 
 
+TEST_FUNC = re.compile(r"^(?:static\s+)?\w+\s+(test_\w+)\s*\(")
+
+
+def check_test_functions(path: Path, text: str) -> list[Problem]:
+    """A problem for each C test function without a comment directly above it."""
+    problems: list[Problem] = []
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        m = TEST_FUNC.match(line)
+        if not m or line.rstrip().endswith(";"):
+            continue
+        prev = lines[i - 1].strip() if i else ""
+        if not (prev.endswith("*/") or prev.startswith("//")):
+            problems.append(Problem(path, i + 1, f"{m.group(1)}: test without a description"))
+    return problems
+
+
 def check_file(path: Path) -> list[Problem]:
     """All documentation problems of one file."""
     text = path.read_text(errors="replace")
     problems = check_license(path, text) if is_code(path) else []
     if path.suffix == ".h" and "source" in path.parts:
         problems += check_header_functions(path, text)
+    if path.suffix == ".c" and path.name.startswith("test_") and "tests" in path.parts:
+        problems += check_test_functions(path, text)
     return problems
 
 

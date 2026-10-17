@@ -78,5 +78,13 @@ Code forked from other projects follows them where we touch it.
 
 - Every new pure module gets `tests/c/test_<module>.c`; its first line lists the sources it links:
   `/* sources: source/game/rd_smoke.c */`. Python tools get pytest tests in `tests/`.
+- **Every test function has a comment** saying which case it checks and why that case matters
+  (the bug it guards against, the contract it pins down, the log line that motivated it):
+  ```c
+  /* 50 % keeps exactly every second puff, not bursts: an uneven filter would make the smoke
+   * flicker in clumps. */
+  static void test_keep(void) {
+  ```
+  `tools/doc_check.py` enforces it for `tests/c/`; ruff's docstring rules for Python tests.
 - `make test` runs everything (with ASan/UBSan for C), `make lint` checks the Python; `make coverage` reports line coverage of the
   host-testable sources and of `tools/`, and CI fails below the recorded threshold.

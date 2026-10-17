@@ -14,6 +14,7 @@ STRINGS = Segment(
 
 
 def addr(s: bytes) -> int:
+    """Virtual address of a NUL-terminated string in the fake string segment."""
     return STRINGS.vaddr + STRINGS.data.index(s + b"\0")
 
 
@@ -23,20 +24,28 @@ BAD, JUNK = addr(b"\xff\xfe"), addr(b"junk")
 
 
 def test_read_cstr():
+    """C strings are read from the segment that contains the address."""
     assert read_cstr([STRINGS], INIT_JNI) == "initJni"
     assert read_cstr([STRINGS], INIT_SIG) == "(Landroid/content/Context;)V"
 
 
 def test_read_cstr_rejects_non_ascii_and_unmapped():
+    """Non-ASCII bytes and unmapped addresses are not strings, so random pointers are not
+    mistaken for method names.
+    """
     assert read_cstr([STRINGS], BAD) is None
     assert read_cstr([STRINGS], 0x9999) is None
 
 
 def test_read_cstr_rejects_unterminated():
+    """A string without a terminating NUL inside the segment is rejected."""
     assert read_cstr([Segment(0, b"abc")], 0) is None
 
 
 def test_finds_consecutive_table_entries():
+    """Consecutive {name, signature, fnPtr} relocation triples are recovered as native methods
+    with their addresses.
+    """
     relocs = {
         0x2000: INIT_JNI,
         0x2008: INIT_SIG,
@@ -52,6 +61,9 @@ def test_finds_consecutive_table_entries():
 
 
 def test_ignores_pointer_triples_that_are_not_methods():
+    """Triples whose signature lacks "(", whose name is not an identifier, or which have no
+    function pointer are not methods.
+    """
     relocs = {
         0x3000: JUNK,
         0x3008: JUNK,
@@ -67,6 +79,9 @@ def test_ignores_pointer_triples_that_are_not_methods():
 
 @pytest.mark.parametrize("release", sorted(RELEASES))
 def test_real_libunity_has_unity_player_natives(release: str):
+    """The real libunity registers the UnityPlayer natives main.c resolves by name (initJni,
+    nativeRender, nativeDone) with the expected signatures.
+    """
     libunity = RELEASES[release]["lib64"] / "libunity.so"
     if not libunity.exists():
         pytest.skip(f"extract the {release} arm64 libs to {RELEASES[release]['lib64']} first")

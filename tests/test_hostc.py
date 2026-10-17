@@ -14,6 +14,9 @@ pytestmark = pytest.mark.skipif(hostc.CC is None, reason="no host C compiler")
 
 
 def test_sources_and_libs_headers(tmp_path: Path):
+    """The sources: and libs: header lines are parsed into the files and linker flags to build
+    with.
+    """
     prog = tmp_path / "p.c"
     prog.write_text(
         "/* sources: source/game/rd_smoke.c */\n/* libs: -lm */\nint main(void){return 0;}\n"
@@ -23,12 +26,16 @@ def test_sources_and_libs_headers(tmp_path: Path):
 
 
 def test_a_program_without_headers_links_nothing(tmp_path: Path):
+    """A program without header lines links only itself."""
     prog = tmp_path / "p.c"
     prog.write_text("int main(void){return 0;}\n")
     assert hostc.linked_sources(prog) == [] and hostc.extra_libs(prog) == []
 
 
 def test_command_line_builds_a_program(tmp_path: Path):
+    """The command line builds a program against loader sources with the project's strict flags,
+    and the program runs.
+    """
     prog = tmp_path / "ok.c"
     prog.write_text(
         '/* sources: source/game/rd_smoke.c */\n#include "rd_smoke.h"\n'
@@ -40,6 +47,7 @@ def test_command_line_builds_a_program(tmp_path: Path):
 
 
 def test_command_line_reports_a_compile_error(tmp_path: Path, capsys):
+    """A compile error makes the command fail and shows the compiler's message."""
     prog = tmp_path / "bad.c"
     prog.write_text("int main(void){ return undefined_name; }\n")
     assert hostc.main([str(prog), str(tmp_path / "bad")]) != 0
@@ -47,6 +55,7 @@ def test_command_line_reports_a_compile_error(tmp_path: Path, capsys):
 
 
 def test_coverage_switch(monkeypatch):
+    """Coverage builds are switched on only by RD_COVERAGE=1 (make coverage), never by accident."""
     monkeypatch.setenv("RD_COVERAGE", "1")
     assert hostc.coverage_enabled()
     monkeypatch.setenv("RD_COVERAGE", "0")

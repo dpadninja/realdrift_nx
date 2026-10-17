@@ -19,6 +19,8 @@ static void setup(so_module *m) {
   strcpy((char *)g_mem + 0x200, "Choreographer available");
 }
 
+/* The image covers exactly the executable segment of a loaded module, and strings are read
+ * from anywhere inside the mapping but not past it. */
 static void test_exec_segment(void) {
   so_module m; rd_image im; setup(&m);
   CHECK(rd_image_from_module(&m, &im) == 0);
@@ -27,6 +29,8 @@ static void test_exec_segment(void) {
   CHECK(im.cstr(im.ctx, sizeof g_mem) == NULL);
 }
 
+/* A module without an executable segment, with a segment beyond its mapping, unmapped or NULL
+ * is rejected, so pattern search never reads outside the module. */
 static void test_bad_modules(void) {
   so_module m; rd_image im; setup(&m);
   m.phdr[1].p_flags = PF_R;                      /* no executable segment */

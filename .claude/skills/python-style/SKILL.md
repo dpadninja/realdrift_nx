@@ -19,5 +19,5 @@ Full rules: `docs/PYTHON_STYLE.md`. Checklist:
 - `tools/stage_sd.py` ships to players: standard library only, Python 3.8 compatible, keep the
   `# >>> game identity` block for `tools/release.py`.
 - Tests: pytest in `tests/`, `tmp_path`, `parametrize`; skip with a reason when `analysis/` files
-  are missing.
+  are missing; a docstring on every test, fixture and helper: the case and why it matters.
 - Before finishing: `make lint`, `make test`, `make coverage`.

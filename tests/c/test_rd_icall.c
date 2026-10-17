@@ -26,6 +26,8 @@ static const void *g_fn[8];
 static int g_n;
 static void fake_real(const char *name, const void *fn) { g_name[g_n] = name; g_fn[g_n] = fn; g_n++; }
 
+/* Override lookup matches the full icall name exactly (GetMouseButton must not catch
+ * GetMouseButtonDown) and tolerates NULL names and tables. */
 static void test_lookup(void) {
   CHECK(rd_icall_lookup(TABLE, "UnityEngine.Input::get_touchCount") == (void *)ours_touch);
   CHECK(rd_icall_lookup(TABLE, "UnityEngine.Input::GetMouseButtonDown") == NULL);  /* exact match */
@@ -33,6 +35,8 @@ static void test_lookup(void) {
   CHECK(rd_icall_lookup(NULL, "x") == NULL);
 }
 
+/* Registration hands il2cpp our function for overridden names and the engine's for everything
+ * else, and counts the overrides for the boot log. */
 static void test_wrapper_substitutes_known_and_forwards_others(void) {
   g_n = 0;
   rd_icall_setup(BOTH, 1, fake_real);
@@ -45,12 +49,16 @@ static void test_wrapper_substitutes_known_and_forwards_others(void) {
   CHECK(rd_icall_applied() == 1);
 }
 
+/* Before the real il2cpp_add_internal_call is known, registering an override still counts it
+ * and does not call through a NULL pointer. */
 static void test_without_real_does_not_crash(void) {
   rd_icall_setup(BOTH, 1, NULL);
   rd_add_internal_call("UnityEngine.Input::get_touchCount", (void *)engine_fn);
   CHECK(rd_icall_applied() == 1);
 }
 
+/* With two tables, a wrapper row receives the engine's function in its orig slot (the smoke
+ * wrapper calls it) and rows of either table are found. */
 static void test_second_table_captures_the_original(void) {
   g_n = 0;
   g_orig_emit = NULL;

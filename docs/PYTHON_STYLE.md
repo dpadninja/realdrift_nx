@@ -54,6 +54,9 @@ in `pyproject.toml`.
 ## Tests
 
 - pytest, one behaviour per test, descriptive names (`test_rejects_lite_apk`).
+- Every test (and fixture, and helper) has a docstring: the case it checks and why that case
+  matters -- the bug it guards against or the contract it pins down. The name says *what*, the
+  docstring says *why* (ruff's `D` rules apply to `tests/` too).
 - `tmp_path` for files, `pytest.mark.parametrize` for tables of cases.
 - Tests that need files from `analysis/` skip when they are missing (`pytest.skip` with the reason).
 - Every tool has tests; `make coverage` reports line coverage of `tools/` and CI fails below the

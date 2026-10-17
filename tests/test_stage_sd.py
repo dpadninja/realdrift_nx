@@ -36,6 +36,7 @@ APK_NAMES = [
 
 
 def utf8_len(n: int) -> bytes:
+    """Length prefix of a UTF-8 string-pool entry (one byte, or two with the high bit set)."""
     return bytes([n]) if n < 0x80 else bytes([0x80 | (n >> 8), n & 0xFF])
 
 
@@ -66,6 +67,9 @@ def make_axml(strings: list[str], utf8: bool = False) -> bytes:
 
 
 def write_apk(path: Path, manifest: list[str] = (GAME.package, "unity.build-id", BUILD_ID)) -> Path:
+    """A fake game APK: the arm64 and armv7 libraries, the Unity data marker and a manifest with
+    the given strings.
+    """
     with zipfile.ZipFile(path, "w") as z:
         for n in APK_NAMES:
             if not n.endswith("/"):
@@ -74,6 +78,7 @@ def write_apk(path: Path, manifest: list[str] = (GAME.package, "unity.build-id",
 
 
 def write_obb(path: Path, build_id: str = BUILD_ID) -> Path:
+    """A fake OBB with the assets/<unity.build-id> marker libunity checks before mounting it."""
     with zipfile.ZipFile(path, "w") as z:
         z.writestr(f"assets/{build_id}", b"")
     return path
@@ -81,11 +86,17 @@ def write_obb(path: Path, build_id: str = BUILD_ID) -> Path:
 
 @pytest.mark.parametrize("utf8", [False, True])
 def test_axml_strings(utf8: bool):
+    """The binary-manifest reader decodes both string-pool encodings (UTF-16 and UTF-8), non-
+    ASCII text and long strings with two-byte lengths.
+    """
     strings = ["manifest", GAME.package, "Ünïcode", "x" * 200]
     assert axml_strings(make_axml(strings, utf8)) == strings
 
 
 def test_game_identity_comes_from_the_loader_header():
+    """The staging script's game identity is the one in rd_game.h (package, versionCode, OBB and
+    APK names) and agrees with the release table.
+    """
     assert GAME.package == "com.realdrift.sipon" and GAME.version_code == 76
     assert OBB == "main.76.com.realdrift.sipon.obb" == obb_name(76)
     assert GAME.base_apk == "base.apk"
@@ -94,20 +105,28 @@ def test_game_identity_comes_from_the_loader_header():
 
 
 def test_plan_apk_takes_arm64_libs_only():
+    """Only the three arm64-v8a libraries are taken from the APK; the 32-bit ones would not load."""
     assert plan_apk(APK_NAMES) == [(f"lib/arm64-v8a/{lib}", lib) for lib in GAME.libs]
 
 
 def test_plan_apk_rejects_non_game_apk():
+    """An APK without Unity's globalgamemanagers is not the game and is refused with that reason."""
     with pytest.raises(ValueError, match="globalgamemanagers"):
         plan_apk([f"lib/arm64-v8a/{lib}" for lib in GAME.libs])
 
 
 def test_plan_apk_rejects_32bit_only_apk():
+    """An APK with only 32-bit libraries is refused and the message names arm64-v8a, the build
+    the user needs.
+    """
     with pytest.raises(ValueError, match="arm64-v8a"):
         plan_apk(["lib/armeabi-v7a/libunity.so", "assets/bin/Data/globalgamemanagers"])
 
 
 def test_find_obb_member_checks_the_version_code():
+    """Inside a downloaded archive only the OBB of this versionCode is accepted; an OBB of
+    another build or another game is refused.
+    """
     assert find_obb_member(["x/", f"{GAME.package}/{OBB}"], 76) == f"{GAME.package}/{OBB}"
     with pytest.raises(ValueError, match=r"main\.74"):
         find_obb_member([f"{GAME.package}/{OBB}"], 74)  # an OBB of another build
@@ -116,6 +135,9 @@ def test_find_obb_member_checks_the_version_code():
 
 
 def test_stage_end_to_end(tmp_path: Path):
+    """Staging from an APK and a zipped OBB yields the libraries, base.apk, the OBB and the .nro,
+    and nothing extracted from the APK (the game reads its data from base.apk).
+    """
     apk = write_apk(tmp_path / "game.apk")
     obb_zip = tmp_path / "obb.zip"
     with zipfile.ZipFile(obb_zip, "w") as z:
@@ -139,12 +161,18 @@ def test_stage_end_to_end(tmp_path: Path):
 
 
 def test_check_obb_marker():
+    """The OBB must carry the marker of the supported build; the 5.0.7 marker is refused as
+    another game version.
+    """
     check_obb_marker(["assets/bin/Data/x", f"assets/{BUILD_ID}"], BUILD_ID)
     with pytest.raises(ValueError, match="another game version"):
         check_obb_marker([f"assets/{BUILD_ID_507}"], BUILD_ID)
 
 
 def test_stage_rejects_obb_without_marker(tmp_path: Path):
+    """Staging fails when the OBB lacks the build marker, instead of producing a folder the game
+    would not start from.
+    """
     apk = write_apk(tmp_path / "game.apk")
     obb = tmp_path / "main.obb"
     with zipfile.ZipFile(obb, "w") as z:
@@ -154,6 +182,9 @@ def test_stage_rejects_obb_without_marker(tmp_path: Path):
 
 
 def test_check_apk_identity():
+    """The APK must be the full game of the supported build: Real Drift Lite and the 5.0.7 build
+    are refused with messages naming them.
+    """
     check_apk_identity([GAME.package, BUILD_ID], GAME.package, BUILD_ID)
     with pytest.raises(ValueError, match="Lite"):
         check_apk_identity([LITE_PACKAGE, LITE_BUILD_ID], GAME.package, BUILD_ID)
@@ -162,6 +193,9 @@ def test_check_apk_identity():
 
 
 def test_main_end_to_end(tmp_path: Path, monkeypatch):
+    """The command line stages the folder and exits 0, and exits 1 with a message (no traceback)
+    for an unsupported APK.
+    """
     apk, obb = write_apk(tmp_path / "base.apk"), write_obb(tmp_path / OBB)
     monkeypatch.chdir(tmp_path)
     assert main([str(apk), str(obb), "--nro", str(tmp_path / "none.nro")]) == 0
@@ -174,6 +208,9 @@ def test_main_end_to_end(tmp_path: Path, monkeypatch):
     "apk, ok", [("original/base.apk", True), ("analysis/realdrift-5.0.7-build74.apk", False)]
 )
 def test_real_apks(apk: str, ok: bool):
+    """On the user's real files: the 5.0.8 APK passes the identity check and the old 5.0.7 APK is
+    refused.
+    """
     if not (ROOT / apk).exists():
         pytest.skip(f"no {apk}")
     strings = apk_strings(ROOT / apk)

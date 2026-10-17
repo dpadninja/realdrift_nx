@@ -37,7 +37,9 @@ ignore = ["D105", "D107"]
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D"]            # test names say what they check
+# A test docstring is one paragraph describing the case and why it matters, not a command
+# with a one-line summary.
+"tests/*" = ["D401", "D205"]
 
 [tool.mypy]
 strict = true

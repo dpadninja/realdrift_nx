@@ -41,6 +41,7 @@ EXPECTED = {
 
 @pytest.fixture(scope="module")
 def tool(tmp_path_factory) -> Path:
+    """find_patch_sites built once for the module (skips without a host C compiler)."""
     if hostc.CC is None:
         pytest.skip("no host C compiler")
     exe = tmp_path_factory.mktemp("fps") / "find_patch_sites"
@@ -50,6 +51,7 @@ def tool(tmp_path_factory) -> Path:
 
 
 def run(tool: Path, *libs: Path) -> dict[str, int]:
+    """The tool's key=0x... output as a dict; the tool must succeed."""
     out = subprocess.run([str(tool), *map(str, libs)], capture_output=True, text=True)
     assert out.returncode == 0, out.stdout + out.stderr
     kv = dict(line.split("=", 1) for line in out.stdout.splitlines())
@@ -57,6 +59,7 @@ def run(tool: Path, *libs: Path) -> dict[str, int]:
 
 
 def libdir(release: str) -> Path:
+    """The extracted libraries of a release, or a skip with the command to extract them."""
     d = RELEASES[release]["lib64"]
     if not (d / "libunity.so").exists():
         pytest.skip(f"extract the {release} arm64 libs to {d.relative_to(hostc.ROOT)} first")
@@ -65,11 +68,17 @@ def libdir(release: str) -> Path:
 
 @pytest.mark.parametrize("release", sorted(EXPECTED))
 def test_finds_all_sites(tool: Path, release: str):
+    """Every pattern finds exactly the hand-verified address in both releases: the loader patches
+    these sites, a wrong one would corrupt the engine.
+    """
     d = libdir(release)
     assert run(tool, d / "libunity.so", d / "libil2cpp.so") == EXPECTED[release]
 
 
 def test_wrong_library_fails_cleanly(tool: Path, tmp_path: Path):
+    """In a library without the sites nothing is reported as found and the tool fails, instead of
+    returning a bogus address.
+    """
     d = libdir("5.0.8")
     fake = tmp_path / "libunity.so"  # libmain renamed: nothing may be "found" in it
     shutil.copy(d / "libmain.so", fake)

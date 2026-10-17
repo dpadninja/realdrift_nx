@@ -7,6 +7,8 @@
 
 #define MS RD_NS_PER_MS
 
+/* Shows "-- FPS" until the first half-second window is full, then publishes once per window:
+ * 30 frames of 16.67 ms read as 60.0 FPS with a 17 ms slowest frame. */
 static void test_steady_60(void) {
   rd_fps f = RD_FPS_INIT;
   char buf[32];
@@ -23,6 +25,8 @@ static void test_steady_60(void) {
   CHECK(!strcmp(buf, "60.0 FPS 17MS"));
 }
 
+/* A single 100 ms hitch lowers the rate and shows up as the slowest frame, and the next window
+ * forgets it, so the counter reflects the last half second only. */
 static void test_hitch_and_reset(void) {
   rd_fps f = RD_FPS_INIT;
   uint64_t t = 5 * MS;
@@ -34,6 +38,8 @@ static void test_hitch_and_reset(void) {
   CHECK(f.fps10 == 500 && f.worst_ms == 20);              /* the next window forgets the hitch */
 }
 
+/* The 3x5 font becomes one rectangle per horizontal run, glyphs advance by 4 pixels, unknown
+ * characters draw nothing, and the output is capped at the caller's buffer size. */
 static void test_layout(void) {
   rd_rect r[64];
   /* '1' = .X. / XX. / .X. / .X. / XXX -> 5 runs */
@@ -48,6 +54,8 @@ static void test_layout(void) {
   CHECK(rd_fps_text_width("", 3) == 0);
 }
 
+/* Every character rd_fps_format can produce has a glyph; a missing one would leave a silent
+ * gap in the counter. */
 static void test_every_char_of_the_text_has_a_glyph(void) {
   rd_rect r[256];
   const char *all = "0123456789.-FPSM";

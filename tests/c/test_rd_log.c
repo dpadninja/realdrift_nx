@@ -3,12 +3,15 @@
 #include "check.h"
 #include "rd_log.h"
 
+/* debug_log=1 keeps every line (NULL format excepted), so a bug report has the whole story. */
 static void test_full_keeps_everything(void) {
   CHECK(rd_log_wanted(RD_LOG_FULL, "[io] open(%s)\n"));
   CHECK(rd_log_wanted(RD_LOG_FULL, "[perf] frame %d\n"));
   CHECK(!rd_log_wanted(RD_LOG_FULL, NULL));
 }
 
+/* debug_log=0 keeps crashes, stalls, the engine's stdio, the build banner, GC stops and Unity
+ * exceptions, and drops the high-volume tags that cost SD writes. */
 static void test_minimal_keeps_only_important(void) {
   CHECK(rd_log_wanted(RD_LOG_MINIMAL, "[crash] pc=%s\n"));
   CHECK(rd_log_wanted(RD_LOG_MINIMAL, "[wd] ===== STALL #%d\n"));
@@ -23,6 +26,8 @@ static void test_minimal_keeps_only_important(void) {
   CHECK(!rd_log_wanted(RD_LOG_MINIMAL, "[perf] frame %d took %ldms\n"));
 }
 
+/* Only crash and watchdog lines are flushed at once: they may be the last thing written before
+ * the process dies, while the rest stays buffered. */
 static void test_urgent(void) {
   CHECK(rd_log_urgent("[crash] ===="));
   CHECK(rd_log_urgent("[wd]   UnityMain"));
@@ -31,6 +36,8 @@ static void test_urgent(void) {
   CHECK(!rd_log_urgent(NULL));
 }
 
+/* dlsym/dlopen/JNI chatter is always dropped, and per-method [jni] lines only when RD_LOG_JNI
+ * is off; other tags are never treated as noise. */
 static void test_noisy(void) {
   CHECK(rd_log_noisy("dlsym(%s)\n", 1));
   CHECK(rd_log_noisy("dlopen(%s)\n", 1));

@@ -17,6 +17,8 @@ static rd_bindings bindings(void) {
   return b;
 }
 
+/* Buttons produce one press on the frame they go down and one release when they go up, never
+ * repeats while held: the game's handlers count presses. */
 static void test_press_and_release_edges(void) {
   rd_bindings b = bindings(); rd_drive_state st = {0}; rd_drive_out o;
   rd_drive_step(&b, &st, ZR, 0, &o);
@@ -29,6 +31,8 @@ static void test_press_and_release_edges(void) {
   CHECK(o.release[RD_ACT_THROTTLE] && o.release[RD_ACT_HANDBRAKE]);
 }
 
+/* Stick travel inside the deadzone is ignored and the rest is rescaled to the full -1..1 range
+ * (clamped), so steering starts smoothly at the deadzone edge. */
 static void test_stick_deadzone_and_rescale(void) {
   rd_bindings b = bindings(); rd_drive_state st = {0}; rd_drive_out o;
   rd_drive_step(&b, &st, 0, 0.1f, &o);
@@ -41,6 +45,8 @@ static void test_stick_deadzone_and_rescale(void) {
   CHECK(o.steer == -1.0f);                               /* clamped */
 }
 
+/* Letting the stick go writes 0 once to release the wheel, then stops writing so the touch
+ * slider can steer again. */
 static void test_return_to_centre_written_once(void) {
   rd_bindings b = bindings(); rd_drive_state st = {0}; rd_drive_out o;
   rd_drive_step(&b, &st, 0, 0.9f, &o);
@@ -50,6 +56,8 @@ static void test_return_to_centre_written_once(void) {
   CHECK(!o.write_steer);                                 /* then leaves it to touch input */
 }
 
+/* With the stick centred the D-pad steers fully left/right, both together cancel out, and a
+ * moved stick overrides the D-pad. */
 static void test_dpad_steering_when_stick_centred(void) {
   rd_bindings b = bindings(); rd_drive_state st = {0}; rd_drive_out o;
   rd_drive_step(&b, &st, LEFT, 0, &o);

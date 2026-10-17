@@ -20,6 +20,8 @@ static void reset(void) {
   config = def;
 }
 
+/* No config.txt yet (first launch): read_config reports -1 so main.c writes the defaults, and
+ * the settings stay at their defaults. */
 static void test_missing_file(void) {
   reset();
   unlink(g_path);
@@ -27,6 +29,8 @@ static void test_missing_file(void) {
   CHECK(config.debug_log == RD_LOG_MINIMAL);
 }
 
+/* A file edited on Windows has CRLF line ends: the value must still parse, and a file that
+ * lacks keys asks for a rewrite (1) so it gains the new ones. */
 static void test_reads_a_key_and_strips_cr(void) {
   reset();
   write_file("# comment\n\ndebug_log=1\r\n");
@@ -34,6 +38,8 @@ static void test_reads_a_key_and_strips_cr(void) {
   CHECK(config.debug_log == RD_LOG_FULL);
 }
 
+/* Keys of removed options (cheats, language) are ignored, and a file without current keys is
+ * rewritten instead of silently kept. */
 static void test_stale_keys_request_rewrite(void) {
   reset();
   write_file("# only a comment\ncheats=1\nlanguage=fr\n");   /* removed keys */
@@ -41,6 +47,8 @@ static void test_stale_keys_request_rewrite(void) {
   CHECK(config.debug_log == RD_LOG_MINIMAL);
 }
 
+/* What write_config writes, read_config reads back unchanged: custom bindings, a fractional
+ * deadzone and the log level survive a save/load. */
 static void test_bindings_roundtrip_and_custom_values(void) {
   reset();
   config.binds.action[RD_ACT_HANDBRAKE] = RD_BTN_A | RD_BTN_B;
@@ -55,6 +63,8 @@ static void test_bindings_roundtrip_and_custom_values(void) {
   CHECK(config.debug_log == RD_LOG_FULL);
 }
 
+/* An unknown button name must not wipe a binding: the default stays, and the file is rewritten
+ * unless a valid line for the same key came first. */
 static void test_bad_binding_keeps_default_and_requests_rewrite(void) {
   reset();
   CHECK(write_config(g_path) == 0);

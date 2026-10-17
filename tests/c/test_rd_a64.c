@@ -6,11 +6,15 @@
 
 /* Encodings below are taken from llvm-objdump of analysis/lib64/libunity.so. */
 
+/* The b.lt of libunity's Choreographer SDK gate decodes to its real target; the gate patch is
+ * built from this decode. */
 static void test_bcond_target_of_real_instruction(void) {
   /* 30f838: 5400032b  b.lt 0x30f89c */
   CHECK(rd_a64_branch_target(0x30f838, 0x5400032bu) == 0x30f89c);
 }
 
+/* B encodes forward and backward offsets that decode back to the same target (the patch
+ * rewrites b.lt into b with the same destination). */
 static void test_b_forward_and_backward(void) {
   CHECK(rd_a64_b(0x30f838, 0x30f89c) == 0x14000019u);
   CHECK(rd_a64_branch_target(0x30f838, 0x14000019u) == 0x30f89c);
@@ -19,12 +23,16 @@ static void test_b_forward_and_backward(void) {
   CHECK(rd_a64_branch_target(0x1000, back) == 0x0ff0);
 }
 
+/* An unaligned target or one beyond the +-128 MB range of B yields 0 instead of a wrong
+ * instruction that would jump elsewhere. */
 static void test_range_and_alignment_errors(void) {
   CHECK(rd_a64_b(0x1000, 0x1002) == 0);
   CHECK(rd_a64_b(0, 1ULL << 27) == 0);
   CHECK(rd_a64_b(0, (1ULL << 27) - 4) != 0);
 }
 
+/* Non-branches (cmp, ret) decode to 0 so a pattern cannot mistake them for branches; BL
+ * decodes (the GC bridge follows a bl). */
 static void test_branch_target_rejects_other_insns(void) {
   CHECK(rd_a64_branch_target(0x30f834, 0x7100401fu) == 0);   /* cmp w0, #0x10 */
   CHECK(rd_a64_branch_target(0x0, 0xd65f03c0u) == 0);        /* ret */
@@ -32,6 +40,8 @@ static void test_branch_target_rejects_other_insns(void) {
 }
 
 /* Real libil2cpp.so instructions (llvm-objdump), used by rd_gcbridge. */
+/* adrp/ldr/add of real libil2cpp code decode to the page, register and offsets the GC bridge
+ * uses to find Boehm's globals; other instructions are rejected. */
 static void test_adrp_ldr_add_decode(void) {
   unsigned rd = 99, rn = 99; uint32_t off = 0, imm = 0;
   CHECK(rd_a64_adrp_target(0x75b4d4, 0xf000bdd8u, &rd) == 0x1f16000 && rd == 24);
@@ -46,6 +56,8 @@ static void test_adrp_ldr_add_decode(void) {
   CHECK(!rd_a64_add_x_imm(0xb94a9b01u, &rd, &rn, &imm));
 }
 
+/* The BL test accepts both offset signs and rejects B and RET (patterns look for the bl before
+ * a site). */
 static void test_encodings(void) {
   CHECK(rd_a64_is_bl(0x94000123u) && rd_a64_is_bl(0x97ffffffu));
   CHECK(!rd_a64_is_bl(0x14000001u) && !rd_a64_is_bl(RD_A64_RET));

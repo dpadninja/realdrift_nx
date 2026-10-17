@@ -18,6 +18,10 @@ NRO = ROOT / "realdrift_nx.nro"
 
 @pytest.mark.skipif(not NRO.exists(), reason="build realdrift_nx.nro first")
 def test_no_macro_names_leaked_into_strings():
+    """No RD_* macro name ended up as a string in the .nro (an undefined macro passed through
+    RD_STR); FMOD once received "RD_AUDIO_FRAMES_PER_BUFFER" as its buffer size and audio
+    stayed silent.
+    """
     leaked = sorted(
         set(re.findall(rb"(?<![A-Za-z0-9_])RD_[A-Z0-9_]{3,}(?=\x00)", NRO.read_bytes()))
     )

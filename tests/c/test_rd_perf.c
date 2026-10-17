@@ -5,6 +5,8 @@
 
 #define MS 1000000ull
 
+/* auto renders 720p handheld and 1080p docked, fixed values win over the mode, and an unknown
+ * value behaves like auto. */
 static void test_resolution(void) {
   int w, h;
   rd_pick_resolution(RD_RES_AUTO, 0, &w, &h); CHECK(w == 1280 && h == 720);
@@ -14,6 +16,9 @@ static void test_resolution(void) {
   rd_pick_resolution(12345, 0, &w, &h);       CHECK(w == 1280 && h == 720);   /* unknown = auto */
 }
 
+/* The CPU boost turns on only for a frame longer than the threshold (a loading frame, not a
+ * 200 ms hitch) and stays on for the tail after loading ends; the boost lowers the GPU clock,
+ * so it must not stick during play. */
 static void test_boost_only_on_long_frames(void) {
   rd_boost b = {0};
   const uint64_t T = RD_BOOST_THRESHOLD_NS, TAIL = RD_BOOST_TAIL_NS;
@@ -26,6 +31,7 @@ static void test_boost_only_on_long_frames(void) {
   CHECK(!rd_boost_update(&b, 7501 * MS, 1, 7495 * MS, T, TAIL));       /* tail expired */
 }
 
+/* The boost is off before any long frame was seen. */
 static void test_boost_starts_off(void) {
   rd_boost b = {0};
   CHECK(!rd_boost_update(&b, 5, 0, 0, RD_BOOST_THRESHOLD_NS, RD_BOOST_TAIL_NS));

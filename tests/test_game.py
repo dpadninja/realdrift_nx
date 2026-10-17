@@ -31,6 +31,9 @@ MACROS = [
 
 @pytest.mark.skipif(hostc.CC is None, reason="no host C compiler")
 def test_python_reader_matches_the_compiler(tmp_path: Path):
+    """The Python macro reader yields exactly what the C compiler sees in rd_game.h, so
+    stage_sd.py and the loader can never disagree on the game identity or file names.
+    """
     prog = tmp_path / "dump.c"
     prog.write_text(
         '#include <stdio.h>\n#include "rd_game.h"\nint main(void) {\n'
@@ -48,6 +51,9 @@ def test_python_reader_matches_the_compiler(tmp_path: Path):
 
 
 def test_reader_handles_comments_concatenation_and_rd_str(tmp_path: Path):
+    """The reader understands the constructs rd_game.h uses: comments, adjacent string literals,
+    integers and RD_STR of another macro.
+    """
     h = tmp_path / "x.h"
     h.write_text(
         "#define RD_STR_(x) #x\n#define RD_STR(x) RD_STR_(x)\n"
@@ -58,5 +64,8 @@ def test_reader_handles_comments_concatenation_and_rd_str(tmp_path: Path):
 
 
 def test_game_object():
+    """The Game record lists the three libraries in load order and the SD home is the sdmc: form
+    of the staging folder.
+    """
     assert GAME.libs == ("libmain.so", "libunity.so", "libil2cpp.so")
     assert GAME.home == "sdmc:" + GAME.home_dir
