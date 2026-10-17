@@ -15,6 +15,7 @@ Read `docs/ARCHITECTURE.md` for the layers, boot sequence, frame flow and thread
 | engine | `source/engine/` | Unity / IL2CPP internals, not the game |
 | game | `source/game/` | Real Drift classes, fields, behaviour, `config.txt` |
 | platform | `source/platform/` | Switch services shared by several layers |
+| mods | `source/mods/` | the mod host and the mod API (`sdk/rd_mod.h`) |
 
 A layer includes only headers from its own layer, lower layers and `platform`.
 
@@ -41,5 +42,9 @@ A layer includes only headers from its own layer, lower layers and `platform`.
 - **Drawing on screen**: `platform/rd_overlay.h` between `rd_overlay_begin` / `rd_overlay_end`
   from the eglSwapBuffers wrapper.
 - **New setting**: one row in the `game/rd_settings.c` table, then `make config-example`.
+- **New mod API function**: append a member to `rd_mod_api` in `sdk/rd_mod.h` (comment it;
+  never reorder: mods compiled earlier use the old layout), fill it in `mods/rd_mod_api.c`,
+  name it in `docs/MODDING.md` (`tests/test_modding_docs.py` checks), keep the header under
+  its size budget. Pure logic it needs goes into a host-tested module.
 
 Research findings and their commands go into `analysis/research/*.md` (local, not published).

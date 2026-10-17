@@ -8,6 +8,8 @@ provided by our code.
 ## Layers
 
 ```
+ mods      the mod host: mods/<id>/ folders, the mod API (sdk/rd_mod.h)   source/mods/
+   │
  game      Real Drift specifics: controls, race HUD, smoke, settings      source/game/
    │
  engine    Unity / IL2CPP: il2cpp API, icall overrides, engine patches,   source/engine/
@@ -38,7 +40,9 @@ through the documented entry points of the upper layer's headers.
    (`bionic/imports.c`, `engine/unity_imports.c`, `bionic/rd_imports.c`); locate and apply
    engine patches by instruction pattern (`engine/rd_patches.c`, `engine/rd_patchsites.c`).
 5. Run the libraries' init arrays, build the fake JNI world (`android/jni_fake.c`,
-   `android/unity_jni.c`), call `JNI_OnLoad` of libunity and libil2cpp.
+   `android/unity_jni.c`); load the mods (`mods/rd_mods.c`: their archive files, patch.ini,
+   mod.so and icall overrides must be in place before Unity starts); call `JNI_OnLoad` of
+   libunity and libil2cpp.
 6. Recover the `UnityPlayer` natives by name from libunity's `RegisterNatives` table and drive
    the lifecycle the Java side would: `initJni` → surface → resume → focus.
 7. Main loop: one `nativeRender` per frame, paced to 60 Hz.
@@ -48,10 +52,11 @@ through the documented entry points of the upper layer's headers.
 ```
  HID (pad, touch, mouse) ── platform/nx_pointer ──┬─► engine/unity_input_hook (UnityEngine.Input icalls)
                                                   └─► game/rd_drive_hook (car controls)
- main loop ── Unity nativeRender ── game code (C#, IL2CPP) ── our hooks (race HUD, smoke)
+ main loop ── mods/rd_mods_frame (game ready, scene changes, patch.ini, mods' on_frame)
+           ── Unity nativeRender ── game code (C#, IL2CPP) ── our hooks (race HUD, smoke)
                      │
                      └─ GLES via mesa ── android/egl: eglSwapBuffers wrapper
-                                            ├─ platform/rd_overlay: FPS counter, cursor
+                                            ├─ platform/rd_overlay: FPS counter, cursor, mods' text
                                             └─ timing counters for the [perf] log
 ```
 
@@ -60,6 +65,9 @@ through the documented entry points of the upper layer's headers.
 - Game data is read straight from `base.apk` and the OBB: Unity's own zip reader through the
   bionic `fopen`/`read` shims, and the fake `AssetManager` (`android/unity_jni.c`) over
   `android/rd_zip.c`. Nothing is extracted to the SD card except what IL2CPP writes itself.
+- With mods that replace archive files, both readers see a view of the archive with those
+  files put in (`bionic/rd_zipview.c` builds it, `bionic/rd_vfile.c` serves it as virtual
+  descriptors and FILEs); the archives on the SD card are never changed.
 - `SharedPreferences` (the game's saves) are stored in `prefs.kv` (`game/rd_prefs.c`).
 
 ## Threads
@@ -79,6 +87,8 @@ through the documented entry points of the upper layer's headers.
 - Anything that knows a Real Drift class, field or behaviour → `game/`; names go into
   `game/rd_game_symbols.h`.
 - A Switch service used by more than one layer → `platform/`.
+- Something mods need from the port → a function in the `rd_mod_api` table (`sdk/rd_mod.h`,
+  filled in `mods/rd_mod_api.c`).
 - Decide by the most specific knowledge the code needs; split pure logic from glue
   (`docs/CODING_STYLE.md`).
 
@@ -120,6 +130,9 @@ One line per module; each file's header comment has the details.
 | `shim_dl.c` | `dlopen`/`dlsym` over the loaded modules (and the icall override hand-over) |
 | `shim_pthread.c` | pthread on newlib: lazily backed mutexes/conditions, thread start, TLS keys, rwlocks, semaphores |
 | `fakefd.{c,h}` | in-process pipes for the engine's pipe()-based thread signalling |
+| `rd_zipfmt.h` | ZIP record layout shared by `rd_zip.c` and `rd_zipview.c` |
+| `rd_zipview.{c,h}` | an archive with entries replaced or added, as a view (pure) |
+| `rd_vfile.{c,h}` | that view served as virtual descriptors / FILEs to Unity and the AssetManager |
 | `rd_iov.{c,h}` | `writev` on top of `write` |
 | `rd_synth.{c,h}` | stdio access to the synthetic `/proc` and `/sys` files |
 
@@ -149,7 +162,8 @@ One line per module; each file's header comment has the details.
 | File | Purpose |
 |---|---|
 | `rd_il2cpp.{c,h}` | the il2cpp runtime API, resolved once, plus helpers (classes, fields, arrays, strings) |
-| `rd_icall.{c,h}` | replace or wrap engine icalls by name at registration |
+| `rd_icall.{c,h}` | replace or wrap engine icalls by name at registration (plus the mods' table) |
+| `rd_hook.{c,h}`, `rd_hook_install.c` | inline hooks: prologue relocation into a trampoline (pure) and the code patch |
 | `rd_sig.{c,h}` | masked AArch64 instruction-pattern search |
 | `rd_patchsites.{c,h}` | the patterns that locate every engine patch site and GC variable |
 | `rd_patches.{c,h}` | apply the libunity patches; the background clock thread (CPU boost, log flush) |
@@ -171,7 +185,8 @@ One line per module; each file's header comment has the details.
 | `nx_pointer_internal.h` | state shared by the two nx_pointer files (internal) |
 | `nx_fonts.{c,h}` | the console's shared fonts as Android system fonts for Unity's fallback |
 | `rd_overlay.{c,h}`, `rd_overlay_gl.c` | 2D drawing on top of the finished frame (cursor, FPS counter) |
-| `rd_fps.{c,h}` | the debug FPS counter: counting and the built-in pixel font |
+| `rd_fps.{c,h}` | the debug FPS counter (counting, layout through `rd_text`) |
+| `rd_text.{c,h}` | the built-in 3x5 pixel font as rectangles (FPS counter, mods' text) |
 | `rd_gpuwait.{c,h}` | time mesa waits for the display and the GPU; real clock rates in the log |
 | `rd_perf.{c,h}` | render resolution choice and CPU boost while loading |
 
@@ -189,3 +204,15 @@ One line per module; each file's header comment has the details.
 
 `main.c` and the import tables (`imports.c`, `unity_imports.c`, `rd_imports.c`) are composition
 points: they may include headers of every layer to wire implementations to the engine.
+
+### mods
+
+| File | What |
+|---|---|
+| `rd_mods.{c,h}` | boot (scan `mods/`, files, patch.ini, mod.so), per-frame work, the mods' text overlay |
+| `rd_mod_api.c` | the functions of the `rd_mod_api` table handed to each mod |
+| `rd_mods_internal.h` | state shared by the two files above (internal) |
+| `rd_mod_ini.{c,h}` | mod.ini / patch.ini parsing and the mod.ini key table |
+| `rd_mod_patch.{c,h}` | patch.ini values parsed for their field type and written |
+| `rd_modhost.{c,h}` | load order, file/icall claims, the per-frame text queue |
+| `../../sdk/rd_mod.h`, `../../sdk/mod.mk` | the public mod API and the mod build rules |
