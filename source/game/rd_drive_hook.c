@@ -67,6 +67,7 @@ static void get_input(void *self, float *throttle, float *brake, float *steer,
                    change_camera, target_gear, mi);
 }
 
+/* Gives up on controller driving for good (logs why); returns 0 for the caller to return. */
 static int fail(const char *what) {
   g_failed = 1;
   debugPrintf("[drive] %s -- controller driving OFF\n", what);

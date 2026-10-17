@@ -38,6 +38,7 @@ static const struct { char c; unsigned char row[RD_FPS_GLYPH_H]; } FONT[] = {
   { 'M', { 5, 7, 7, 5, 5 } },
 };
 
+/* The five rows of c in the 3x5 font, or NULL if the font has no such character. */
 static const unsigned char *glyph(char c) {
   for (size_t i = 0; i < sizeof FONT / sizeof FONT[0]; i++)
     if (FONT[i].c == c) return FONT[i].row;

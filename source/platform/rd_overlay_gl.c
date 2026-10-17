@@ -22,6 +22,7 @@ static GLuint s_prog = 0;
 static GLint  s_u_screen, s_u_origin, s_u_scale, s_u_colour, s_u_tex, s_u_use_tex;
 static int    s_gl_failed = 0;
 
+/* Compiles one shader; 0 on a compile error. */
 static GLuint mkshader(GLenum t, const char *src) {
   GLuint s = glCreateShader(t);
   glShaderSource(s, 1, &src, NULL);
@@ -32,6 +33,8 @@ static GLuint mkshader(GLenum t, const char *src) {
   return s;
 }
 
+/* Builds the overlay program and looks up its uniforms on first use; 1 if ready, 0 forever
+ * after a failure (logged). */
 static int gl_init(void) {
   if (s_prog) return 1;
   if (s_gl_failed) return 0;
@@ -99,6 +102,7 @@ typedef struct {
   void *ptr;
 } AttribState;
 
+/* Saves everything glVertexAttribPointer and the enable flag set for attribute i. */
 static void attrib_save(GLuint i, AttribState *a) {
   glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &a->enabled);
   glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_SIZE, &a->size);
@@ -109,6 +113,7 @@ static void attrib_save(GLuint i, AttribState *a) {
   glGetVertexAttribPointerv(i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &a->ptr);
 }
 
+/* Restores attribute i, rebinding the buffer it was captured with first. */
 static void attrib_restore(GLuint i, const AttribState *a) {
   /* glVertexAttribPointer captures whatever ARRAY_BUFFER is bound right now, so
    * re-bind the attribute's original buffer before restoring its pointer. */

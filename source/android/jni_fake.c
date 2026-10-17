@@ -25,26 +25,10 @@ volatile int jni_quit_requested = 0;
 #include "unity_jni.h"
 
 
-// Bring-up trace: log each unique class.method upcall once (RD_LOG_JNI), so a run shows which
-// Java APIs the engine and the game's plugins actually call. Behaviour is unchanged: after
-// logging, the call falls through to the handlers.
-/* A "framework" class we never need to trace (Android/JDK/Unity/Google-infra). Anything
- * else is the game's own app/plugin code -- log those to find boot gates. */
-static int is_framework_cls(const char *c) {
-  if (!c) return 1;
-  return name_has(c, "android/") || name_has(c, "android.") ||
-         name_has(c, "java/")    || name_has(c, "java.")    ||
-         name_has(c, "javax/")   || name_has(c, "dalvik/")  ||
-         name_has(c, "com/unity3d/") || name_has(c, "com.unity3d.") ||
-         name_has(c, "org/khronos")  || name_has(c, "sun/");
-}
+/* Bring-up trace: logs each unique class.method the engine calls once ([jni] call: lines, kept
+ * with RD_LOG_JNI), so a run shows which Java APIs the engine and the game's plugins rely on.
+ * Behaviour is unchanged: the call then goes to the handlers. */
 static void log_app_upcall(const FakeID *id) {
-  /* DIAGNOSTIC: log EVERY JNI method upcall once per class.method (dedup by the
-   * interned class+name ptr pair), NO framework filter -- the boot gate (Payment
-   * nativeInstance null) may go through com/android/vending or com/android/billingclient
-   * (Google Play Billing), which a naive "android/" filter wrongly excludes. Bounded by
-   * dedup (~a few hundred unique pairs). Once the culprit is known, re-narrow this. */
-  (void)is_framework_cls;
   static const void *seen_c[400]; static const void *seen_n_[400]; static int seen_k = 0;
   for (int i = 0; i < seen_k; i++)
     if (seen_c[i] == id->cls && seen_n_[i] == id->name) return;
@@ -52,6 +36,9 @@ static void log_app_upcall(const FakeID *id) {
   debugPrintf(RD_LOG_TAG_JNI " call: %s.%s%s\n", id->cls, id->name, id->sig);
 }
 
+/* Call<Object>Method: classes with real behaviour go to unity_jni.c, a few generic cases
+ * (Bundle meta-data, String.getBytes) are answered here, everything else by the framework
+ * answers (act_object). */
 static void *dispatch_object(void *recv, const FakeID *id, va_list va) {
   if (!id) return NULL;
   log_app_upcall(id);
@@ -76,6 +63,8 @@ static void *dispatch_object(void *recv, const FakeID *id, va_list va) {
   if (sig_returns(id->sig, "Landroid/graphics/Bitmap;")) return NULL;
   return act_object(id, va);
 }
+/* Call<Int/Boolean/Long>Method, routed like dispatch_object (hasSystemFeature,
+ * Bundle.containsKey, String methods, then unity_jni.c / act_int). */
 static juint dispatch_int(void *recv, const FakeID *id, va_list va) {
   if (!id) return 0;
   log_app_upcall(id);
@@ -107,6 +96,7 @@ static juint dispatch_int(void *recv, const FakeID *id, va_list va) {
   if (unity_owns_class(id->cls)) return unity_dispatch_int(recv, id, va);
   return act_int(id, va);
 }
+/* Call<Float>Method: unity_jni.c classes, else the framework answer. */
 static float dispatch_float(void *recv, const FakeID *id, va_list va) {
   if (!id) return 0.0f;
   log_app_upcall(id);
@@ -114,6 +104,7 @@ static float dispatch_float(void *recv, const FakeID *id, va_list va) {
   { float f; if (unity_prefs_get_float(id, va, &f)) return f; }
   return act_float(id, va);
 }
+/* Call<Void>Method: unity_jni.c classes, else the framework handler (side effects only). */
 static void dispatch_void(void *recv, const FakeID *id, va_list va) {
   log_app_upcall(id);
   if (unity_owns_class(id->cls)) { unity_dispatch_void(recv, id, va); return; }
@@ -122,6 +113,10 @@ static void dispatch_void(void *recv, const FakeID *id, va_list va) {
 
 // ---------------------------------------------------------------------------
 // JNIEnv function implementations
+// Each j_<Name> implements the JNIEnv function <Name> of the JNI specification; jni_init puts
+// it into the function table at that function's slot. Only what Unity and the game call is
+// implemented -- every other slot logs its index through jni_unimpl.h. The `env` argument is
+// always our single fake JNIEnv and is ignored.
 // ---------------------------------------------------------------------------
 
 static juint j_GetVersion(void *env) { (void)env; return JNI_VERSION_1_6; }
@@ -345,6 +340,8 @@ static juint j_GetArrayLength(void *env, void *arr) {
   return 0;
 }
 
+/* A zeroed local primitive array of len elements of elem_size bytes (at least one element is
+ * allocated). */
 static void *new_pri_array(int len, int elem_size) {
   void *data = calloc(len ? len : 1, elem_size);
   return make_pri_array_adopt(data, len, elem_size);
@@ -510,10 +507,12 @@ const char *jni_string_utf(void *jstr) {
 void *fake_env = &env_table_ptr;
 
 static juint vm_DestroyJavaVM(void *vm) { (void)vm; return JNI_OK; }
+/* Every thread shares the one fake JNIEnv; attaching just hands it out. */
 static juint vm_AttachCurrentThread(void *vm, void **env, void *args) {
   (void)vm; (void)args; if (env) *env = fake_env; return JNI_OK;
 }
 static juint vm_DetachCurrentThread(void *vm) { (void)vm; return JNI_OK; }
+/* Returns the shared fake JNIEnv for any thread and JNI version. */
 static juint vm_GetEnv(void *vm, void **env, int version) {
   (void)vm; (void)version; if (env) *env = fake_env; return JNI_OK;
 }

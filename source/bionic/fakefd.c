@@ -30,9 +30,12 @@ static Mutex   g_lock;
 static CondVar g_cond;
 static int     g_inited = 0;
 
+/* Initialises the lock and condition variable on first use (the first pipe() may come from any
+ * thread). */
 static void fakefd_once(void) {
   if (!g_inited) { mutexInit(&g_lock); condvarInit(&g_cond); g_inited = 1; }
 }
+/* Index of a free fd slot, or -1; caller holds g_lock. */
 static int alloc_slot(void) {
   for (int i = 0; i < MAX_FAKE_FDS; i++)
     if (g_fds[i].kind == FD_NONE) return i;

@@ -15,6 +15,8 @@ float rd_pref_float(const char *stored, float def) {
   return (end != stored && *end == '\0') ? v : def;
 }
 
+/* Writes s with backslash, tab and newline escaped (\\ \t \n), so a value cannot break the
+ * line format. */
 static void put_escaped(FILE *f, const char *s) {
   for (; *s; s++) {
     if (*s == '\\' || *s == '\t' || *s == '\n') {
@@ -26,6 +28,7 @@ static void put_escaped(FILE *f, const char *s) {
   }
 }
 
+/* Undoes put_escaped in place; returns s. */
 static char *unescape(char *s) {
   char *w = s;
   for (const char *o = s; *o; o++) {
@@ -88,6 +91,7 @@ int rd_prefs_read_entry(FILE *f, char **line, size_t *cap, char *type, char **ke
   return 0;
 }
 
+/* 1 if a file exists at path. */
 static int exists(const char *path) {
   struct stat st;
   return stat(path, &st) == 0;

@@ -229,6 +229,7 @@ void act_void(const FakeID *id, va_list va) {
 // never verifies them against anything but a stubbed RemoteConfig, so exact
 // numbers don't gate boot. Easy to correct once known.
 
+/* 1 if the field ID is `name` of a class whose name contains cls_sub. */
 static int fld_is(const FakeID *id, const char *cls_sub, const char *name) {
   return name_has(id->cls, cls_sub) && !strcmp(id->name, name);
 }
@@ -325,8 +326,11 @@ void *field_object(const FakeID *id) {
  * phone at any of these resolutions), matching standard Android density buckets:
  *   720->320dpi/2.0, 1080->480dpi/3.0, 1440->640dpi/4.0. */
 extern int screen_width, screen_height;
+/* Display density reported to the game, scaled so the screen is 360 dp wide whatever the
+ * render size (Unity lays out its UI in dp). */
 static int   nx_report_density_dpi(void){ int w = screen_width > 0 ? screen_width : 720;
                                           return (int)(w * 160.0f / 360.0f + 0.5f); }
+/* DisplayMetrics.density for the same 360 dp-wide screen. */
 static float nx_report_density(void){     int w = screen_width > 0 ? screen_width : 720;
                                           return w / 360.0f; }
 

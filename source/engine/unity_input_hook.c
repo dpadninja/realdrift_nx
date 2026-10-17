@@ -36,15 +36,18 @@ static HookTouch g_hook_touch[NX_MAX_TOUCH];
 /* slot allocator: slot_hid[s] = the HID finger_id holding slot s, or -1 if free */
 static int  slot_hid[NX_MAX_TOUCH];
 static int  slot_ready = 0;
+/* Marks every touch slot free (on first use). */
 static void slot_init(void) {
   if (slot_ready) return;
   for (int s = 0; s < NX_MAX_TOUCH; s++) slot_hid[s] = -1;
   slot_ready = 1;
 }
+/* Slot of the HID finger id, or -1. */
 static int slot_find(int hid) {
   for (int s = 0; s < NX_MAX_TOUCH; s++) if (slot_hid[s] == hid) return s;
   return -1;
 }
+/* Gives the HID finger the lowest free slot, as Android numbers pointers; -1 if all are taken. */
 static int slot_take(int hid) {                    /* lowest free slot, like Android */
   for (int s = 0; s < NX_MAX_TOUCH; s++) if (slot_hid[s] < 0) { slot_hid[s] = hid; return s; }
   return -1;

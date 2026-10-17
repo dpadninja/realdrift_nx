@@ -66,13 +66,17 @@ int crash_resolve_module(uintptr_t addr, char *name_out, size_t name_cap, uintpt
 static volatile uint32_t g_frame_count = 0;
 uint32_t port_frame_count(void) { return g_frame_count; }
 
+/* rd_il2cpp_load lookup: an export of libil2cpp (mod is its so_module), or NULL. */
 static void *il2cpp_sym(void *mod, const char *name) {
   return (void *)so_try_find_addr_rx((so_module *)mod, name);
 }
+/* Logs an il2cpp API function libil2cpp does not export (the hooks needing it stay off). */
 static void il2cpp_sym_missing(const char *name) {
   debugPrintf("[boot] WARNING: %s not exported by " RD_LIB_IL2CPP "\n", name);
 }
 
+/* Fatal unless the process may map code memory and change its permissions (needs the right
+ * launch mode / NPDM). */
 static void check_syscalls(void) {
   if (!envIsSyscallHinted(0x77)) fatal_error("svcMapProcessCodeMemory is unavailable.");
   if (!envIsSyscallHinted(0x78)) fatal_error("svcUnmapProcessCodeMemory is unavailable.");
@@ -104,6 +108,8 @@ static void check_data(void) {
   }
 }
 
+/* Loads a game library from the game folder into the next part of the .so region and resolves
+ * its imports; 0 or -1. */
 static int load_module(so_module *mod, const char *name) {
   char path[RD_PATH_MAX];
   snprintf(path, sizeof path, "%s/%s", RD_GAME_HOME, name);

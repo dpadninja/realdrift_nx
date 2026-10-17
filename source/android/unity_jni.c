@@ -49,6 +49,8 @@ typedef struct {
   double bfval;             /* UJ_BOXED float payload                       */
 } UHandle;
 
+/* A new handle of the given kind (asset stream, file, ...), tagged so unity_jni can recognise
+ * its own objects among JNI handles. */
 static UHandle *uh_new(int kind){
   UHandle *h = calloc(1,sizeof *h);
   h->tag = UJ_TAG; h->kind = kind; h->fd = -1; return h;
@@ -72,6 +74,8 @@ static void apk_asset_entry(char *out,size_t n,const char *name){
  * default device (sdmc), set by our boot chdir, so file I/O is unaffected. Our
  * internal g_root keeps the explicit "sdmc:" prefix. */
 static int rd_file_exists(const char *p){ struct stat st; return stat(p,&st)==0; }
+/* The game folder without its "sdmc:" device, as managed code must see paths (see managed_path
+ * in libc_shim.h). */
 static const char *managed_root(void){
   const char *c = strchr(g_root, ':');
   return (c && c[1] == '/') ? c + 1 : g_root;
@@ -86,6 +90,8 @@ static KV   *g_kv = NULL; static int g_kv_n=0, g_kv_cap=0; static int g_kv_dirty
 
 static char *prefs_file(char *buf,size_t n){ snprintf(buf,n,"%s/" RD_PREFS_FILE,g_root); return buf; }
 
+/* Sets a SharedPreferences entry (type letter, key, value), replacing an existing key; marks
+ * the store dirty. */
 static void kv_set(char type,const char*key,const char*val){
   for (int i=0;i<g_kv_n;i++) if(!strcmp(g_kv[i].key,key)){
     g_kv[i].type=type; free(g_kv[i].val); g_kv[i].val=strdup(val); g_kv_dirty=1; return; }
@@ -94,6 +100,7 @@ static void kv_set(char type,const char*key,const char*val){
   g_kv_n++; g_kv_dirty=1;
 }
 static KV *kv_get(const char*key){ for(int i=0;i<g_kv_n;i++) if(!strcmp(g_kv[i].key,key)) return &g_kv[i]; return NULL; }
+/* Removes a SharedPreferences entry if present; marks the store dirty. */
 static void kv_remove(const char*key){
   for(int i=0;i<g_kv_n;i++) if(!strcmp(g_kv[i].key,key)){
     free(g_kv[i].key);free(g_kv[i].val); g_kv[i]=g_kv[--g_kv_n]; g_kv_dirty=1; return; }
@@ -113,6 +120,8 @@ static void prefs_load(void){
   free(line); fclose(f); g_kv_dirty=0;
   debugPrintf("[prefs] load: %d entries from %s\n", g_kv_n, src);
 }
+/* Writes the SharedPreferences store to prefs.kv through the .tmp file and an atomic replace
+ * (rd_prefs.h), if anything changed; logs the outcome. */
 static void prefs_flush(void){
   if(!g_kv_dirty){ debugPrintf("[prefs] flush: nothing dirty (%d entries)\n", g_kv_n); return; }
   char p[RD_PATH_MAX], tmp[RD_PATH_MAX + 8];

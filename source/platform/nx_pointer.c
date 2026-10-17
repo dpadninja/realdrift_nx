@@ -103,6 +103,7 @@ static int      s_nev;
 #define GYRO_MIN    0.10f
 #define GYRO_MAX    8.0f
 
+/* 1 while the console is docked (TV mode). */
 static int is_docked(void) {
   return appletGetOperationMode() == AppletOperationMode_Console;
 }
@@ -120,6 +121,7 @@ int nxp_fclose(FILE *f) {
   return nxp_cfg.fclose_fn ? nxp_cfg.fclose_fn(f) : fclose(f);
 }
 
+/* Keeps the three sensitivities inside their allowed ranges (after loading or a change). */
 static void clamp_settings(void) {
   if (s_stick_speed < STICK_MIN) s_stick_speed = STICK_MIN;
   if (s_stick_speed > STICK_MAX) s_stick_speed = STICK_MAX;
@@ -129,10 +131,12 @@ static void clamp_settings(void) {
   if (s_gyro_sens   > GYRO_MAX)  s_gyro_sens   = GYRO_MAX;
 }
 
+/* <data_dir>/pointer.cfg. */
 static void settings_path(char *out, size_t n) {
   snprintf(out, n, "%s/pointer.cfg", nxp_cfg.data_dir ? nxp_cfg.data_dir : ".");
 }
 
+/* Reads the sensitivities from pointer.cfg (defaults if it is missing), clamped. */
 static void settings_load(void) {
   if (!nxp_cfg.data_dir) return;
   char path[512];
@@ -235,6 +239,7 @@ void nxp_init(const NxpConfig *cfg) {
 
 /* ---------------------------------------------------------------- helpers */
 
+/* Keeps the cursor inside the render area. */
 static void clamp_cursor(void) {
   if (nxp_cx < 0) nxp_cx = 0;
   if (nxp_cy < 0) nxp_cy = 0;
@@ -242,6 +247,7 @@ static void clamp_cursor(void) {
   if (nxp_cy > nxp_cfg.screen_h - 1) nxp_cy = (float)(nxp_cfg.screen_h - 1);
 }
 
+/* Queues one pointer event for this frame (dropped if the queue is full). */
 static void push(int id, float x, float y, int phase) {
   if (s_nev >= (int)(sizeof s_ev / sizeof s_ev[0])) return;
   NxpEvent *e = &s_ev[s_nev++];
@@ -405,6 +411,8 @@ static void do_gyro(void) {
 static u64 s_mouse_seen = 0;
 static int s_mouse_logged = 0;
 
+/* Reads the USB mouse: moves the cursor by its deltas, taps with the left button, adjusts
+ * sensitivity with the wheel; returns 1 while a mouse is connected. */
 static int do_mouse(void) {
   HidMouseState st[16];
   int n = (int)hidGetMouseStates(st, 16);

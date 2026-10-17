@@ -17,6 +17,8 @@
 
 static long rd_stub0(void) { return 0; }
 
+/* writev for the engine, one write_fake per buffer (so fake fds and the read-ahead bookkeeping
+ * see every write). */
 static long rd_writev(int fd, const rd_iovec *iov, int iovcnt) {
   return rd_writev_via((rd_write_fn)write_fake, fd, iov, iovcnt);
 }

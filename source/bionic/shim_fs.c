@@ -33,6 +33,8 @@
 #define LINUX_O_TRUNC  01000
 #define LINUX_O_APPEND 02000
 
+/* bionic/Linux O_* flags to newlib's values (only the access mode and the
+ * creat/excl/trunc/append bits matter here). */
 static int convert_open_flags(int flags) {
   int out = flags & 3;
   if (flags & LINUX_O_CREAT)  out |= O_CREAT;
@@ -152,6 +154,7 @@ struct bionic_stat {
   uint32_t __unused4; uint32_t __unused5;
 };
 
+/* newlib struct stat to the bionic aarch64 layout the engine reads (second-resolution times). */
 static void convert_stat(const struct stat *in, struct bionic_stat *out) {
   memset(out, 0, sizeof(*out));
   out->st_dev = in->st_dev; out->st_ino = in->st_ino; out->st_mode = in->st_mode;
@@ -385,6 +388,8 @@ long read_fake(int fd, void *buf, size_t count) {          /* [perf] read= */
   if (r > 0) __atomic_add_fetch(&nx_stat_read_bytes, (unsigned long long)r, __ATOMIC_RELAXED);
   return r;
 }
+/* read() routing: fake-pipe fds to fakefd.c, read-ahead fds through their window, the rest to
+ * newlib. */
 static long read_fake_inner(int fd, void *buf, size_t count) {
   if (fakefd_is_fake(fd)) return fakefd_read(fd, buf, count);
   { struct RaCache *c = ra_find(fd); if (c) return ra_read(c, fd, buf, count); }

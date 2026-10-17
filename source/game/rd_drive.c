@@ -2,6 +2,8 @@
 #include <string.h>
 #include "rd_drive.h"
 
+/* Clamps a stick value to -1..1, zeroes it inside the deadzone and rescales the rest so full
+ * deflection is still 1. */
 static float apply_deadzone(float x, float dz) {
   if (x > 1.0f) x = 1.0f;
   if (x < -1.0f) x = -1.0f;

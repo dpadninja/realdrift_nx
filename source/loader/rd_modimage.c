@@ -1,6 +1,8 @@
 /* rd_modimage.c -- see rd_modimage.h. MIT (see LICENSE). */
 #include "rd_modimage.h"
 
+/* rd_image string reader: the C string at link-time address va of the module, or NULL past its
+ * mapping. */
 static const char *module_cstr(void *ctx, uint64_t va) {
   const so_module *m = ctx;
   if (va >= m->load_size) return NULL;

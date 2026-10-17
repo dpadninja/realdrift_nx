@@ -68,6 +68,7 @@ static long z_prctl(int option, unsigned long a2, unsigned long a3,
   if (option == Z_PR_SET_NAME && a2) diag_set_name(NULL, (const char *)a2);
   return 0;
 }
+/* Thread names go to the stall watchdog, which prints them in its dumps. */
 static int z_pthread_setname_np(void *thread, const char *name){
   diag_set_name(thread, name);
   return 0;
@@ -105,6 +106,8 @@ static int z_pthread_getattr_np(void *thread, void *attr){ (void)thread; (void)a
 static int z_getpagesize(void){ return 0x1000; }
 static int z_pthread_equal(unsigned long a, unsigned long b){ return a==b; }
 static int z_gettid(void){ return 1; }
+/* dup() that never fails: falls back to the same fd when fsdev cannot duplicate (see the
+ * comment inside). */
 static int z_dup(int fd){
   /* il2cpp's MemoryMappedFile::Map dup()s the metadata fd; a -1 here sent the
    * loader down its error path, so global-metadata.dat never mapped and every

@@ -73,6 +73,7 @@
 extern int CRASH_LOG_PRINTF(const char *fmt, ...);
 #define CLOG(...) CRASH_LOG_PRINTF(__VA_ARGS__)
 #else
+/* printf to svcOutputDebugString, used when no CRASH_LOG_PRINTF is configured. */
 static void crash_out(const char *fmt, ...) {
     char buf[512];
     va_list ap; va_start(ap, fmt);
@@ -119,6 +120,8 @@ static int mem_readable(uintptr_t addr, size_t len) {
     return 1;
 }
 
+/* "module+0xoffset" for v if it lies in a loaded module (crash_resolve_module), else the raw
+ * address; written into buf. */
 static const char *sym(uintptr_t v, char *buf, size_t cap) {
     char mod[64]; uintptr_t base = 0;
     if (crash_resolve_module(v, mod, sizeof mod, &base)) {

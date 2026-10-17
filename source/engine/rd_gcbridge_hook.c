@@ -78,6 +78,9 @@ static struct { pthread_t pth; Handle h; uint64_t entry; } g_gc_paused[GC_MAX_PA
 static int g_gc_npaused = 0;
 static unsigned g_gc_stops = 0, g_gc_fallbacks = 0, g_gc_logged = 0;
 
+/* Pauses thread t (never the calling thread), reads its registers and publishes them on its
+ * stack as Boehm's suspend handler would (rd_gc_emulate_suspend); returns 1 if t is now
+ * stopped, 0 if it could not be paused. */
 static int gc_pause_and_publish(pthread_t t, uint64_t entry, uint64_t stop) {
   Handle h = diag_handle_for_pthread(t);
   if (!h || h == threadGetCurHandle() || g_gc_npaused >= GC_MAX_PAUSED) return 0;

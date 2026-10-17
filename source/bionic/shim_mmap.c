@@ -37,6 +37,9 @@ static int   g_fb_n = 0;
 static size_t g_fb_bytes = 0;
 static Mutex g_fb_lock;
 
+/* When the arena is full: a memalign'd block (256 MB-aligned for big anonymous maps, which
+ * Unity's pools need), filled like an arena map and remembered so munmap can free it. NULL if
+ * the heap is exhausted. */
 static void *mmap_fallback(size_t length, int flags, int fd, long offset) {
   /* Big anonymous reservations are Unity Dynamic-Heap pools: its allocator masks
    * pointers down to a large-aligned pool base to derive block indices, so a
@@ -128,6 +131,7 @@ static int mapseen_check_and_record(uint64_t ino, long off, size_t len) {
 
 static struct { uint64_t ino; long off; size_t len; void *ptr; } g_mapc[MAPC_N];
 static int g_mapc_n = 0;
+/* The cached read-only map of (inode, offset, length), or NULL. */
 static void *mapcache_get(uint64_t ino, long off, size_t len) {
   void *r = NULL;
   mutexLock(&g_fb_lock);
@@ -136,6 +140,7 @@ static void *mapcache_get(uint64_t ino, long off, size_t len) {
   mutexUnlock(&g_fb_lock);
   return r;
 }
+/* 1 if ptr is a cached map; munmap must keep it. */
 static int mapcache_contains(void *ptr) {
   int r = 0;
   mutexLock(&g_fb_lock);
@@ -143,6 +148,8 @@ static int mapcache_contains(void *ptr) {
   mutexUnlock(&g_fb_lock);
   return r;
 }
+/* Pins a fully read read-only map in the cache (dropping it from the fallback list so it is
+ * never freed); warns once when the cache is full. */
 static void mapcache_put(uint64_t ino, long off, size_t len, void *ptr) {
   mutexLock(&g_fb_lock);
   for (int i = 0; i < g_fb_n; i++)          // pin: drop from fallback free-list

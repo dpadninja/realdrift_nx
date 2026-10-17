@@ -136,6 +136,8 @@ static const char *trim(const char *v, char *buf, size_t n) {
   return buf;
 }
 
+/* Parses `value` for setting st into the rd_settings field; 0, or -1 if invalid (the field is
+ * left unchanged). */
 static int parse(const setting *st, const char *value, void *field) {
   char v[128];
   trim(value, v, sizeof v);
@@ -178,6 +180,7 @@ static int parse(const setting *st, const char *value, void *field) {
   return -1;
 }
 
+/* The value of setting st as it is written to config.txt. */
 static void format(const setting *st, const void *field, char *buf, size_t n) {
   switch (st->type) {
     case T_BUTTONS:  if (rd_format_buttons(*(const uint64_t *)field, buf, n)) snprintf(buf, n, "NONE"); break;

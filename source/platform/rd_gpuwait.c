@@ -43,6 +43,8 @@ Result __wrap_nwindowSetSwapInterval(NWindow *nw, u32 swap_interval) {
   return r;
 }
 
+/* Current clock of a PCV module in MHz through clkrst; 0 with the error in *rc if the session
+ * fails. */
 static unsigned clock_mhz(PcvModuleId module, Result *rc) {
   ClkrstSession s;
   u32 hz = 0;

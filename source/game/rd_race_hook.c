@@ -46,6 +46,7 @@ int rd_race_active(void) {
   return g_installed && (port_frame_count() - g_last_race_frame) < RD_ACTIVE_WINDOW_FRAMES;
 }
 
+/* Deactivates every on-screen driving control GameObject that is active (hide_touch_controls). */
 static void hide_touch_controls(void *uim) {
   for (int i = UIM_FIRST_TOUCH_CONTROL; i < UIM_COUNT; i++) {
     void *go = FIELD(uim, g_uim[i], void *);
@@ -53,6 +54,8 @@ static void hide_touch_controls(void *uim) {
   }
 }
 
+/* Wrapper of UIManager.Update (runs every race frame): marks the race active, hides the touch
+ * controls, lets the smoke hook rescan, and handles the pause button. */
 static void ui_update(void *self, const void *mi) {
   g_orig_update(self, mi);
   if (!self) return;

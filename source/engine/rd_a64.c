@@ -8,6 +8,7 @@ uint32_t rd_a64_b(uint64_t from, uint64_t to) {
   return 0x14000000u | ((uint32_t)(d >> 2) & 0x03ffffffu);
 }
 
+/* Sign-extends the low `bits` bits of v (branch offsets are signed immediates). */
 static int64_t sext(uint64_t v, int bits) {
   return (int64_t)(v << (64 - bits)) >> (64 - bits);
 }

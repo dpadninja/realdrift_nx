@@ -66,6 +66,8 @@ FILE *fopen_fake(const char *path, const char *mode) {
 
 uint8_t fake_sF[3][0x100]; // referenced by imports.c (__sF / std{in,out,err})
 
+/* 1 if f is one of the engine's stdin/stdout/stderr (&fake_sF[0..2]), which go to debug.log
+ * instead of newlib. */
 static int is_fake_file(const void *f) {
   const uint8_t *p = f;
   const uint8_t *base = (const uint8_t *)fake_sF;

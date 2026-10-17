@@ -55,6 +55,7 @@ void nxp_slurp_cursor_png(void) {
 /* libpng reader over the in-memory buffer */
 typedef struct { const uint8_t *p; size_t len, off; } PngSrc;
 
+/* libpng read callback over the in-memory cursor.png; a read past the end is a libpng error. */
 static void png_read_mem(png_structp png, png_bytep out, png_size_t n) {
   PngSrc *s = (PngSrc *)png_get_io_ptr(png);
   if (s->off + n > s->len) { png_error(png, "short read"); return; }

@@ -119,6 +119,9 @@ static void mix_player(Player *p, int32_t *acc, int frames) {
   }
 }
 
+/* SDL audio thread: mixes every playing player into the device buffer (fixed-point, clipped)
+ * and fires their buffer-queue callbacks, with its own bionic TLS so FMOD's callback finds its
+ * stack guard. */
 static void SDLCALL audio_callback(void *ud, Uint8 *stream, int len) {
   (void)ud;
 

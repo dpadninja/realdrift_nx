@@ -30,9 +30,11 @@
 #define ZIP_DEFLATED        8
 
 static uint16_t le16(const uint8_t *p) { return (uint16_t)(p[0] | (p[1] << 8)); }
+/* Little-endian 32-bit value at p (zip headers are little-endian). */
 static uint32_t le32(const uint8_t *p) { return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
                                                 ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24); }
 
+/* Reads exactly n bytes at offset off; 0 or -1. */
 static int read_at(FILE *f, uint64_t off, void *buf, size_t n) {
   return fseeko(f, (off_t)off, SEEK_SET) == 0 && fread(buf, 1, n, f) == n ? 0 : -1;
 }

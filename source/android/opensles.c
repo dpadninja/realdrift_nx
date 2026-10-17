@@ -38,10 +38,15 @@ DEF_IID(VIBRA); DEF_IID(VIRTUALIZER); DEF_IID(VISUALIZATION); DEF_IID(VOLUME);
 #undef DEF_IID
 
 
+/* OpenSL volume in millibels to a linear gain (0 mB = 1.0; -9600 mB and below = silence). */
 static float mb_to_linear(SLmillibel mb) {
   if (mb <= -9600) return 0.0f;
   return powf(10.0f, (float)mb / 2000.0f); // 100 mB = 1 dB
 }
+
+// The interface methods below implement the OpenSL ES 1.0.1 methods of the same name
+// (<interface>_<Method>). `self` points at the interface's vtable pointer inside the object;
+// CONTAINER() gets back to the Player / Engine. They return SL_RESULT_* codes.
 
 // --- buffer queue interface -------------------------------------------------
 

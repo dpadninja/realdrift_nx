@@ -65,6 +65,9 @@ void android_native_update_mode(void){
 /* Remember the last geometry so we can re-assert it (see nx_window_reassert). */
 static u32 g_geom_bw = RD_DOCKED_W, g_geom_bh = RD_DOCKED_H;
 
+/* Sizes the window buffer to the render size, crops presentation to exactly that area (the
+ * buffer may be width-aligned larger) and keeps the identity transform; remembers the geometry
+ * for nx_window_reassert. */
 static void nx_window_set_geom(NWindow *w, u32 bw, u32 bh) {
   g_geom_bw = bw; g_geom_bh = bh;
   nwindowSetDimensions(w, bw, bh);
@@ -123,6 +126,8 @@ static int   g_loopers_init = 0;
 
 static void loopers_once(void){ if(!g_loopers_init){ mutexInit(&g_loopers_lock); g_loopers_init=1; } }
 
+/* The looper owned by thread `tid`, creating it in a free slot if `create`; NULL if there is
+ * none and none can be made. */
 static struct ALooper *looper_for(u32 tid, int create){
   loopers_once();
   mutexLock(&g_loopers_lock);

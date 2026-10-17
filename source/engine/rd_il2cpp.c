@@ -88,6 +88,7 @@ int rd_resolve_fields(rd_field_offset_fn lookup, void *ctx, const char *const na
 }
 
 struct field_ctx { const rd_il2cpp_api *api; void *klass; };
+/* rd_field_offset_fn over the il2cpp API for one class (ctx is a struct field_ctx). */
 static int api_lookup(void *ctx, const char *name, uint32_t *offset) {
   const struct field_ctx *c = ctx;
   return rd_il2cpp_field_offset(c->api, c->klass, name, offset);

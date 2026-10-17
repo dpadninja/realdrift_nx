@@ -76,6 +76,8 @@ static int truncate_stub(const char *path, long len) { (void)path; (void)len; re
 static int ftruncate_stub(int fd, long len) { return ftruncate(fd, (off_t)len); }
 static int fsync_stub(int fd) { int r = fsync(fd); fsdevCommitDevice("sdmc"); return r; }
 static int dup2_stub(int a, int b) { (void)a; return b; }
+/* pread over lseek + read: seeks, reads until n bytes or EOF (fsdev can short-read), and
+ * restores the file position. */
 static long pread_impl(int fd, void *buf, size_t n, long off) {
   long cur = lseek(fd, 0, SEEK_CUR);
   if (cur < 0) return -1;
@@ -90,6 +92,7 @@ static long pread_impl(int fd, void *buf, size_t n, long off) {
   watch_dump("pread", fd, (long)off, (long)n, buf, (long)total);
   return (long)total;
 }
+/* pwrite over lseek + write, restoring the file position. */
 static long pwrite_impl(int fd, const void *buf, size_t n, long off) {
   long cur = lseek(fd, 0, SEEK_CUR);
   if (cur < 0) return -1;
@@ -544,6 +547,8 @@ extern int rd_dynlib_numfunctions;
 
 static DynLibFunction *g_combined = NULL;
 static int g_combined_n = 0;
+/* Joins the import tables (main, Unity, libc extras, Real Drift additions) into one array for
+ * so_resolve, once. */
 static void build_combined(void) {
   if (g_combined) return;
   g_combined_n = (int)dynlib_numfunctions + unity_dynlib_numfunctions

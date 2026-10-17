@@ -381,6 +381,8 @@ int so_dump_maps(char *buf, size_t cap) {
   return (int)off;
 }
 
+/* Address for an import of mod: our shim tables first (they win over real exports), then the
+ * exports of the other loaded modules; 0 if none has it. */
 static uintptr_t so_resolve_symbol(so_module *mod, DynLibFunction *funcs, int num_funcs, const char *name) {
   // Prefer Switch shims over exports from other loaded modules.
   for (int k = 0; k < num_funcs; k++) {

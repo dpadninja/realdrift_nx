@@ -22,6 +22,7 @@
 
 typedef struct { RwLock lock; } FakeRwLock;
 
+/* The libnx RwLock behind a bionic rwlock slot, created on first use. */
 static FakeRwLock *get_rwlock(void **storage) {
   if (!*storage) { FakeRwLock *l = calloc(1, sizeof(*l)); rwlockInit(&l->lock); *storage = l; }
   return *storage;
@@ -79,6 +80,8 @@ int pthread_mutex_destroy_fake(pthread_mutex_t **uid) {
   if (uid && *uid && (uintptr_t)*uid > 0x8000) { pthread_mutex_destroy(*uid); free(*uid); *uid = NULL; }
   return 0;
 }
+/* Backs a bionic mutex slot that still holds a static initializer (any value below 0x10000)
+ * with a real newlib mutex, recursive for 0x4000. Returns 0 or the init error. */
 static int ensure_mutex(pthread_mutex_t **uid) {
   // A real (already-initialized) handle is a heap pointer; anything small is a
   // bionic static initializer left in place: 0 = normal, 0x4000 = recursive,
@@ -119,6 +122,8 @@ int pthread_cond_init_fake(pthread_cond_t **cnd, const int *attr) {
   if (pthread_cond_init(c, NULL) < 0) { free(c); return -1; }
   *cnd = c; return 0;
 }
+/* Backs a bionic condition-variable slot that still holds a static initializer with a real
+ * newlib condition variable. */
 static int ensure_cond(pthread_cond_t **cnd) {
   // like ensure_mutex: any small value is a bionic static cond initializer that
   // needs a real newlib object (was only treating 0 as needing init, so a
@@ -199,6 +204,8 @@ int pthread_attr_setstacksize_fake(void *a, size_t s) { if (a) { OurAttr *o = a;
 
 typedef struct { void *(*entry)(void *); void *arg; int is_main; uint8_t tls[BIONIC_TLS_SIZE]; } ThreadStart;
 static volatile int g_first_engine_thread_taken = 0;
+/* First code of every engine thread: installs the thread's own bionic TLS block and registers
+ * it with the stall watchdog around the engine's entry function. */
 static void *thread_trampoline(void *p) {
   ThreadStart *ts = (ThreadStart *)p;   /* leaked on purpose: tpidr points into ts->tls */
   install_bionic_tls(ts->tls);          // this thread's OWN stack-guard block (tpidr_el0+0x28)
@@ -250,6 +257,8 @@ static pthread_key_t g_master_key;
 static int g_master_key_ready;
 typedef struct { void *values[FAKE_KEYS_MAX]; } KeyValues;
 
+/* Thread-exit destructor of the per-thread value array: runs the destructors of the bionic
+ * keys, repeating (up to 4 rounds, as POSIX allows) while destructors set new values. */
 static void master_key_dtor(void *p) {
   KeyValues *kv = p;
   for (int iter = 0; iter < 4; iter++) {     // POSIX: rerun while dtors set new values

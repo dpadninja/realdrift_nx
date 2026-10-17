@@ -33,6 +33,8 @@ static rd_smoke_set g_smoke;                             /* smoke GameObjects of
 static uint32_t g_last_frame, g_last_scan;
 static int g_acc;                                        /* rd_smoke_keep remainder */
 
+/* Wrapper of ParticleSystem::Internal_EmitOld: in a race, for the smoke systems, drops a share
+ * of the particles and scales the size of the rest, then calls the engine. */
 static void ic_emit_old(void *ps, void *particle) {
   const int in_race = port_frame_count() - g_last_frame <= RD_ACTIVE_WINDOW_FRAMES;
   if (g_state > 0 && in_race && ps && particle && g_smoke.n &&
@@ -50,12 +52,15 @@ static const rd_icall_override g_icalls[] = {
 };
 const rd_icall_override *rd_smoke_icall_table(void) { return g_icalls; }
 
+/* An engine icall by name, or NULL (logged and counted in *missing). */
 static void *icall(const char *name, int *missing) {
   void *p = g_il2cpp.resolve_icall ? g_il2cpp.resolve_icall(name) : NULL;
   if (!p) { debugPrintf("[smoke] icall %s not found\n", name); (*missing)++; }
   return p;
 }
 
+/* Resolves the icalls, the ParticleSystemRenderer type and the Particle.m_StartSize offset
+ * once; returns 1 if the smoke hook can work, -1 (logged) if not. */
 static int init(void) {
   int missing = 0;
   g.find_objects    = icall(RD_ICALL_FIND_OBJECTS, &missing);
@@ -79,11 +84,14 @@ static int init(void) {
   return missing ? -1 : 1;
 }
 
+/* 1 if the renderer's material is the tyre smoke (RD_SMOKE_MATERIAL). */
 static int is_smoke(void *renderer) {
   void *mat = g.shared_material(renderer);
   return mat && rd_il2cpp_str_eq(&g_il2cpp, g.object_name(mat), RD_SMOKE_MATERIAL);
 }
 
+/* Adds the GameObjects of all smoke renderers in the scene to the set; logs when the count
+ * changes. */
 static void scan(void) {
   void *arr = g.find_objects(g.type_renderer);
   const uint32_t n = arr ? g_il2cpp.array_length(arr) : 0;

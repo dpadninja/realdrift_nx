@@ -57,6 +57,7 @@ static Thread            g_wd_thread;
 static inline uint64_t now_tick(void) { return armGetSystemTick(); }
 static inline uint64_t tick_to_ns(uint64_t t) { return armTicksToNs(t); }
 
+/* Name of a DIAG_W_* wait kind for the stall dump. */
 static const char *wait_kind_name(int k) {
   switch (k) {
     case DIAG_W_COND:   return "cond_wait";
@@ -69,6 +70,7 @@ static const char *wait_kind_name(int k) {
   }
 }
 
+/* Claims a free thread-registry slot (zeroed, in use), or NULL when all are taken. */
 static DiagThread *slot_alloc(void) {
   mutexLock(&g_reg_lock);
   DiagThread *t = NULL;
@@ -192,6 +194,8 @@ static uint64_t g_nro_base, g_nro_size;
 /* Set per-thread by snapshot_thread: enable the stack scan only for the main /
  * loader threads so the dump stays readable. */
 static int g_scan_stack;
+/* Records the address range of our own .nro (the memory block containing this function) so
+ * dumps can name NRO+offset frames. */
 static void nro_range_init(void) {
   MemoryInfo mi; u32 pi;
   if (R_SUCCEEDED(svcQueryMemory(&mi, &pi, (u64)(uintptr_t)&nro_range_init)) && mi.size) {
@@ -217,6 +221,7 @@ static void resolve_addr(char *buf, size_t n, uint64_t addr) {
   }
 }
 
+/* Logs one paused thread's PC, LR (symbolicated), SP, FP and first argument registers. */
 static void dump_thread_context(const char *name, const ThreadContext *ctx) {
   char a[40], b[40];
   resolve_addr(a, sizeof a, ctx->pc.x);
@@ -312,6 +317,9 @@ static void snapshot_thread(DiagThread *t) {
   g_scan_stack = 0;
 }
 
+/* The stall report: how long frames have not advanced, a table of every registered thread
+ * (state, wait object, wait counters since the last dump), then each thread's CPU context and
+ * frame-pointer backtrace (snapshot_thread). */
 static void dump_threads(int episode, uint64_t now) {
   uint64_t stalled_ns = tick_to_ns(now - g_last_progress);
   debugPrintf("\n[wd] ===== STALL #%d : no frame progress for %llu.%llus (last frame=%d) =====\n",
@@ -352,6 +360,9 @@ static void dump_threads(int episode, uint64_t now) {
   debugPrintf("\n");
 }
 
+/* The watchdog thread (plain libnx thread, not through the pthread shim): polls every
+ * DIAG_POLL_NS and dumps all threads once frames have not advanced for DIAG_STALL_NS, again
+ * every DIAG_REDUMP_NS while the stall lasts. */
 static void watchdog_main(void *unused) {
   (void)unused;
   int episode = 0;

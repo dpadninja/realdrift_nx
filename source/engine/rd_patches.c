@@ -69,6 +69,8 @@ int rd_install_engine_patches(uintptr_t unity_base, int *total) {
 #define CLOCK_THREAD_CPU     -2            /* libnx: the default core */
 #define BOOST_LOG_MAX        6             /* log only the first CPU boost switches */
 static Thread g_clock_thr;
+/* Background service thread (own bionic TLS): every CLOCK_POLL_NS flushes debug.log about once
+ * a second and switches the CPU boost on long loading frames (boost_loading). */
 static void rd_clock_thread(void *arg) {
   (void)arg;
   static uint8_t clk_tls[BIONIC_TLS_SIZE] __attribute__((aligned(16)));

@@ -146,6 +146,8 @@ int gettid_fake(void) {
 static Mutex   futex_lock[FUTEX_BUCKETS];   // libnx Mutex/CondVar are u32; 0 == ready
 static CondVar futex_cond[FUTEX_BUCKETS];
 
+/* FUTEX_WAIT / FUTEX_WAKE over hashed libnx mutex + condvar buckets; waits re-check *uaddr
+ * under the bucket lock, infinite waits are capped (see the comment above). */
 static long futex_impl(volatile int32_t *uaddr, int op, int val, const struct timespec *to) {
   const int cmd = op & FUTEX_CMD_MASK;
   const unsigned h = (unsigned)(((uintptr_t)uaddr >> 4) & (FUTEX_BUCKETS - 1));
