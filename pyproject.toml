@@ -9,9 +9,39 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4.0",
     "pytest>=9.1.1",
+    "ruff>=0.17.1",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+# docs/PYTHON_STYLE.md
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["."]
+
+[tool.ruff.per-file-target-version]
+"tools/stage_sd.py" = "py38"   # ships to players: stdlib only, Python 3.8+
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "D", "N", "RUF", "PTH", "C4"]
+ignore = ["D105", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]            # test names say what they check
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+files = ["tools"]
+
+[[tool.mypy.overrides]]
+module = ["elftools.*", "UnityPy.*"]
+ignore_missing_imports = true

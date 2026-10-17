@@ -1,4 +1,5 @@
 """config.example.txt must be exactly what the loader writes with default settings."""
+
 import subprocess
 from pathlib import Path
 
@@ -21,4 +22,6 @@ def generate(tmp_path: Path) -> str:
 @pytest.mark.skipif(hostc.CC is None, reason="no host C compiler")
 def test_config_example_matches_defaults(tmp_path: Path):
     actual = (hostc.ROOT / "config.example.txt").read_text()
-    assert actual == generate(tmp_path), "config.example.txt is stale; regenerate: make config-example"
+    assert actual == generate(tmp_path), (
+        "config.example.txt is stale; regenerate: make config-example"
+    )

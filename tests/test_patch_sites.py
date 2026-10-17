@@ -2,6 +2,7 @@
 
 The expected addresses were derived by hand from llvm-objdump (analysis/research/08-device-runs.md
 run 02 / run 08 / run 12 for 5.0.7; analysis/research/10-patch-sites.md for 5.0.8)."""
+
 import shutil
 import subprocess
 from pathlib import Path
@@ -13,14 +14,24 @@ from tools.game import RELEASES
 
 EXPECTED = {
     "5.0.7": {
-        "choreo_gate": 0x30F834, "choreo_skip": 0x30F89C,
-        "gc.sig_suspend": 0x1F16A98, "gc.sig_restart": 0x1F16A9C, "gc.retry_signals": 0x1F56908,
-        "gc.suspend_ack_sem": 0x1F6AC20, "gc.stop_count": 0x1F568F8, "gc.threads": 0x1F56920,
+        "choreo_gate": 0x30F834,
+        "choreo_skip": 0x30F89C,
+        "gc.sig_suspend": 0x1F16A98,
+        "gc.sig_restart": 0x1F16A9C,
+        "gc.retry_signals": 0x1F56908,
+        "gc.suspend_ack_sem": 0x1F6AC20,
+        "gc.stop_count": 0x1F568F8,
+        "gc.threads": 0x1F56920,
     },
     "5.0.8": {
-        "choreo_gate": 0x3136DC, "choreo_skip": 0x313744,
-        "gc.sig_suspend": 0x1F1C730, "gc.sig_restart": 0x1F1C734, "gc.retry_signals": 0x1F5C548,
-        "gc.suspend_ack_sem": 0x1F707B0, "gc.stop_count": 0x1F5C538, "gc.threads": 0x1F5C560,
+        "choreo_gate": 0x3136DC,
+        "choreo_skip": 0x313744,
+        "gc.sig_suspend": 0x1F1C730,
+        "gc.sig_restart": 0x1F1C734,
+        "gc.retry_signals": 0x1F5C548,
+        "gc.suspend_ack_sem": 0x1F707B0,
+        "gc.stop_count": 0x1F5C538,
+        "gc.threads": 0x1F5C560,
     },
 }
 
@@ -57,7 +68,7 @@ def test_finds_all_sites(tool: Path, release: str):
 
 def test_wrong_library_fails_cleanly(tool: Path, tmp_path: Path):
     d = libdir("5.0.8")
-    fake = tmp_path / "libunity.so"          # libmain renamed: nothing may be "found" in it
+    fake = tmp_path / "libunity.so"  # libmain renamed: nothing may be "found" in it
     shutil.copy(d / "libmain.so", fake)
     out = subprocess.run([str(tool), str(fake)], capture_output=True, text=True)
     assert out.returncode != 0 and "choreo_gate.result=0" in out.stdout

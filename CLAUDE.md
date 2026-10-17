@@ -13,7 +13,7 @@ Porting the Android game **Real Drift** (`com.realdrift.sipon`, Unity 2018.4.14f
 - **Research findings go into `analysis/research/*.md`** (index in `analysis/research/README.md`; gitignored, not published -- do not mention them in README.md). Record every significant result as you go, together with the command or script that reproduces it.
 - **All our own code must have unit tests**: Python tools in `tests/` (pytest); C code from the loader/shims needs host-side tests that run without the Switch. Forked upstream code does not need retroactive tests, but our changes to it do.
 - Never commit game files: `original/` (APK/OBB) and `analysis/` (extracted libs, dumps, reference clones) are gitignored.
-- **C code follows `docs/CODING_STYLE.md`** and the layers in `docs/ARCHITECTURE.md`. Project skills: `c-style` (before writing C), `port-architecture` (where code goes, recipes), `port-review` (before finishing a change).
+- **C code follows `docs/CODING_STYLE.md`, Python follows `docs/PYTHON_STYLE.md`**, and the layers in `docs/ARCHITECTURE.md`. Every file of code states its license. Project skills: `c-style` (before writing C), `python-style` (before writing Python), `port-architecture` (where code goes, recipes), `port-review` (before finishing a change).
 
 ## Layout
 

@@ -75,5 +75,5 @@ Code forked from other projects follows them where we touch it.
 
 - Every new pure module gets `tests/c/test_<module>.c`; its first line lists the sources it links:
   `/* sources: source/game/rd_smoke.c */`. Python tools get pytest tests in `tests/`.
-- `make test` runs everything (with ASan/UBSan for C); `make coverage` reports line coverage of the
+- `make test` runs everything (with ASan/UBSan for C), `make lint` checks the Python; `make coverage` reports line coverage of the
   host-testable sources and of `tools/`, and CI fails below the recorded threshold.

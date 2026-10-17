@@ -5,12 +5,20 @@ from pathlib import Path
 import pytest
 
 from tools.game import GAME, LITE_BUILD_ID, LITE_PACKAGE, RELEASES, ROOT, obb_name
-from tools.stage_sd import (apk_strings, axml_strings, check_apk_identity, check_obb_marker,
-                            find_obb_member, main, plan_apk, stage)
+from tools.stage_sd import (
+    apk_strings,
+    axml_strings,
+    check_apk_identity,
+    check_obb_marker,
+    find_obb_member,
+    main,
+    plan_apk,
+    stage,
+)
 
 BUILD_ID = GAME.build_id
 BUILD_ID_507 = RELEASES["5.0.7"]["build_id"]
-OBB = GAME.obb_name                                   # main.76.com.realdrift.sipon.obb
+OBB = GAME.obb_name  # main.76.com.realdrift.sipon.obb
 
 APK_NAMES = [
     "AndroidManifest.xml",
@@ -37,8 +45,17 @@ def make_axml(strings: list[str], utf8: bool = False) -> bytes:
         else:
             data += struct.pack("<H", len(s)) + s.encode("utf-16-le") + b"\0\0"
     strings_at = 28 + 4 * len(strings)
-    pool = struct.pack("<HHIIIIII", 0x0001, 28, strings_at + len(data), len(strings), 0,
-                       0x100 if utf8 else 0, strings_at, 0)
+    pool = struct.pack(
+        "<HHIIIIII",
+        0x0001,
+        28,
+        strings_at + len(data),
+        len(strings),
+        0,
+        0x100 if utf8 else 0,
+        strings_at,
+        0,
+    )
     pool += struct.pack(f"<{len(strings)}I", *offsets) + data
     return struct.pack("<HHI", 0x0003, 8, 8 + len(pool)) + pool
 
@@ -87,8 +104,8 @@ def test_plan_apk_rejects_32bit_only_apk():
 
 def test_find_obb_member_checks_the_version_code():
     assert find_obb_member(["x/", f"{GAME.package}/{OBB}"], 76) == f"{GAME.package}/{OBB}"
-    with pytest.raises(ValueError, match="main.74"):
-        find_obb_member([f"{GAME.package}/{OBB}"], 74)        # an OBB of another build
+    with pytest.raises(ValueError, match=r"main\.74"):
+        find_obb_member([f"{GAME.package}/{OBB}"], 74)  # an OBB of another build
     with pytest.raises(ValueError):
         find_obb_member(["main.1.other.game.obb"], 76)
 
@@ -108,7 +125,7 @@ def test_stage_end_to_end(tmp_path: Path):
     stage(apk, obb_zip, out, nro, GAME.version_code, BUILD_ID)
 
     assert (out / "libunity.so").read_text() == "lib/arm64-v8a/libunity.so"
-    assert not (out / "assets").exists()                 # data stays inside base.apk
+    assert not (out / "assets").exists()  # data stays inside base.apk
     with zipfile.ZipFile(out / OBB) as z:
         assert z.namelist() == [f"assets/{BUILD_ID}"]
     assert (out / "realdrift_nx.nro").read_bytes() == b"NRO"
@@ -148,8 +165,9 @@ def test_main_end_to_end(tmp_path: Path, monkeypatch):
     assert main([str(bad), str(obb)]) == 1
 
 
-@pytest.mark.parametrize("apk, ok", [("original/base.apk", True),
-                                     ("analysis/realdrift-5.0.7-build74.apk", False)])
+@pytest.mark.parametrize(
+    "apk, ok", [("original/base.apk", True), ("analysis/realdrift-5.0.7-build74.apk", False)]
+)
 def test_real_apks(apk: str, ok: bool):
     if not (ROOT / apk).exists():
         pytest.skip(f"no {apk}")

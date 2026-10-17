@@ -10,7 +10,7 @@ METHODS = [
 def test_lookup_picks_containing_method():
     s = Symbolizer.from_methods(METHODS)
     assert s.lookup(0x1000) == "A$$Start+0x0"
-    assert s.lookup(0x1ffc) == "A$$Start+0xffc"
+    assert s.lookup(0x1FFC) == "A$$Start+0xffc"
     assert s.lookup(0x2010) == "B$$Run+0x10"
 
 
@@ -23,4 +23,6 @@ def test_lookup_below_first_method_and_zero_addresses_ignored():
 def test_annotate_log_line():
     s = Symbolizer.from_methods(METHODS)
     line = "[wd]     bt[4] libil2cpp.so+0x2010 then libunity.so+0x10"
-    assert s.annotate(line) == "[wd]     bt[4] libil2cpp.so+0x2010 [B$$Run+0x10] then libunity.so+0x10"
+    assert (
+        s.annotate(line) == "[wd]     bt[4] libil2cpp.so+0x2010 [B$$Run+0x10] then libunity.so+0x10"
+    )

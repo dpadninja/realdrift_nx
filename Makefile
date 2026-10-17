@@ -10,9 +10,12 @@
 #   make test             all unit tests (Python + host C, tests/)
 #   make tools            build-host/find_patch_sites
 #   make config-example   regenerate config.example.txt from the loader's settings table
+#   make lint             ruff check + ruff format --check + mypy (docs/PYTHON_STYLE.md)
+#
+# MIT (see LICENSE).
 #---------------------------------------------------------------------------------
 .SUFFIXES:
-HOST_GOALS := test tools config-example
+HOST_GOALS := test tools config-example lint
 ifneq ($(filter $(HOST_GOALS),$(MAKECMDGOALS)),)
 HOST_BUILD := build-host
 .PHONY: $(HOST_GOALS)
@@ -23,6 +26,10 @@ tools:
 config-example:
 	uv run python -m tools.hostc tests/c/gen_config_example.c $(HOST_BUILD)/gen_config_example
 	$(HOST_BUILD)/gen_config_example config.example.txt
+lint:
+	uv run ruff check
+	uv run ruff format --check
+	uv run mypy
 else
 ifeq ($(strip $(DEVKITPRO)),)
 $(error "Set DEVKITPRO in your environment. (export DEVKITPRO=/opt/devkitpro)")

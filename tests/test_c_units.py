@@ -3,6 +3,7 @@
 
 The binary gets the test's tmp dir as argv[1]; a sample zip is written there as test.zip.
 """
+
 import subprocess
 import zipfile
 from pathlib import Path

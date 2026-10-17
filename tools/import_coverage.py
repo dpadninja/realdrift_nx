@@ -1,47 +1,62 @@
 """Report imports of Android .so files that the loader's shim tables do not provide.
 
-Shim tables are the `{ "name", (uintptr_t)&fn }` initializers in source/*.c|h|inc.
+Shim tables are the `{ "name", (uintptr_t)&fn }` initializers in source/**/*.c|h|inc.
 
-Usage: python tools/import_coverage.py analysis/lib64/*.so
+    python tools/import_coverage.py analysis/lib64/*.so
+
+MIT (see LICENSE).
 """
+
+import argparse
 import re
 import sys
 from pathlib import Path
 
 from elftools.elf.elffile import ELFFile
+from elftools.elf.sections import SymbolTableSection
 
 ROOT = Path(__file__).resolve().parents[1]
 TABLE_ENTRY = re.compile(r'\{\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*,')
 
 
 def table_symbols(source_dir: Path) -> set[str]:
+    """Every name that appears as the first field of a table row under `source_dir`."""
     names: set[str] = set()
     for pattern in ("*.c", "*.h", "*.inc"):
-        for f in source_dir.glob(pattern):
+        for f in source_dir.rglob(pattern):
             names.update(TABLE_ENTRY.findall(f.read_text(errors="replace")))
     return names
 
 
 def undefined_imports(so_path: Path) -> set[str]:
-    with open(so_path, "rb") as f:
+    """Names of the undefined dynamic symbols (imports) of a shared library.
+
+    Raises:
+        ValueError: the file has no .dynsym section.
+    """
+    with so_path.open("rb") as f:
         dynsym = ELFFile(f).get_section_by_name(".dynsym")
-        return {
-            s.name for s in dynsym.iter_symbols()
-            if s.name and s["st_shndx"] == "SHN_UNDEF"
-        }
+        if not isinstance(dynsym, SymbolTableSection):
+            raise ValueError(f"{so_path}: no .dynsym section")
+        return {s.name for s in dynsym.iter_symbols() if s.name and s["st_shndx"] == "SHN_UNDEF"}
 
 
 def missing(so_paths: list[Path], source_dir: Path = ROOT / "source") -> dict[str, list[str]]:
+    """Per library file name, the sorted imports no shim table provides."""
     provided = table_symbols(source_dir)
     return {p.name: sorted(undefined_imports(p) - provided) for p in so_paths}
 
 
-def main(paths: list[str]) -> int:
-    report = missing([Path(p) for p in paths])
+def main(argv: list[str] | None = None) -> int:
+    """Command line: prints the report; exit code 1 if anything is missing."""
+    ap = argparse.ArgumentParser(description="Imports the loader's shim tables do not provide.")
+    ap.add_argument("libs", nargs="+", type=Path, help="Android .so files")
+    args = ap.parse_args(argv)
+    report = missing(args.libs)
     for lib, names in report.items():
         print(f"{lib}: {len(names)} missing" + (": " + " ".join(names) if names else ""))
     return 1 if any(report.values()) else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())
