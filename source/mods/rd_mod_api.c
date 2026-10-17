@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "rd_hook.h"
 #include "rd_il2cpp.h"
 #include "rd_log.h"
 #include "rd_mods_internal.h"
@@ -114,6 +115,14 @@ static int api_method_swap(void *method, void *fn, void **orig) {
   return 0;
 }
 
+static void *api_method_code(void *method) { return method ? *(void **)method : NULL; }
+
+static int api_inline_hook(void *code, void *fn, void **orig) {
+  if (!code || !fn) return RD_MOD_EARG;
+  const int r = rd_hook_install(code, fn, orig);
+  return r == 0 ? 0 : r == -1 ? RD_MOD_EARG : RD_MOD_EFULL;
+}
+
 static void api_draw_text(float x, float y, float size, uint32_t rgba, const char *text) {
   if (text) rd_mods_text(x, y, size, rgba, text);
 }
@@ -141,6 +150,8 @@ void rd_mods_api_fill(rd_mod_slot *s) {
     .icall = api_icall,
     .icall_override = api_icall_override,
     .method_swap = api_method_swap,
+    .method_code = api_method_code,
+    .inline_hook = api_inline_hook,
     .draw_text = api_draw_text,
   };
 }

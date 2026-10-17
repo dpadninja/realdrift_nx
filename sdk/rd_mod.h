@@ -94,6 +94,13 @@ struct rd_mod_api {
    * coroutines, invoke() -- not direct calls compiled into other C# methods. fn has the
    * method's C signature plus a trailing MethodInfo*: void fn(void *self, ..., void *mi). */
   int (*method_swap)(void *method, void *fn, void **orig);
+  /* Address of a method's compiled code (from method()), for inline_hook. */
+  void *(*method_code)(void *method);
+  /* Redirects the native function at `code` (method_code(), an icall(), any libil2cpp /
+   * libunity code) to fn, for every caller, including direct calls. *orig gets a trampoline
+   * that runs the original. RD_MOD_EARG if the function is too small or tail-calls (hook its
+   * target instead). Best done in on_game_ready, before the code is busy. */
+  int (*inline_hook)(void *code, void *fn, void **orig);
 
   /* ---- screen ---- */
 
