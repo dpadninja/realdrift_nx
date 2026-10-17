@@ -253,22 +253,6 @@ void *mmap_fake(void *addr, size_t length, int prot, int flags, int fd, long off
   // less than the requested length; the spill lives past the arena and is trimmed).
   size_t fill = length < reserved ? length : reserved;
 
-  if (g_overcommit) {
-    // PROT_NONE reservation: address space only, no physical -- the whole point.
-    // The engine commits the sub-ranges it uses later via mprotect(RW).
-    if (prot == BIONIC_PROT_NONE) return p;
-    // Otherwise commit now (anon RW, file maps): svcMapPhysicalMemory zero-fills,
-    // so anon needs no memset; file maps read their contents over the zeros.
-    arena_commit_range(p, fill);
-    if (!(flags & BIONIC_MAP_ANONYMOUS) && fd >= 0) {
-      long got = 0, cur = lseek(fd, 0, SEEK_CUR);
-      if (lseek(fd, offset, SEEK_SET) >= 0)
-        while ((size_t)got < fill) { long r = read(fd, (char *)p + got, fill - got); if (r <= 0) break; got += r; }
-      if (cur >= 0) lseek(fd, cur, SEEK_SET);
-    }
-    return p;
-  }
-
   if (flags & BIONIC_MAP_ANONYMOUS) {
     memset(p, 0, fill);   // anonymous memory must read back as zero
   } else {
@@ -309,14 +293,12 @@ int munmap_fake(void *addr, size_t length) {
     mutexUnlock(&g_mmap_lock);
     return 0;
   }
-  arena_decommit_range(addr, length);       // reclaim physical (overcommit only)
   mmap_arena_free(addr, length);            // unreserve address space
   return 0;
 }
 
-// In overcommit mode mprotect drives commit/decommit: RW/R commits physical at
-// the alias address, PROT_NONE decommits it (safe -- reuse re-mprotects to RW).
-// In heap-backed mode the arena is always RW so this is a no-op.
+// mprotect: the heap arena is always RW, so only the overcommit window acts on it (commits on
+// RW; PROT_NONE is left mapped, Unity never decommits). The rest is a diagnostic.
 int mprotect_fake(void *addr, size_t len, int prot) {
   /* Diagnostic (fires even heap-backed): measure Unity's commit pattern so we can
    * confirm it commits PROT_NONE reservations via mprotect(RW) and size the
@@ -346,14 +328,11 @@ int mprotect_fake(void *addr, size_t len, int prot) {
     }
     return 0;
   }
-  if (!g_overcommit) return 0;
-  if (prot == BIONIC_PROT_NONE) arena_decommit_range(addr, len);
-  else                          arena_commit_range(addr, len);
   return 0;
 }
-// madvise(MADV_DONTNEED): overcommit zeroes-but-keeps (see arena_dontneed_range);
-// heap-backed leaves pages as-is (always RW-backed).
+// madvise: no-op. The arena is heap memory, always backed; MADV_DONTNEED leaves the pages as
+// they are, as it always did in the heap-backed mode.
 int madvise_fake(void *addr, size_t len, int advice) {
-  if (g_overcommit && advice == BIONIC_MADV_DONTNEED) arena_dontneed_range(addr, len);
+  (void)addr; (void)len; (void)advice;
   return 0;
 }

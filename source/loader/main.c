@@ -59,16 +59,6 @@ static size_t heap_so_limit = 0;
 /* mmap arena (consumed by mmap_fake/munmap_fake in libc_shim.c). */
 void  *g_mmap_arena_base = NULL;
 size_t g_mmap_arena_size = 0;
-int    g_overcommit      = 0;
-u64    g_alias_base = 0, g_alias_size = 0;
-unsigned g_oc_heap_mb = 0, g_oc_freed_mb = 0;
-int      g_oc_hint_map = 0, g_oc_hint_unmap = 0;
-unsigned g_oc_alias_mb = 0;
-void    *g_oc_win = NULL;
-int      g_oc_probe_tried = 0, g_oc_shrink_tried = 0;
-unsigned g_oc_probe_rc = 0, g_oc_shrink_rc = 0;
-unsigned long g_oc_win_addr = 0;
-u64      g_oc_sysres = 0;
 
 so_module main_mod, unity_mod, il2cpp_mod;
 
@@ -143,18 +133,6 @@ static void *oc_find_stack_window(size_t want, size_t *out_size) {
   return (void *)aligned;
 }
 
-static int overcommit_setup(void *addr, size_t size, size_t so_zone,
-                            void **out_addr, size_t *out_fake) {
-  (void)addr; (void)size; (void)so_zone; (void)out_addr; (void)out_fake;
-  g_oc_hint_map   = envIsSyscallHinted(0x2c);
-  g_oc_hint_unmap = envIsSyscallHinted(0x2d);
-  svcGetInfo(&g_alias_base, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
-  svcGetInfo(&g_alias_size, InfoType_AliasRegionSize,    CUR_PROCESS_HANDLE, 0);
-  g_oc_alias_mb = (unsigned)(g_alias_size >> 20);
-  svcGetInfo(&g_oc_sysres, InfoType_SystemResourceSizeTotal, CUR_PROCESS_HANDLE, 0);
-  return 0;   /* no system resource -> svcMapPhysicalMemory unusable; heap-backed */
-}
-
 /* Called by libnx before main() to set up the newlib heap (overrides libnx's default). */
 void __libnx_initheap(void);
 void __libnx_initheap(void) {
@@ -184,15 +162,6 @@ void __libnx_initheap(void) {
 
   extern char *fake_heap_start;
   extern char *fake_heap_end;
-
-  void *oc_addr; size_t oc_fake;
-  if (overcommit_setup(addr, size, so_zone, &oc_addr, &oc_fake)) {
-    fake_heap_start = (char *)oc_addr;
-    fake_heap_end   = (char *)oc_addr + oc_fake;
-    heap_so_base    = (void *)ALIGN_MEM((uintptr_t)oc_addr + oc_fake, 0x1000);
-    heap_so_limit   = so_zone;
-    return;
-  }
 
   const size_t big_align    = MMAP_ARENA_ALIGN;
   const size_t newlib_floor = 384 * MB;

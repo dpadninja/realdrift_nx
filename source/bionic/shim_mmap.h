@@ -1,7 +1,7 @@
 /* shim_mmap.h -- shared state of the mmap shims (bionic layer, internal).
  *
  *   shim_mmap.c        the bionic entry points, memalign fallback, read-only file-map cache
- *   shim_mmap_arena.c  the page arena on the newlib heap (+ on-demand commit with overcommit)
+ *   shim_mmap_arena.c  the page arena on the newlib heap
  *   shim_mmap_oc.c     the stack-region overcommit window for big PROT_NONE reservations
  * Functions named *_locked must be called with g_mmap_lock held.
  * MIT (see LICENSE). */
@@ -14,8 +14,6 @@
 
 extern void  *g_mmap_arena_base;   // set by __libnx_initheap (main.c)
 extern size_t g_mmap_arena_size;
-extern int    g_overcommit;        // 1 = alias-region on-demand commit
-extern u64    g_alias_base, g_alias_size;
 
 #define BIONIC_MAP_ANONYMOUS 0x20
 #define MMAP_PAGE       0x1000u
@@ -38,12 +36,6 @@ void  mmap_arena_init_locked(void);
 void *mmap_arena_alloc_locked(size_t len, size_t *got);
 /* munmap of an arena range: releases exactly those pages (takes g_mmap_lock itself). */
 void  mmap_arena_free(void *addr, size_t len);
-/* With overcommit: commit [addr,len) on demand (mprotect RW / anon mmap), decommit on PROT_NONE /
- * munmap; madvise(DONTNEED) zeroes but keeps the pages committed (no fault handler to recommit).
- * No-ops without overcommit. They take g_mmap_lock themselves. */
-void  arena_commit_range(void *addr, size_t len);
-void  arena_decommit_range(void *addr, size_t len);
-void  arena_dontneed_range(void *addr, size_t len);
 
 /* ---- overcommit window (shim_mmap_oc.c) ----------------------------------------------- */
 
