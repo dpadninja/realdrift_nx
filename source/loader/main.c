@@ -8,40 +8,28 @@
  * (jni_fake.c); engine patches find their sites by instruction pattern (rd_patches.c).
  * Game data is read straight from base.apk and the OBB (unity_jni.c, rd_zip.c).
  *
- * Forked from badpiggies_nx (ChanseyIsTheBest, MIT) and its colorsheep_nx / laytonbmr_nx
- * lineage; the memory/heap/overcommit scaffolding is inherited. */
-#include <stdlib.h>
-#include <malloc.h>
-#include <string.h>
-#include <strings.h>
+ * main() is a list of boot steps (boot_* below); the memory layout set up before it runs is in
+ * mem_layout.c.
+ *
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the colorsheep_nx / laytonbmr_nx so-loader lineage. MIT (see LICENSE). */
 #include <dirent.h>
-#include <unistd.h>
-#include <time.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <switch.h>
 #include <SDL2/SDL.h>
 
 #include "config.h"
-#include "rd_log.h"
 #include "rd_il2cpp.h"
-#include "rd_drive.h"
 #include "rd_platform.h"
 #include "rd_patches.h"
 #include "libc_shim.h"
 #include "nx_fonts.h"
 #include "util.h"
 #include "error.h"
-#include "so_util.h"
 #include "imports.h"
 #include "jni_fake.h"
 #include "android_native_unity.h"
 #include "opensles.h"
 #include "unity_entrypoints.h"
 #include "unity_input_hook.h"
-#include "rd_icall.h"
-#include "rd_apkpath.h"
-#include "rd_perf.h"
 #include "rd_gpuwait.h"
 
 volatile uint64_t g_rd_frame_start_ns = 0;   /* Read by rd_patches.c clock thread */
@@ -52,13 +40,7 @@ volatile int      g_rd_in_frame = 0;
 #include "unity_jni.h"
 #include "rd_perfstat.h"
 #include "rd_gcbridge.h"
-
-static void *heap_so_base = NULL;
-static size_t heap_so_limit = 0;
-
-/* mmap arena (consumed by mmap_fake/munmap_fake in libc_shim.c). */
-void  *g_mmap_arena_base = NULL;
-size_t g_mmap_arena_size = 0;
+#include "mem_layout.h"
 
 so_module main_mod, unity_mod, il2cpp_mod;
 
@@ -89,107 +71,6 @@ static void *il2cpp_sym(void *mod, const char *name) {
 }
 static void il2cpp_sym_missing(const char *name) {
   debugPrintf("[boot] WARNING: %s not exported by " RD_LIB_IL2CPP "\n", name);
-}
-
-/* libunity ~19M + libil2cpp ~48M + headroom for relocated segments */
-#define SO_REGION_BYTES (240u * 1024 * 1024)
-
-/* ==========================================================================
- * Memory/heap/overcommit scaffolding, inherited from the so-loader lineage (MIT).
- * ========================================================================== */
-static void *oc_find_stack_window(size_t want, size_t *out_size) {
-  *out_size = 0;
-  u64 sbase = 0, ssize = 0;
-  svcGetInfo(&sbase, InfoType_StackRegionAddress, CUR_PROCESS_HANDLE, 0);
-  svcGetInfo(&ssize, InfoType_StackRegionSize,    CUR_PROCESS_HANDLE, 0);
-  if (!sbase || !ssize) return NULL;
-  u64 end = sbase + ssize, a = sbase, best_a = 0, best_l = 0;
-  int holes = 0, mapped = 0;
-  while (a < end) {
-    MemoryInfo mi; u32 pi;
-    if (R_FAILED(svcQueryMemory(&mi, &pi, a))) break;
-    u64 ms = mi.addr, me = mi.addr + mi.size;
-    if (me <= a) break;
-    if (mi.type == MemType_Unmapped) {
-      u64 hs = ms < sbase ? sbase : ms, he = me > end ? end : me;
-      if (he > hs) {
-        if (he - hs > best_l) { best_l = he - hs; best_a = hs; }
-        if (holes < 8)
-          debugPrintf("[oc] stack hole %d: %p .. %p (%u MB)\n",
-                      holes++, (void *)hs, (void *)he, (unsigned)((he - hs) >> 20));
-      }
-    } else mapped++;
-    a = me;
-  }
-  debugPrintf("[oc] stack scan: base=%p size=%u MB, %d holes, %d mapped spans, largest=%u MB\n",
-              (void *)sbase, (unsigned)(ssize >> 20), holes, mapped, (unsigned)(best_l >> 20));
-  if (!best_a) return NULL;
-  u64 aligned = (best_a + (MMAP_ARENA_ALIGN - 1)) & ~(MMAP_ARENA_ALIGN - 1);
-  if (aligned >= best_a + best_l) return NULL;
-  u64 avail = ((best_a + best_l) - aligned) & ~(MMAP_ARENA_ALIGN - 1);
-  if (!avail) return NULL;
-  if (avail > want) avail = want;
-  *out_size = avail;
-  return (void *)aligned;
-}
-
-/* Called by libnx before main() to set up the newlib heap (overrides libnx's default). */
-void __libnx_initheap(void);
-void __libnx_initheap(void) {
-  void *addr;
-  size_t size = 0;
-  size_t mem_available = 0, mem_used = 0;
-
-  if (envHasHeapOverride()) {
-    addr = envGetHeapOverrideAddr();
-    size = envGetHeapOverrideSize();
-  } else {
-    svcGetInfo(&mem_available, InfoType_TotalMemorySize, CUR_PROCESS_HANDLE, 0);
-    svcGetInfo(&mem_used, InfoType_UsedMemorySize, CUR_PROCESS_HANDLE, 0);
-    if (mem_available > mem_used + 0x200000)
-      size = (mem_available - mem_used - 0x200000) & ~0x1FFFFF;
-    if (size == 0)
-      size = 0x2000000 * 16;
-    Result rc = svcSetHeapSize(&addr, size);
-    if (R_FAILED(rc))
-      diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_HeapAllocFailed));
-  }
-
-  const size_t MB = 1024 * 1024;
-  size_t so_zone = SO_REGION_BYTES;
-  if (so_zone > size / 2)
-    so_zone = size / 2;
-
-  extern char *fake_heap_start;
-  extern char *fake_heap_end;
-
-  const size_t big_align    = MMAP_ARENA_ALIGN;
-  const size_t newlib_floor = 384 * MB;
-  size_t arena_sz = MMAP_ARENA_RESERVE;
-  size_t fake_heap_size;
-
-  if (size > so_zone + big_align + newlib_floor + 256 * MB) {
-    size_t avail = size - so_zone - big_align - newlib_floor;
-    if (arena_sz > avail) arena_sz = avail & ~(big_align - 1);
-    size_t usable    = size - so_zone - big_align;
-    size_t arena_cap = ((usable * 30) / 100) & ~(big_align - 1);
-    if (arena_sz > arena_cap) arena_sz = arena_cap;
-    fake_heap_size = size - so_zone - arena_sz - big_align;
-  } else {
-    fake_heap_size = (size > so_zone) ? size - so_zone : size / 2;
-    arena_sz = 0;
-  }
-
-  fake_heap_start = (char *)addr;
-  fake_heap_end   = (char *)addr + fake_heap_size;
-
-  heap_so_base  = (void *)ALIGN_MEM((uintptr_t)addr + fake_heap_size, 0x1000);
-  heap_so_limit = so_zone;
-
-  if (arena_sz) {
-    g_mmap_arena_base = (void *)ALIGN_MEM((uintptr_t)heap_so_base + so_zone, big_align);
-    g_mmap_arena_size = arena_sz;
-  }
 }
 
 static void check_syscalls(void) {
@@ -254,69 +135,37 @@ static void nx_applet_hook(AppletHookType hook, void *param) {
     nx_sd_flush();
 }
 
-int main(int argc, char *argv[]) {
-  (void)argc; (void)argv;
-  socketInitializeDefault();
-  debugPrintf(RD_LOG_TAG_BANNER " realdrift_nx start (Real Drift " RD_GAME_VERSION_NAME ", Unity " RD_UNITY_VERSION ") ===\n");
+/* The engine-facing objects built by the fake JNI (jni_fake.c, unity_glue.c). */
+extern void *fake_env, *fake_unityplayer_thiz, *fake_context_obj, *fake_surface_obj;
+extern void *fake_vm;
 
-  /* CWD fix: title-override leaves cwd at the .nro folder or SD root; Unity reads many
-   * files via relative paths, so chdir into RD_GAME_HOME. */
-  {
-    char cwd[256] = {0};
-    getcwd(cwd, sizeof cwd);
-    int rc = chdir(RD_GAME_HOME);
-    struct stat st;
-    int reach_apk = stat(RD_BASE_APK_NAME, &st) == 0;
-    int reach_obb = stat(RD_GAME_OBB_NAME, &st) == 0;
-    debugPrintf("[boot] cwd '%s' -> chdir(%s)=%d; reachable(rel): %s=%d %s=%d\n",
-                cwd, RD_GAME_HOME, rc, RD_BASE_APK_NAME, reach_apk, RD_GAME_OBB_NAME, reach_obb);
-  }
+/* The main thread runs the init arrays and the engine lifecycle with this bionic TLS block. */
+static uint8_t main_tls[BIONIC_TLS_SIZE] __attribute__((aligned(16)));
 
-  /* config.txt (render resolution) -- create with defaults on first run. */
-  {
-    const char *cfg = RD_GAME_HOME "/" RD_CONFIG_FILE;
-    if (read_config(cfg) != 0) write_config(cfg);
-  }
+/* ---- boot steps, in the order main() runs them ----------------------------------------- */
 
-  check_syscalls();
-  debugPrintf("[boot] syscalls ok\n");
-  {
-    extern char *fake_heap_start, *fake_heap_end;
-    debugPrintf("[boot] mem: newlib=%u MB, mmap arena=%u MB @ %p\n",
-                (unsigned)((fake_heap_end - fake_heap_start) / (1024 * 1024)),
-                (unsigned)(g_mmap_arena_size / (1024 * 1024)), g_mmap_arena_base);
-    u64 tot = 0, used = 0;
-    svcGetInfo(&tot,  InfoType_TotalMemorySize, CUR_PROCESS_HANDLE, 0);
-    svcGetInfo(&used, InfoType_UsedMemorySize,  CUR_PROCESS_HANDLE, 0);
-    debugPrintf("[boot] phys: total=%u MB used=%u MB free=%u MB\n",
-                (unsigned)(tot >> 20), (unsigned)(used >> 20), (unsigned)((tot - used) >> 20));
-  }
+/* Title override leaves the cwd at the .nro folder or the SD root; Unity reads many files by
+ * relative path, so chdir into RD_GAME_HOME. */
+static void boot_enter_game_folder(void) {
+  char cwd[256] = {0};
+  getcwd(cwd, sizeof cwd);
+  int rc = chdir(RD_GAME_HOME);
+  struct stat st;
+  int reach_apk = stat(RD_BASE_APK_NAME, &st) == 0;
+  int reach_obb = stat(RD_GAME_OBB_NAME, &st) == 0;
+  debugPrintf("[boot] cwd '%s' -> chdir(%s)=%d; reachable(rel): %s=%d %s=%d\n",
+              cwd, RD_GAME_HOME, rc, RD_BASE_APK_NAME, reach_apk, RD_GAME_OBB_NAME, reach_obb);
+}
 
-  /* Stack-region overcommit arena. Any failure -> heap-backed arena. */
-  {
-    void *pool = NULL;
-    size_t winsz = 0;
-    void *win = oc_find_stack_window(OC_WINDOW_BYTES, &winsz);
-    VirtmemReservation *rv = NULL;
-    if (win && winsz) {
-      virtmemLock();
-      rv = virtmemAddReservation(win, winsz);
-      virtmemUnlock();
-    }
-    if (win && rv && winsz) {
-      pool = memalign(0x1000, OC_POOL_BYTES);
-      if (pool && oc_arena_init(win, winsz, pool, OC_POOL_BYTES))
-        debugPrintf("[oc] ARMED: window %u MB @ %p, pool %u MB @ %p\n",
-                    (unsigned)(winsz >> 20), win, (unsigned)(OC_POOL_BYTES >> 20), pool);
-      else
-        debugPrintf("[oc] DISABLED: pool=%p init failed -> heap-backed only\n", pool);
-    } else {
-      debugPrintf("[oc] DISABLED: no usable stack hole -> heap-backed only\n");
-    }
-  }
+/* config.txt: read it, or write it with defaults on first run / after a schema change. */
+static void boot_read_config(void) {
+  const char *cfg = RD_GAME_HOME "/" RD_CONFIG_FILE;
+  if (read_config(cfg) != 0) write_config(cfg);
+}
 
-  /* Render resolution (config.txt render_resolution, rd_perf.h): auto = 720p handheld /
-   * 1080p docked, chosen once at boot. Touch follows it (nx_pointer scales the panel). */
+/* Render resolution (config.txt render_resolution, rd_perf.h): auto = 720p handheld /
+ * 1080p docked, chosen once at boot. Touch follows it (nx_pointer scales the panel). */
+static void boot_pick_resolution(void) {
   rd_pick_resolution(config.render_res,
                      appletGetOperationMode() == AppletOperationMode_Console,
                      &screen_width, &screen_height);
@@ -324,42 +173,31 @@ int main(int argc, char *argv[]) {
               appletGetOperationMode() == AppletOperationMode_Console ? "DOCKED" : "HANDHELD",
               screen_width, screen_height,
               (double)screen_width / RD_TOUCH_PANEL_W, (double)screen_height / RD_TOUCH_PANEL_H);
+}
 
-  SDL_SetMainReady();
-  if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0)
-    debugPrintf("SDL_Init failed: %s\n", SDL_GetError());
-
-  check_data();
-
-  /* Sweep Unity's case-sensitivity probe files: CASESENSITIVETEST<guid> strays from older
-   * builds, plus the single hidden scratch the probe is now redirected to (libc_shim.c
-   * casetest_redirect). Prevents junk accumulating on the SD card each launch. */
-  {
-    DIR *dd = opendir(RD_GAME_HOME);
-    int swept = 0;
-    if (dd) {
-      struct dirent *de;
-      while ((de = readdir(dd))) {
-        if (strncasecmp(de->d_name, RD_CASETEST_PREFIX, sizeof RD_CASETEST_PREFIX - 1) == 0 ||
-            strcmp(de->d_name, RD_CASETEST_SCRATCH) == 0) {
-          char pth[RD_PATH_MAX]; snprintf(pth, sizeof pth, RD_GAME_HOME "/%s", de->d_name);
-          if (unlink(pth) == 0) swept++;
-        }
+/* Sweep Unity's case-sensitivity probe files: CASESENSITIVETEST<guid> strays from older
+ * builds, plus the single hidden scratch the probe is now redirected to (shim_fs_path.c
+ * casetest_redirect). Prevents junk accumulating on the SD card each launch. */
+static void boot_sweep_case_probes(void) {
+  DIR *dd = opendir(RD_GAME_HOME);
+  int swept = 0;
+  if (dd) {
+    struct dirent *de;
+    while ((de = readdir(dd))) {
+      if (strncasecmp(de->d_name, RD_CASETEST_PREFIX, sizeof RD_CASETEST_PREFIX - 1) == 0 ||
+          strcmp(de->d_name, RD_CASETEST_SCRATCH) == 0) {
+        char pth[RD_PATH_MAX]; snprintf(pth, sizeof pth, RD_GAME_HOME "/%s", de->d_name);
+        if (unlink(pth) == 0) swept++;
       }
-      closedir(dd);
     }
-    if (swept) debugPrintf("[boot] swept %d case-sensitivity probe file(s)\n", swept);
+    closedir(dd);
   }
+  if (swept) debugPrintf("[boot] swept %d case-sensitivity probe file(s)\n", swept);
+}
 
-  debugPrintf(RD_LOG_TAG_BANNER "== realdrift_nx build %s %s =====\n", __DATE__, __TIME__);
-  debugPrintf("[boot] fixes: ftt-stub gc-offsets asset-redirect touch-hooks 1080p rename-posix "
-              "map-dedup fd-cache(.so-only) synth-proc-cache cjk-fonts+opendir\n");
-  /* Extract the console's shared fonts and expose them where Unity's dynamic font fallback
-   * looks (/system/fonts + fonts.xml). MUST run before the modules load: libunity reads the
-   * font config while building its fallback list, and an empty list is exactly why the
-   * Simplified Chinese banner text rendered blank while the Latin UI was fine. */
-  nx_fonts_init(RD_GAME_HOME);
-
+/* Loads libmain, libunity and libil2cpp into the .so region, maps them as code, starts the GC
+ * bridge and applies the engine patches. */
+static void boot_load_modules(void) {
   debugPrintf("[boot] loading modules...\n");
   if (load_module(&main_mod,   RD_LIB_MAIN)   < 0) fatal_error("Could not load %s", RD_LIB_MAIN);
   if (load_module(&unity_mod,  RD_LIB_UNITY)  < 0) fatal_error("Could not load %s", RD_LIB_UNITY);
@@ -383,31 +221,30 @@ int main(int argc, char *argv[]) {
     int n = rd_install_engine_patches((uintptr_t)unity_mod.load_virtbase, &total);
     debugPrintf("[boot] engine patches applied: %d/%d\n", n, total);
   }
+}
 
-
-
-  /* Main thread runs init_array + the engine lifecycle; give it a stable bionic TLS. */
-  static uint8_t main_tls[BIONIC_TLS_SIZE] __attribute__((aligned(16)));
+/* Runs the libraries' constructors (with the main thread's bionic TLS installed). */
+static void boot_run_init_arrays(void) {
   install_bionic_tls(main_tls);
-
   debugPrintf("[boot] running init arrays...\n");
   so_execute_init_array(&main_mod);
   so_execute_init_array(&unity_mod);
   so_execute_init_array(&il2cpp_mod);
   so_free_temp(&main_mod); so_free_temp(&unity_mod); so_free_temp(&il2cpp_mod);
   debugPrintf("[boot] init arrays done\n");
+}
 
+/* The fake JNI world, the engine-facing objects, the window size and HID input. */
+static void boot_jni_and_input(void) {
   jni_init();
   unity_environment_init(RD_GAME_HOME);
   android_native_update_mode();
   android_native_input_init();
   debugPrintf("[boot] jni + env + hid ready\n");
+}
 
-  install_bionic_tls(main_tls);
-
-  extern void *fake_env, *fake_unityplayer_thiz, *fake_context_obj, *fake_surface_obj;
-  extern void *fake_vm;
-
+/* JNI_OnLoad of libunity (registers the UnityPlayer natives) and of libil2cpp. */
+static void boot_jni_onload(void) {
   /* Call libunity's real JNI_OnLoad(fake_vm) FIRST (exported symbol): runs
    * jni::Initialize() (caches the JavaVM) AND registers the UnityPlayer natives,
    * which our fake RegisterNatives captures for by-name resolution below. */
@@ -420,11 +257,8 @@ int main(int argc, char *argv[]) {
     debugPrintf("[boot] JNI_OnLoad returned 0x%x\n", jver);
   }
 
-  /* Register the JavaVM with the il2cpp runtime. We call libil2cpp's exported
-   * JNI_OnLoad by name (simpler + version-proof vs. hardcoding the VM-global RVAs
-   * the reference replicated). TODO: if this mis-binds (a PLT log call at its head
-   * bound wrong), fall back to replicating the two VM-global stores directly --
-   * derive their RVAs from this libil2cpp's JNI_OnLoad. */
+  /* Register the JavaVM with the il2cpp runtime by calling libil2cpp's exported JNI_OnLoad by
+   * name (version-proof, unlike hard-coding the RVAs of its two VM globals). */
   {
     fn_jnionload Il2cpp_JNI_OnLoad =
       (fn_jnionload)so_try_find_addr_rx(&il2cpp_mod, "JNI_OnLoad");
@@ -435,7 +269,10 @@ int main(int argc, char *argv[]) {
       debugPrintf("[boot] WARNING: libil2cpp JNI_OnLoad not found (managed JNI may fail)\n");
     }
   }
+}
 
+/* The UnityPlayer natives the lifecycle needs, by name. */
+static void boot_resolve_natives(void) {
   /* Resolve the UnityPlayer natives BY NAME from the captured RegisterNatives table. */
   #define RESOLVE_NATIVE(var, cast, name) do {                         \
       var = (cast)jni_lookup_unity_native(name);                       \
@@ -451,9 +288,10 @@ int main(int argc, char *argv[]) {
   #undef RESOLVE_NATIVE
   debugPrintf("[boot] natives resolved (initJni=%p render=%p)\n",
               (void *)Unity_initJni, (void *)Unity_nativeRender);
+}
 
-  install_bionic_tls(main_tls);
-
+/* What the Java UnityPlayer does on start: initJni, surface, resume, focus. */
+static void boot_start_unity(void) {
   /* initJni is 3-ARG (env,thiz,Context) in 2018.4 (unity_entrypoints.h). */
   debugPrintf("[boot] initJni(ctx)...\n");
   Unity_initJni(fake_env, fake_unityplayer_thiz, fake_context_obj);
@@ -465,9 +303,10 @@ int main(int argc, char *argv[]) {
   Unity_nativeResume(fake_env, fake_unityplayer_thiz);
   Unity_nativeFocusChanged(fake_env, fake_unityplayer_thiz, 1 /* hasFocus */);
   debugPrintf("[boot] resumed + focus=true\n");
+}
 
-  appletHook(&g_applet_cookie, nx_applet_hook, NULL);
-
+/* Before the first nativeRender: GC off (its stop-the-world needs signals Horizon lacks). */
+static void boot_disable_gc(void) {
   /* CRITICAL ORDER: disable the Boehm GC + install the clock BEFORE the first
    * nativeRender. First-frame managed allocs can trigger a GC whose stop-the-world
    * uses POSIX signals Switch never delivers -> nativeRender would never return. */
@@ -481,20 +320,11 @@ int main(int argc, char *argv[]) {
     if (il2cpp_gc_disable)  { il2cpp_gc_disable();   debugPrintf("[boot] il2cpp_gc_disable() -> GC OFF\n"); }
     else debugPrintf("[boot] WARNING: il2cpp_gc_disable not found\n");
   }
+}
 
-  /* The exported il2cpp API used by the input/driving/race hooks, resolved once. */
-  int il2cpp_missing = rd_il2cpp_load(&g_il2cpp, il2cpp_sym, &il2cpp_mod, il2cpp_sym_missing);
-  debugPrintf("[boot] il2cpp API: %d function(s) missing\n", il2cpp_missing);
-
-  /* Controller driving + race UI (rd_drive_hook.c), installed lazily in the loop. */
-
-  rd_start_clock_thread();
-  debugPrintf("[boot] GC off + clock thread started; entering render loop\n");
-
-  diag_thread_register(NULL, 0);
-  diag_set_name(NULL, "NX_UIMain");
-  diag_watchdog_start();
-
+/* One nativeRender per frame, paced to RD_TARGET_HZ, until the engine or the applet quits.
+ * Slow frames log a [perf] line with what happened during them. */
+static void run_main_loop(void) {
   int frame = 0;
   uint64_t next_frame_ns = 0;
   next_frame_ns = rd_now_ns();
@@ -549,6 +379,62 @@ int main(int argc, char *argv[]) {
     if ((int64_t)(next_frame_ns - now) > 0) svcSleepThread(next_frame_ns - now);
     else next_frame_ns = now;
   }
+}
+
+int main(int argc, char *argv[]) {
+  (void)argc; (void)argv;
+  socketInitializeDefault();
+  debugPrintf(RD_LOG_TAG_BANNER " realdrift_nx start (Real Drift " RD_GAME_VERSION_NAME ", Unity " RD_UNITY_VERSION ") ===\n");
+
+  boot_enter_game_folder();
+  boot_read_config();
+  check_syscalls();
+  debugPrintf("[boot] syscalls ok\n");
+  mem_log_boot();
+  mem_arm_overcommit();
+  boot_pick_resolution();
+
+  SDL_SetMainReady();
+  if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0)
+    debugPrintf("SDL_Init failed: %s\n", SDL_GetError());
+
+  check_data();
+  boot_sweep_case_probes();
+
+  debugPrintf(RD_LOG_TAG_BANNER "== realdrift_nx build %s %s =====\n", __DATE__, __TIME__);
+  debugPrintf("[boot] fixes: ftt-stub gc-offsets asset-redirect touch-hooks 1080p rename-posix "
+              "map-dedup fd-cache(.so-only) synth-proc-cache cjk-fonts+opendir\n");
+  /* Extract the console's shared fonts and expose them where Unity's dynamic font fallback
+   * looks (/system/fonts + fonts.xml). MUST run before the modules load: libunity reads the
+   * font config while building its fallback list, and an empty list is exactly why the
+   * Simplified Chinese banner text rendered blank while the Latin UI was fine. */
+  nx_fonts_init(RD_GAME_HOME);
+
+  boot_load_modules();
+  boot_run_init_arrays();
+  boot_jni_and_input();
+  install_bionic_tls(main_tls);
+  boot_jni_onload();
+  boot_resolve_natives();
+  install_bionic_tls(main_tls);
+  boot_start_unity();
+
+  appletHook(&g_applet_cookie, nx_applet_hook, NULL);
+  boot_disable_gc();
+
+  /* The exported il2cpp API used by the input/driving/race hooks, resolved once. */
+  int il2cpp_missing = rd_il2cpp_load(&g_il2cpp, il2cpp_sym, &il2cpp_mod, il2cpp_sym_missing);
+  debugPrintf("[boot] il2cpp API: %d function(s) missing\n", il2cpp_missing);
+
+  /* Controller driving + race UI (rd_drive_hook.c) are installed lazily in the loop. */
+  rd_start_clock_thread();
+  debugPrintf("[boot] GC off + clock thread started; entering render loop\n");
+
+  diag_thread_register(NULL, 0);
+  diag_set_name(NULL, "NX_UIMain");
+  diag_watchdog_start();
+
+  run_main_loop();
 
   Unity_nativeDone(fake_env, fake_unityplayer_thiz);
 

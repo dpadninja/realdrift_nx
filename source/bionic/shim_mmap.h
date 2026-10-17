@@ -11,9 +11,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <switch.h>
+#include "mem_layout.h"   /* g_mmap_arena_base/size */
 
-extern void  *g_mmap_arena_base;   // set by __libnx_initheap (main.c)
-extern size_t g_mmap_arena_size;
 
 #define BIONIC_MAP_ANONYMOUS 0x20
 #define MMAP_PAGE       0x1000u
