@@ -64,6 +64,7 @@ uv run python -m tools.il2cpp_find method 'List.MoveNext'  # explicit interface 
 uv run python -m tools.il2cpp_disasm Wheel.CalcSkidSmoke
 uv run python -m tools.il2cpp_disasm System.Linq.Enumerable.Select     # its generic instances
 uv run python -m tools.il2cpp_disasm 0x95961c
+uv run python -m tools.il2cpp_disasm Wheel.CalcSkidSmoke --callers     # who calls it (direct)
 ```
 
 The method's code runs from its RVA to the next code start in `script.json` and is decoded

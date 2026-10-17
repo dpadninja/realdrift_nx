@@ -8,8 +8,9 @@ description: Writing, fixing or reviewing a Real Drift mod (mods/<id>/ with mod.
 Read only these, in this order -- the port's sources are not needed:
 1. `sdk/rd_mod.h` -- the whole API (every function commented).
 2. `docs/MODDING.md` -- folder layout, mod.ini / patch.ini, which hook to use, limits.
+   Unsure what a file can reach or how to find a name: `docs/MODDING_GUIDE.md` sections 4-7.
 3. The example closest to the task in `mods/examples/` (hello: template, balance: patch.ini,
-   retexture: assets, fov: inline hook).
+   retexture: assets, fov: inline hook, inspect: log live field values).
 
 ## Loop
 

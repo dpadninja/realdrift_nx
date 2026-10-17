@@ -1,25 +1,33 @@
 """Asset mods by name: find the game's textures and texts, and build the files replacing them.
 
+MIT (see LICENSE). Guide: docs/MODDING_GUIDE.md.
+
+Where the game's assets are: base.apk and the OBB are zip archives whose assets/bin/Data/
+holds Unity files. A Unity file contains many objects (textures, texts, sounds, meshes,
+scripts' data). Large files are stored cut into parts (sharedassets0.assets.split0..40 in the
+APK); some have their bulk data next to them (<file>.resS / <file>.resource). This tool reads
+a Unity file whole -- parts joined, its data file next to it -- so a mod never needs to know
+how it is stored.
+
 A mod lists its replacements by object name in assets.ini:
 
     MainMenu_Options = art/options.png        # Texture2D: a PNG of the same size
     SomeConfig       = text/config.txt        # TextAsset: any bytes
-    Logo@e3dd51a5... = art/logo.png           # name@member GUID when the name is not unique
+    Logo@e3dd51a5... = art/logo.png           # name@<Unity file> when the name is not unique
 
-`build` turns the assets.ini of several mods into the Unity files the port serves
-(mods/<id>/files/<apk|obb>/<member>, source/bionic/rd_vfile.h): each member is loaded once
-from YOUR base.apk / OBB, every replacement of every mod in it is applied, the result is read
-back, and the file goes to the highest-priority mod that touches the member. Mods load in the
-port's order (priority, then id); when two change the same object the first wins and the
-other gets a warning. stage_sd.py --mods runs it; the built files go to the SD copy only.
+`build` turns the assets.ini of several mods into what the port serves
+(mods/<id>/files/<apk|obb>/<archive member>, source/bionic/rd_vfile.h): each Unity file is
+loaded once from YOUR base.apk / OBB, every replacement of every mod in it is applied, the
+result is read back and written (cut into the same parts if the original was). The files go to
+the highest-priority mod that touches the Unity file. Mods load in the port's order (priority,
+then id); when two change the same object the first wins and the other gets a warning.
+stage_sd.py --mods runs it; the built files go to the SD copy only.
 
     uv run python -m tools.mod_assets list --name 'MainMenu_' --type Texture2D
     uv run python -m tools.mod_assets export MainMenu_Options options.png
     uv run python -m tools.mod_assets build mods/retexture --out sd/switch/realdrift_nx/mods
 
-`list` prints lines ready for assets.ini. Members split by Unity (*.splitN) cannot be changed.
-
-MIT (see LICENSE).
+`list` prints lines ready for assets.ini.
 """
 
 from __future__ import annotations
@@ -27,6 +35,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import tempfile
 import zipfile
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -41,26 +50,98 @@ from tools.game import user_archives
 
 DATA_PREFIX = "assets/bin/Data/"
 TYPES = ("Texture2D", "TextAsset", "AudioClip", "Sprite", "Mesh", "Material")
-EDITABLE = ("Texture2D", "TextAsset")  # what export / replace handle
-SPLIT = re.compile(r"\.split\d+$")
+EDITABLE = ("Texture2D", "TextAsset")  # what export and assets.ini handle
+SPLIT = re.compile(r"\.split(\d+)$")
+DATA_FILES = (".resS", ".resource")  # bulk data stored next to a Unity file
+ASSETS_INI = "assets.ini"
+ASSET_LINE = re.compile(r"^(?P<name>[^=@]+?)(?:@(?P<file>[^=\s]+))?\s*=\s*(?P<path>.+?)\s*$")
+
+
+# ---- Unity files in an archive ------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class UnityFile:
+    """A Unity file as stored in an archive: one member, or parts; maybe a data file."""
+
+    archive: str  # "apk" / "obb"
+    name: str  # logical member path: assets/bin/Data/sharedassets0.assets
+    parts: tuple[str, ...]  # the members holding it, in order (one if not split)
+    data: tuple[str, ...]  # members with its bulk data (.resS / .resource)
+    part_size: int  # size of each part but the last (0 if not split)
+
+
+def unity_files(z: zipfile.ZipFile, archive: str) -> list[UnityFile]:
+    """The Unity files under assets/bin/Data/ of an open archive."""
+    names = set(z.namelist())
+    parts: dict[str, list[tuple[int, str]]] = {}
+    for n in names:
+        if not n.startswith(DATA_PREFIX) or n.endswith(DATA_FILES):
+            continue
+        m = SPLIT.search(n)
+        base = n[: m.start()] if m else n
+        parts.setdefault(base, []).append((int(m.group(1)) if m else 0, n))
+    out = []
+    for base, ps in sorted(parts.items()):
+        ordered = tuple(n for _, n in sorted(ps))
+        size = z.getinfo(ordered[0]).file_size if len(ordered) > 1 else 0
+        data = tuple(base + ext for ext in DATA_FILES if base + ext in names)
+        out.append(UnityFile(archive, base, ordered, data, size))
+    return out
+
+
+def open_env(z: zipfile.ZipFile, uf: UnityFile) -> tuple[Any, Any]:
+    """(UnityPy environment, the Unity file's object inside it) with parts joined.
+
+    With a data file next to it, both are put into a temporary folder so UnityPy finds the
+    texture/sound data the file refers to.
+    """
+    joined = b"".join(z.read(p) for p in uf.parts)
+    if not uf.data:
+        env: Any = UnityPy.load(joined)
+        return env, env.file
+    tmp = Path(tempfile.mkdtemp(prefix="mod_assets_"))
+    base = Path(uf.name).name
+    (tmp / base).write_bytes(joined)
+    for d in uf.data:
+        (tmp / Path(d).name).write_bytes(z.read(d))
+    env = UnityPy.load(str(tmp))
+    return env, env.files[base]
+
+
+def split_parts(uf: UnityFile, data: bytes) -> list[tuple[str, bytes]]:
+    """(member, bytes) to write for new contents of uf, cut like the original.
+
+    A split file keeps its part size. If it got shorter, the leftover parts are written empty
+    (the archive still has them and Unity joins all parts); if longer, parts are added.
+    """
+    if not uf.part_size:
+        return [(uf.parts[0], data)]
+    n = max(len(uf.parts), -(-len(data) // uf.part_size))
+    return [
+        (f"{uf.name}.split{i}", data[i * uf.part_size : (i + 1) * uf.part_size]) for i in range(n)
+    ]
+
+
+# ---- objects ------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class Asset:
-    """One object in one archive member."""
+    """One object in one Unity file."""
 
     archive: str  # "apk" / "obb"
-    member: str  # path inside the archive
+    member: str  # the Unity file (logical member path)
     path_id: int
     type: str
     name: str
     detail: str  # "230x96 RGB24" for textures
 
     def line(self) -> str:
-        """The compact one-line form `list` prints."""
-        guid = self.member.removeprefix(DATA_PREFIX)
+        """The compact one-line form: archive, Unity file, path id, type, name, detail."""
+        short = self.member.removeprefix(DATA_PREFIX)
         return (
-            f"{self.archive} {guid} {self.path_id} {self.type} {self.name} {self.detail}".rstrip()
+            f"{self.archive} {short} {self.path_id} {self.type} {self.name} {self.detail}".rstrip()
         )
 
 
@@ -75,10 +156,10 @@ def describe(obj: Any, data: Any) -> str:
     return ""
 
 
-def scan_member(archive: str, member: str, data: bytes, types: tuple[str, ...]) -> Iterator[Asset]:
-    """The named objects of the wanted types in one serialized file."""
+def scan_file(uf: UnityFile, joined: bytes, types: tuple[str, ...]) -> Iterator[Asset]:
+    """The named objects of the wanted types in one Unity file."""
     try:
-        env = UnityPy.load(data)
+        env = UnityPy.load(joined)
     except Exception:  # UnityPy raises anything on non-Unity data
         return
     for obj in env.objects:
@@ -90,23 +171,22 @@ def scan_member(archive: str, member: str, data: bytes, types: tuple[str, ...]) 
             continue
         name = getattr(d, "m_Name", "") or ""
         if name:
-            yield Asset(archive, member, obj.path_id, obj.type.name, name, describe(obj, d))
+            yield Asset(uf.archive, uf.name, obj.path_id, obj.type.name, name, describe(obj, d))
 
 
 def scan(archives: dict[str, Path], types: tuple[str, ...] = TYPES) -> Iterator[Asset]:
-    """Every named object of `types` in the archives' assets/bin/Data members."""
+    """Every named object of `types` in the archives' Unity files."""
     for archive, path in archives.items():
         if not path.is_file():
             continue
         with zipfile.ZipFile(path) as z:
-            for member in z.namelist():
-                if member.startswith(DATA_PREFIX) and not member.endswith(".resS"):
-                    yield from scan_member(archive, member, z.read(member), types)
+            for uf in unity_files(z, archive):
+                yield from scan_file(uf, b"".join(z.read(p) for p in uf.parts), types)
 
 
-def select(assets: Iterator[Asset], name: str, member: str | None) -> list[Asset]:
-    """Assets named exactly `name` (and in `member`, if given; a GUID or full path)."""
-    want = None if member is None else member.removeprefix(DATA_PREFIX)
+def select(assets: Iterator[Asset], name: str, file: str | None) -> list[Asset]:
+    """Assets named exactly `name` (and in Unity file `file`, short or full, if given)."""
+    want = None if file is None else file.removeprefix(DATA_PREFIX)
     return [
         a
         for a in assets
@@ -114,12 +194,9 @@ def select(assets: Iterator[Asset], name: str, member: str | None) -> list[Asset
     ]
 
 
-def load_object(archives: dict[str, Path], a: Asset) -> tuple[Any, Any, Any]:
-    """(environment, object reader, object data) of an asset."""
-    with zipfile.ZipFile(archives[a.archive]) as z:
-        env = UnityPy.load(z.read(a.member))
-    obj = next(o for o in env.objects if o.path_id == a.path_id)
-    return env, obj, obj.read()
+def find_file(z: zipfile.ZipFile, a: Asset) -> UnityFile:
+    """The Unity file of an open archive that holds asset a."""
+    return next(u for u in unity_files(z, a.archive) if u.name == a.member)
 
 
 def export(archives: dict[str, Path], a: Asset, out: Path) -> None:
@@ -128,20 +205,22 @@ def export(archives: dict[str, Path], a: Asset, out: Path) -> None:
     Raises:
         ValueError: the type cannot be exported.
     """
-    _, obj, d = load_object(archives, a)
-    if obj.type.name == "Texture2D":
+    if a.type not in EDITABLE:
+        raise ValueError(f"{a.type} cannot be exported (Texture2D and TextAsset can)")
+    with zipfile.ZipFile(archives[a.archive]) as z:
+        env, _ = open_env(z, find_file(z, a))
+    d = next(o for o in env.objects if o.path_id == a.path_id).read()
+    if a.type == "Texture2D":
         d.image.save(out)
-    elif obj.type.name == "TextAsset":
+    else:
         script = d.m_Script
         out.write_bytes(
             script.encode("utf-8", "surrogateescape") if isinstance(script, str) else script
         )
-    else:
-        raise ValueError(f"{a.type} cannot be exported (Texture2D and TextAsset can)")
 
 
 def check_roundtrip(data: bytes, a: Asset, img: Image.Image | None) -> None:
-    """Reloads the written member and checks the object is there with the new content.
+    """Reloads a written Unity file and checks the object is there with the new content.
 
     Raises:
         ValueError: it is not.
@@ -157,8 +236,7 @@ def check_roundtrip(data: bytes, a: Asset, img: Image.Image | None) -> None:
             raise ValueError("the texture reads back different (format not encodable by UnityPy)")
 
 
-ASSETS_INI = "assets.ini"
-ASSET_LINE = re.compile(r"^(?P<name>[^=@]+?)(?:@(?P<member>[^=\s]+))?\s*=\s*(?P<file>.+?)\s*$")
+# ---- assets.ini and the build -------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -168,8 +246,8 @@ class Wanted:
     mod: str  # mod id (folder name)
     line: int
     name: str
-    member: str | None  # GUID or member path when given as name@member
-    file: Path
+    member: str | None  # the Unity file when given as name@file
+    file: Path  # the mod's file to put in
 
 
 @dataclass(frozen=True)
@@ -182,10 +260,10 @@ class Replacement:
 
 @dataclass
 class Plan:
-    """What build writes: replacements per member, the mod that owns each member's file."""
+    """What build writes: replacements per Unity file and the mod that owns each file."""
 
-    members: dict[tuple[str, str], list[Replacement]]  # (archive, member) -> replacements
-    owner: dict[tuple[str, str], str]  # (archive, member) -> mod id
+    members: dict[tuple[str, str], list[Replacement]]  # (archive, Unity file) -> replacements
+    owner: dict[tuple[str, str], str]  # (archive, Unity file) -> mod id
     errors: list[str]
     warnings: list[str]
 
@@ -205,21 +283,21 @@ def parse_assets_ini(mod: Path) -> tuple[list[Wanted], list[str]]:
         if not m:
             errors.append(f'{ASSETS_INI}:{num}: not "Name = file"')
             continue
-        wanted.append(Wanted(mod.name, num, m["name"].strip(), m["member"], mod / m["file"]))
+        wanted.append(Wanted(mod.name, num, m["name"].strip(), m["file"], mod / m["path"]))
     return wanted, errors
 
 
 def texture_size(a: Asset) -> tuple[int, int] | None:
-    """Width and height from a texture's `list` detail ("230x96 RGB24")."""
+    """Width and height from a texture's detail ("230x96 RGB24")."""
     m = re.match(r"(\d+)x(\d+) ", a.detail + " ")
     return (int(m[1]), int(m[2])) if m and a.type == "Texture2D" else None
 
 
 def plan_build(order: list[str], wanted: dict[str, list[Wanted]], assets: list[Asset]) -> Plan:
-    """Resolves every mod's lines (mods in load order) and groups them by archive member.
+    """Resolves every mod's lines (mods in load order) and groups them by Unity file.
 
     A name must resolve to exactly one editable object; an object claimed by an earlier mod
-    stays with it. The first mod to touch a member owns the member's file.
+    stays with it. The first mod to touch a Unity file owns the written file.
     """
     plan = Plan({}, {}, [], [])
     taken: dict[tuple[str, str, int], str] = {}
@@ -229,18 +307,13 @@ def plan_build(order: list[str], wanted: dict[str, list[Wanted]], assets: list[A
             found = select(iter(assets), w.name, w.member)
             if len(found) != 1:
                 cands = ", ".join(f"{a.name}@{a.member.removeprefix(DATA_PREFIX)}" for a in found)
-                plan.errors.append(
-                    f"{where}: {len(found)} editable objects named {w.name!r}"
-                    + (f" ({cands}): add @<member>" if found else "")
-                )
-                continue
-            a = found[0]
-            if SPLIT.search(a.member):
-                plan.errors.append(f"{where}: {w.name} is in {a.member}, split by Unity")
+                hint = f" ({cands}): add @<file>" if found else " (see tools/mod_assets.py list)"
+                plan.errors.append(f"{where}: {len(found)} editable objects named {w.name!r}{hint}")
                 continue
             if not w.file.is_file():
                 plan.errors.append(f"{where}: {w.file} does not exist")
                 continue
+            a = found[0]
             key = (a.archive, a.member, a.path_id)
             if key in taken:
                 plan.warnings.append(
@@ -254,17 +327,13 @@ def plan_build(order: list[str], wanted: dict[str, list[Wanted]], assets: list[A
     return plan
 
 
-def apply_member(
-    archives: dict[str, Path], member: tuple[str, str], reps: list[Replacement]
-) -> bytes:
-    """The member with all its replacements applied and read back.
+def apply_file(z: zipfile.ZipFile, uf: UnityFile, reps: list[Replacement]) -> bytes:
+    """The Unity file with all its replacements applied and read back.
 
     Raises:
         ValueError: a PNG has the wrong size, or a replacement does not read back.
     """
-    archive, name = member
-    with zipfile.ZipFile(archives[archive]) as z:
-        env: Any = UnityPy.load(z.read(name))  # UnityPy's types do not know .file.save()
+    env, file = open_env(z, uf)
     objs = {o.path_id: o for o in env.objects}
     images: dict[int, Image.Image | None] = {}
     for r in reps:
@@ -284,14 +353,14 @@ def apply_member(
             d.m_Script = r.wanted.file.read_bytes().decode("utf-8", "surrogateescape")
             images[r.asset.path_id] = None
         d.save()
-    data: bytes = env.file.save()
+    data: bytes = file.save()
     for r in reps:
         check_roundtrip(data, r.asset, images[r.asset.path_id])
     return data
 
 
 def mod_order(mods: list[Path]) -> list[str]:
-    """Mod ids in the port's load order: priority descending, then id (source/mods/rd_modhost.c)."""
+    """Mod ids in the port's load order: priority descending, then id (rd_modhost.c)."""
     from tools.mod_ini import read_mod  # here: the C parser is only needed to build
 
     prio = {m.name: read_mod(m).priority for m in mods}
@@ -301,7 +370,7 @@ def mod_order(mods: list[Path]) -> list[str]:
 def build(
     mods: list[Path], out: Path, archives: dict[str, Path] | None = None
 ) -> tuple[list[Path], list[str]]:
-    """Builds the replaced members of `mods` (folders) under out/<owner id>/files/.
+    """Builds the replaced Unity files of `mods` (folders) under out/<owner id>/files/.
 
     Returns:
         The written files and the warnings.
@@ -317,41 +386,54 @@ def build(
         wanted[m.name] = lines
         errors += [f"{m.name}: {e}" for e in errs]
     if not any(wanted.values()):
+        if errors:
+            raise ValueError("\n".join(errors))
         return [], []
     plan = plan_build(mod_order(mods), wanted, list(scan(archives, EDITABLE)))
     errors += plan.errors
-    by_id = {m.name: m for m in mods}
-    for (archive, member), owner in plan.owner.items():
+    jobs: list[tuple[UnityFile, list[Replacement], str]] = []
+    for (archive, name), reps in plan.members.items():
+        with zipfile.ZipFile(archives[archive]) as z:
+            uf = next(u for u in unity_files(z, archive) if u.name == name)
+        owner = plan.owner[(archive, name)]
         for m in mods:
-            if (m / "files" / archive / member).is_file():
-                errors.append(
-                    f"{m.name}: files/{archive}/{member} is also built from assets.ini "
-                    f"({owner}); remove one"
-                )
+            for part in uf.parts:
+                if (m / "files" / archive / part).is_file():
+                    errors.append(
+                        f"{m.name}: files/{archive}/{part} is also built from {ASSETS_INI} "
+                        f"({owner}); remove one"
+                    )
+        jobs.append((uf, reps, owner))
     if errors:
         raise ValueError("\n".join(errors))
-    written = []
-    for key, reps in plan.members.items():
-        dest = out / by_id[plan.owner[key]].name / "files" / key[0] / key[1]
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(apply_member(archives, key, reps))
-        written.append(dest)
+    written: list[Path] = []
+    for uf, reps, owner in jobs:
+        with zipfile.ZipFile(archives[uf.archive]) as z:
+            data = apply_file(z, uf, reps)
+        for member, chunk in split_parts(uf, data):
+            dest = out / owner / "files" / uf.archive / member
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(chunk)
+            written.append(dest)
     return written, plan.warnings
+
+
+# ---- command line -------------------------------------------------------------------------
 
 
 def list_assets(
     archives: dict[str, Path], rx: re.Pattern[str], kind: str | None, archive: str | None
 ) -> int:
-    """Prints matching objects; editable ones as assets.ini lines (name@member when needed)."""
+    """Prints matching objects; editable ones as assets.ini lines (name@file when needed)."""
     wanted = {k: v for k, v in archives.items() if not archive or k == archive}
     assets = [a for a in scan(wanted, (kind,) if kind else TYPES) if rx.search(a.name)]
     count: dict[str, int] = {}
     for a in scan(archives, EDITABLE):
         count[a.name] = count.get(a.name, 0) + 1
     for a in assets:
-        guid = a.member.removeprefix(DATA_PREFIX)
+        short = a.member.removeprefix(DATA_PREFIX)
         if a.type in EDITABLE:
-            name = a.name if count.get(a.name) == 1 else f"{a.name}@{guid}"
+            name = a.name if count.get(a.name) == 1 else f"{a.name}@{short}"
             print(f"{name} = <file>    # {a.line()}")
         else:
             print(f"# {a.line()}   (not editable)")
@@ -369,7 +451,7 @@ def main(argv: list[str] | None = None) -> int:
     ex = sub.add_parser("export", help="texture to PNG, TextAsset to a file")
     ex.add_argument("name")
     ex.add_argument("out", type=Path)
-    ex.add_argument("--member", help="archive member (GUID) when the name is not unique")
+    ex.add_argument("--file", help="the Unity file (from list) when the name is not unique")
     bd = sub.add_parser("build", help="assets.ini of mods -> their files/ under --out")
     bd.add_argument("mods", nargs="+", type=Path, help="mod folders")
     bd.add_argument("--out", type=Path, required=True, help="where the mods are staged")
@@ -391,19 +473,19 @@ def main(argv: list[str] | None = None) -> int:
         for f in written:
             print(f)
         return 0
-    found = select(scan(archives, EDITABLE), args.name, args.member)
+    found = select(scan(archives, EDITABLE), args.name, args.file)
     if len(found) != 1:
-        hint = "; pass --member" if found else ""
+        hint = "; pass --file" if found else ""
         print(f"mod_assets: {len(found)} objects named {args.name!r}{hint}", file=sys.stderr)
         for a in found:
             print(a.line(), file=sys.stderr)
         return 1
     try:
         export(archives, found[0], args.out)
-        print(args.out)
     except (ValueError, OSError) as e:
         print(f"mod_assets: {e}", file=sys.stderr)
         return 1
+    print(args.out)
     return 0
 
 

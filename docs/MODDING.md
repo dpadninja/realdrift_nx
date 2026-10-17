@@ -3,6 +3,8 @@
 A mod is a folder in `mods/` next to `config.txt` on the SD card. The port loads every enabled
 mod at boot; `mods = 0` in `config.txt` starts the original game. A broken mod is skipped with
 a log line, never the game. The API is `sdk/rd_mod.h`: read it, it is short.
+**New to this? Read `docs/MODDING_GUIDE.md`** -- what each file changes, its limits, and how
+to find classes, fields and textures with the reverse tools. This page is the reference.
 
 MIT (see LICENSE).
 
@@ -135,6 +137,7 @@ stubs): hook the function they jump to.
 | `balance` | a data-only mod: `patch.ini` raises the rev limiter |
 | `retexture` | an asset mod: `assets.ini` gives the Options button new art |
 | `fov` | `inline_hook` on `UnityEngine.Camera.set_fieldOfView`, scaled by a mod.ini key |
+| `inspect` | a research aid: logs the values of chosen fields of live objects |
 
 ## Limits
 

@@ -5,6 +5,7 @@ MIT (see LICENSE).
 """
 
 import zipfile
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -54,10 +55,11 @@ class FakeObj:
 class FakeEnv:
     """A loaded serialized file; save() registers what it wrote so it can be loaded again."""
 
-    def __init__(self, objects, registry):
-        """objects, and the registry load() reads from."""
+    def __init__(self, objects, registry, name=None):
+        """objects, and the registry load() reads from; name when loaded from a folder."""
         self.objects, self.registry = objects, registry
         self.file = SimpleNamespace(save=self.save)
+        self.files = {name: self.file} if name else {}
 
     def save(self):
         """Serialized bytes of the current objects."""
@@ -78,6 +80,7 @@ def game(tmp_path, monkeypatch):
         ],
         b"TXT": [FakeObj(5, "TextAsset", FakeText("Config", "a=1"))],
         b"SPLIT": [FakeObj(1, "Texture2D", FakeTexture("Split"))],
+        b"SPL" + b"IT2": [FakeObj(1, "Texture2D", FakeTexture("Split2"))],
         b"TWO": [
             FakeObj(1, "Texture2D", FakeTexture("A")),
             FakeObj(2, "Texture2D", FakeTexture("B")),
@@ -86,9 +89,13 @@ def game(tmp_path, monkeypatch):
     }
 
     def load(data):
+        name = None
+        if isinstance(data, str):  # a folder: the Unity file next to its data file
+            (f,) = [p for p in Path(data).iterdir() if p.suffix not in (".resS", ".resource")]
+            name, data = f.name, f.read_bytes()
         if data not in registry:
             raise ValueError("not a Unity file")
-        return FakeEnv(registry[data], registry)
+        return FakeEnv(registry[data], registry, name)
 
     monkeypatch.setattr(mod_assets.UnityPy, "load", load)
     obb = tmp_path / "game.obb"
@@ -96,6 +103,8 @@ def game(tmp_path, monkeypatch):
         z.writestr("assets/bin/Data/aaa", b"TEX")
         z.writestr("assets/bin/Data/bbb", b"TXT")
         z.writestr("assets/bin/Data/ccc.split0", b"SPLIT")
+        z.writestr("assets/bin/Data/sss.split0", b"SPL")
+        z.writestr("assets/bin/Data/sss.split1", b"IT2")
         z.writestr("assets/bin/Data/aaa.resS", b"raw")
         z.writestr("assets/bin/Data/junk", b"junk")
         z.writestr("assets/bin/Data/ddd", b"TWO")
@@ -192,8 +201,8 @@ def test_plan_merges_one_member_and_keeps_priority(game, tmp_path):
 
 
 def test_plan_errors(game, tmp_path):
-    """An ambiguous name lists its candidates as name@member, an unknown name, a missing file
-    and a split member are errors.
+    """An ambiguous name lists its candidates as name@file, and an unknown name and a missing
+    file are errors.
     """
     mod = make_mod(
         tmp_path, "m", "A = a.png\nNope = a.png\nLogo = missing.png\nSplit = a.png\n", ["a.png"]
@@ -204,9 +213,9 @@ def test_plan_errors(game, tmp_path):
         list(mod_assets.scan(game, mod_assets.EDITABLE)),
     )
     text = "\n".join(plan.errors)
-    assert "2 editable objects named 'A' (A@ddd, A@eee): add @<member>" in text
+    assert "2 editable objects named 'A' (A@ddd, A@eee): add @<file>" in text
     assert "0 editable objects named 'Nope'" in text
-    assert "missing.png does not exist" in text and "split by Unity" in text
+    assert "missing.png does not exist" in text
 
 
 def test_build_writes_only_the_owners_file(game, tmp_path, monkeypatch):
@@ -243,6 +252,40 @@ def test_build_refusals(game, tmp_path, monkeypatch):
     plain = tmp_path / "plain"
     plain.mkdir()
     assert mod_assets.build([plain], tmp_path / "out", game) == ([], [])
+
+
+def test_unity_files_join_parts(game):
+    """Parts of a split Unity file are one file, in numeric order, with the part size; the
+    data file next to a Unity file is found; data files are not Unity files themselves.
+    """
+    with zipfile.ZipFile(game["obb"]) as z:
+        files = {
+            u.name.removeprefix(mod_assets.DATA_PREFIX): u for u in mod_assets.unity_files(z, "obb")
+        }
+    assert files["sss"].parts == ("assets/bin/Data/sss.split0", "assets/bin/Data/sss.split1")
+    assert files["sss"].part_size == 3
+    assert files["aaa"].data == ("assets/bin/Data/aaa.resS",) and "aaa.resS" not in files
+    assert [a.name for a in mod_assets.scan(game) if a.member.endswith("sss")] == ["Split2"]
+
+
+def test_split_parts():
+    """New contents are cut like the original: the same part size, extra parts when longer,
+    empty leftover parts when shorter (Unity joins every part the archive has).
+    """
+    uf = mod_assets.UnityFile("apk", "d/f", ("d/f.split0", "d/f.split1", "d/f.split2"), (), 4)
+    assert mod_assets.split_parts(uf, b"abcdefghij") == [
+        ("d/f.split0", b"abcd"),
+        ("d/f.split1", b"efgh"),
+        ("d/f.split2", b"ij"),
+    ]
+    assert mod_assets.split_parts(uf, b"abcde") == [
+        ("d/f.split0", b"abcd"),
+        ("d/f.split1", b"e"),
+        ("d/f.split2", b""),
+    ]
+    assert len(mod_assets.split_parts(uf, b"x" * 17)) == 5
+    single = mod_assets.UnityFile("obb", "d/g", ("d/g",), (), 0)
+    assert mod_assets.split_parts(single, b"xyz") == [("d/g", b"xyz")]
 
 
 def test_texture_size():

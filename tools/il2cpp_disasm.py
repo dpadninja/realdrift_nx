@@ -16,6 +16,7 @@ from Il2CppDumper's output and annotates each instruction with what it touches:
     uv run python -m tools.il2cpp_disasm Wheel.CalcSkidSmoke
     uv run python -m tools.il2cpp_disasm System.Linq.Enumerable.Select   # generic: its instances
     uv run python -m tools.il2cpp_disasm 0x95961c --release 5.0.7
+    uv run python -m tools.il2cpp_disasm Drivetrain.CalcValues --callers   # who calls it
 
 Needs llvm-mc (LLVM) and a dump from tools/il2cpp_dump.py. The helper table is cached in the
 dump folder (helpers.json) and rebuilt when libil2cpp.so changes.
@@ -291,6 +292,31 @@ def scan_helpers(elf: ElfImage, is_known: Callable[[int], bool]) -> dict[int, st
     return out
 
 
+def decode_branch(word: int, pc: int) -> int | None:
+    """The target of a `bl` or `b` (tail call) instruction word, or None."""
+    if word & 0x7C000000 != 0x14000000:
+        return None
+    imm = word & 0x3FFFFFF
+    return pc + ((imm - (1 << 26) if imm & (1 << 25) else imm) << 2)
+
+
+def find_callers(elf: ElfImage, targets: set[int]) -> dict[int, list[int]]:
+    """Addresses of the bl / b instructions in the library's code that go to each target.
+
+    Only direct calls: virtual calls (blr through a vtable), delegates and Unity messages
+    (Update, Start, ... called by the engine) do not show up.
+    """
+    out: dict[int, list[int]] = {t: [] for t in targets}
+    for lo, hi in elf.code:
+        data = elf.read(lo, hi - lo) or b""
+        words = struct.unpack(f"<{len(data) // 4}I", data[: len(data) - len(data) % 4])
+        for i, w in enumerate(words):
+            t = decode_branch(w, lo + 4 * i)
+            if t in out:
+                out[t].append(lo + 4 * i)
+    return out
+
+
 def cached_helpers(cache: Path, lib: Path, img: Image) -> dict[int, str]:
     """scan_helpers for `lib`, cached in `cache` until the library changes."""
     st = lib.stat()
@@ -550,6 +576,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Annotated disassembly of a C# method (libil2cpp).")
     ap.add_argument("method", help="Type.Method, Type$$Method or an RVA (0x...)")
     ap.add_argument("--release", choices=sorted(RELEASES), help="default: the loader's target")
+    ap.add_argument("--callers", action="store_true", help="list who calls it instead")
     args = ap.parse_args(argv)
     rel = RELEASES[args.release] if args.release else target_release()
     try:
@@ -559,6 +586,12 @@ def main(argv: list[str] | None = None) -> int:
         if not found:
             print(f"il2cpp_disasm: no method {args.method}", file=sys.stderr)
             return 1
+        if args.callers:
+            for target, sites in find_callers(img.elf, set(found)).items():
+                print(f"{img.name_code(target) or hex(target)}: {len(sites)} direct callers")
+                for site in sites:
+                    print(f"  {site:8x}  {img.name_code(site) or 'il2cpp runtime'}")
+            return 0
         if len(found) > MAX_LISTINGS:
             more = f"{len(found)} bodies, showing {MAX_LISTINGS}"
             print(f"il2cpp_disasm: {more}; pass an address for another", file=sys.stderr)

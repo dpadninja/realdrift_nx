@@ -427,3 +427,21 @@ def test_real_calc_skid_smoke():
     assert "this.isSkidSmoke" in text
     assert HELPERS["nre"] in text and HELPERS["init"] in text
     assert json.loads((rel.dump / il2cpp_disasm.HELPER_CACHE).read_text())["helpers"]
+
+
+def test_find_callers():
+    """Direct calls (bl) and tail calls (b) to a target are found by address, forward and
+    backward; other branches and other targets are not -- the --callers answer to "who calls
+    this method".
+    """
+    code = [
+        bl(0x40),
+        0xD503201F,
+        0x14000000 | (0x38 >> 2),
+        bl(0x100),
+        bl(-4),
+    ]  # b +0x38 from 0x1008
+    elf = ElfImage([Segment(0x1000, b"".join(w(x) for x in code))], code=[(0x1000, 0x1014)])
+    found = il2cpp_disasm.find_callers(elf, {0x1040, 0x110C, 0x100C})
+    assert found == {0x1040: [0x1000, 0x1008], 0x110C: [0x100C], 0x100C: [0x1010]}
+    assert il2cpp_disasm.decode_branch(0xD503201F, 0) is None

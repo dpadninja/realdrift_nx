@@ -207,10 +207,10 @@ def test_files_against_the_archives(tmp_path, monkeypatch):
 @needs_cc
 def test_examples_pass(capsys):
     """The shipped examples pass the check (built mod.so and files/ are checked when present)."""
-    mods = [EXAMPLES / n for n in ("hello", "balance", "retexture", "fov")]
+    mods = [EXAMPLES / n for n in ("hello", "balance", "retexture", "fov", "inspect")]
     assert mod_check.main([str(m) for m in mods]) == 0
     out = capsys.readouterr().out
-    assert all(f"ok {n}" in out for n in ("hello", "balance", "retexture", "fov"))
+    assert all(f"ok {n}" in out for n in ("hello", "balance", "retexture", "fov", "inspect"))
 
 
 @needs_cc
