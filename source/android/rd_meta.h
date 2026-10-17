@@ -3,7 +3,8 @@
  *
  * Unity 2018.4 reads "unity.build-id" and only mounts an OBB that contains the marker
  * entry assets/<build-id>. Without it the engine logs "build <unknown>", ignores the OBB,
- * and everything stored there (Resources, shaders, levels 1..N) silently fails to load. */
+ * and everything stored there (Resources, shaders, levels 1..N) silently fails to load.
+ * MIT (see LICENSE). */
 #ifndef RD_META_H
 #define RD_META_H
 

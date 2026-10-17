@@ -1,4 +1,7 @@
-"""config.example.txt must be exactly what the loader writes with default settings."""
+"""config.example.txt must be exactly what the loader writes with default settings.
+
+MIT (see LICENSE).
+"""
 
 import subprocess
 from pathlib import Path

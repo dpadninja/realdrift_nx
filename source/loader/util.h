@@ -4,6 +4,8 @@
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the LICENSE file for details.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #ifndef __UTIL_H__
@@ -11,12 +13,14 @@
 
 #include <stdint.h>
 
+/* printf into debug.log (buffered; lines the debug_log=0 filter drops are skipped, urgent ones
+ * are written at once, see rd_log.h). Thread-safe. Always returns 0. */
 int debugPrintf(char *text, ...);
 
+/* CPU boost on (1785 MHz, FastLoad: the GPU drops to 76.8 MHz) or back to normal. */
 void cpu_boost(int on);
-void debug_log_flush(void);   /* Push buffered debug.log lines to the SD card */
-
-// bionic code reads its stack-protector canary from tpidr_el0 + 0x28.
+/* Pushes buffered debug.log lines to the SD card (clock thread ~1/s, and at exit). */
+void debug_log_flush(void);
 
 
 /* Point TPIDR_EL0 at a zeroed per-thread block so the engine's stack-protector
@@ -27,19 +31,5 @@ void debug_log_flush(void);   /* Push buffered debug.log lines to the SD card */
 #define BIONIC_TLS_SIZE 0x400
 #define BIONIC_TLS_TP_OFFSET 0x200   /* tp points into the block: headroom for any negative bionic TLS slots */
 void install_bionic_tls(void *buf);
-
-static inline void* armGetTlsRw(void) {
-  void* ret;
-  __asm__ ("mrs %x[data], s3_3_c13_c0_2" : [data] "=r" (ret));
-  return ret;
-}
-
-static inline void armSetTlsRw(void *addr) {
-  __asm__  ("msr s3_3_c13_c0_2, %0" : : "r"(addr));
-}
-
-static inline uint64_t umin(uint64_t a, uint64_t b) {
-  return (a < b) ? a : b;
-}
 
 #endif

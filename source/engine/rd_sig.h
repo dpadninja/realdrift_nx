@@ -2,7 +2,8 @@
  *
  * A pattern is a run of {value, mask} words; an instruction matches if (insn & mask) == value.
  * Masks blank out what changes between builds of the same code (ADRP/ADD/LDR immediates,
- * branch targets) and keep the opcode and registers, which do not. */
+ * branch targets) and keep the opcode and registers, which do not.
+ * MIT (see LICENSE). */
 #ifndef RD_SIG_H
 #define RD_SIG_H
 

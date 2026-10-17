@@ -1,5 +1,6 @@
 /* rd_modimage.h -- rd_image (rd_patchsites.h) over a module loaded by so_util.
- * Host-testable (tests/c/test_rd_modimage.c). */
+ * Host-testable (tests/c/test_rd_modimage.c).
+ * MIT (see LICENSE). */
 #ifndef RD_MODIMAGE_H
 #define RD_MODIMAGE_H
 

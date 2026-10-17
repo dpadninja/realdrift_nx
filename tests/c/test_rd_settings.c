@@ -1,4 +1,5 @@
 /* sources: source/game/rd_settings.c source/platform/rd_perf.c */
+/* Host unit test of rd_settings. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_settings.h"

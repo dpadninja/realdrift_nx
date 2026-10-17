@@ -1,7 +1,8 @@
 /* rd_device.h -- the Android device the port pretends to be. Reported through Build.* fields
  * (jni_fake.c), system properties (__system_property_get, libc_shim.c), sysconf and the
  * synthetic /proc and /sys files (libc_shim.c). Keep them consistent: Unity cross-reads them.
- * Nothing here is checked by Real Drift; the values only steer engine decisions. */
+ * Nothing here is checked by Real Drift; the values only steer engine decisions.
+ * MIT (see LICENSE). */
 #ifndef RD_DEVICE_H
 #define RD_DEVICE_H
 

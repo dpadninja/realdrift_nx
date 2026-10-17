@@ -1,4 +1,5 @@
 /* sources: source/android/rd_features.c */
+/* Host unit test of rd_features. MIT (see LICENSE). */
 #include "check.h"
 #include "rd_features.h"
 

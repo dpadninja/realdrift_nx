@@ -1,5 +1,6 @@
 /* android_log.c -- liblog (__android_log_*) and bionic's __assert2: the engine's Android log goes
- * to debug.log. Inherited from the so-loader lineage (MIT); split out of imports.c.
+ * to debug.log. Split out of imports.c, forked from badpiggies_nx by ChanseyIsTheBest
+ * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
  * MIT (see LICENSE). */
 #define _GNU_SOURCE
 #include <stdarg.h>

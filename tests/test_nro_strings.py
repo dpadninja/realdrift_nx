@@ -2,7 +2,10 @@
 
 That is what RD_STR(X) yields when X is not defined where it is used (a header not included):
 the game then gets the name instead of the value -- FMOD once got "RD_AUDIO_FRAMES_PER_BUFFER"
-as its buffer size and audio stayed silent. Skips if the .nro has not been built."""
+as its buffer size and audio stayed silent. Skips if the .nro has not been built.
+
+MIT (see LICENSE).
+"""
 
 import re
 

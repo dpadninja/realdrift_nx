@@ -1,7 +1,10 @@
 """tools/find_patch_sites: the loader's pattern finders on the real binaries of both releases.
 
 The expected addresses were derived by hand from llvm-objdump (analysis/research/08-device-runs.md
-run 02 / run 08 / run 12 for 5.0.7; analysis/research/10-patch-sites.md for 5.0.8)."""
+run 02 / run 08 / run 12 for 5.0.7; analysis/research/10-patch-sites.md for 5.0.8).
+
+MIT (see LICENSE).
+"""
 
 import shutil
 import subprocess

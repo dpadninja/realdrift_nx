@@ -1,4 +1,5 @@
 /* sources: source/game/rd_prefs.c */
+/* Host unit test of rd_prefs. MIT (see LICENSE). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

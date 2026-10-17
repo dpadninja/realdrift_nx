@@ -1,4 +1,5 @@
-/* rd_iov.h -- writev() on top of a plain write(); host-testable (tests/c/test_rd_iov.c). */
+/* rd_iov.h -- writev() on top of a plain write(); host-testable (tests/c/test_rd_iov.c).
+ * MIT (see LICENSE). */
 #ifndef RD_IOV_H
 #define RD_IOV_H
 

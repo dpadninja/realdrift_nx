@@ -1,4 +1,5 @@
 /* sources: source/engine/rd_patchsites.c source/engine/rd_sig.c source/engine/rd_a64.c */
+/* Host unit test of rd_patchsites. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_patchsites.h"

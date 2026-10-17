@@ -1,4 +1,5 @@
 /* sources: source/engine/rd_il2cpp.c */
+/* Host unit test of rd_il2cpp. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_il2cpp.h"

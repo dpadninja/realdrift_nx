@@ -1,3 +1,8 @@
+"""tools/import_coverage.py: imports of the game libraries the shim tables do not provide.
+
+MIT (see LICENSE).
+"""
+
 from pathlib import Path
 
 import pytest

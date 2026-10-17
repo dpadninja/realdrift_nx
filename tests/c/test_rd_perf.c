@@ -1,4 +1,5 @@
 /* sources: source/platform/rd_perf.c */
+/* Host unit test of rd_perf. MIT (see LICENSE). */
 #include "check.h"
 #include "rd_perf.h"
 

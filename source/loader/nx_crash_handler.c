@@ -2,6 +2,9 @@
  * nx_crash_handler.c  --  drop-in user-exception crash dumper for Switch
  *                         homebrew (so-loader / Unity IL2CPP ports, or anything)
  *
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
+ *
  * WHAT IT DOES
  *   On any CPU fault (segfault, illegal instruction, bad blr, alignment, etc.)
  *   libnx calls __libnx_exception_handler. This one dumps, to your log:

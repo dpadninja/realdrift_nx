@@ -11,6 +11,8 @@
  *   com/unity3d/player/UnityPlayer        -> host queries (mostly no-op)
  *
  * unity_jni_init(RD_GAME_HOME) registers the class list at startup.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 #ifndef UNITY_JNI_H
 #define UNITY_JNI_H
@@ -18,8 +20,9 @@
 #include <stdarg.h>
 #include <stdint.h>
 
-/* FakeID is defined in jni_fake.c; we only read .cls/.name/.sig (all char[]). */
+/* FakeID is defined in jni_internal.h; we only read .cls/.name/.sig (all char[]). */
 
+/* Registers the Java classes with real behaviour and opens prefs.kv under data_root. */
 void  unity_jni_init(const char *data_root);
 
 /* unity_glue.c: creates the fake UnityPlayer / Context / Surface objects and registers the
@@ -27,8 +30,10 @@ void  unity_jni_init(const char *data_root);
 void  unity_environment_init(const char *data_root);
 int   unity_owns_class(const char *cls);          /* 1 if this module handles it */
 
+/* Call a method of a class this module owns (id is the FakeID, arguments in va), by result
+ * type: objects, integers (int/boolean/long) and void. */
 void     *unity_dispatch_object(void *recv, const void *id, va_list va);
-uint64_t  unity_dispatch_int   (void *recv, const void *id, va_list va); /* int/bool/long */
+uint64_t  unity_dispatch_int   (void *recv, const void *id, va_list va);
 void      unity_dispatch_void  (void *recv, const void *id, va_list va);
 
 /* Boxed PlayerPrefs values returned by getAll() iteration. jni_fake.c routes

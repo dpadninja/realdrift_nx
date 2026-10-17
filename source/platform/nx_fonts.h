@@ -1,6 +1,8 @@
 /* nx_fonts.h -- Switch system fonts exposed as Android system fonts, so Unity's
  * dynamic-font fallback has somewhere to find Cyrillic/CJK glyphs.
- * See nx_fonts.c for why this is needed. */
+ * See nx_fonts.c for why this is needed.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE). */
 #ifndef NX_FONTS_H
 #define NX_FONTS_H
 

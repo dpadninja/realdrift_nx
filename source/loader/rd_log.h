@@ -3,7 +3,8 @@
  *
  * debug.log used to fflush every line (an SD write each, ~960 lines per track load, run 13).
  * It is now fully buffered and flushed about once a second by the clock thread, except the
- * "urgent" lines below, which flush immediately so a crash/stall report is never lost. */
+ * "urgent" lines below, which flush immediately so a crash/stall report is never lost.
+ * MIT (see LICENSE). */
 #ifndef RD_LOG_H
 #define RD_LOG_H
 

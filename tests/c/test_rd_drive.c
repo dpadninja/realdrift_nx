@@ -1,4 +1,5 @@
 /* sources: source/game/rd_drive.c */
+/* Host unit test of rd_drive. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_drive.h"

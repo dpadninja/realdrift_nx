@@ -4,7 +4,8 @@
  * The game's MobileCarController reads only its mobile* fields, which the on-screen buttons
  * set through OnThrottlePress/Release, OnBrakePress/Release, ... (dump.cs). We emulate those
  * buttons on press/release EDGES (so the game's own logic runs, e.g. the reverse flag at
- * +0xD3) and write analog steering straight into mobileSteerInput. */
+ * +0xD3) and write analog steering straight into mobileSteerInput.
+ * MIT (see LICENSE). */
 #ifndef RD_DRIVE_H
 #define RD_DRIVE_H
 

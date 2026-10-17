@@ -1,4 +1,6 @@
-/* unity_jni.c -- real handlers for the Android classes listed in unity_jni.h. */
+/* unity_jni.c -- real handlers for the Android classes listed in unity_jni.h.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE). */
 
 #include <stdio.h>
 #include <stdlib.h>

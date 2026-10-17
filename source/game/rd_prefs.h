@@ -4,7 +4,8 @@
  * Inherited bugs fixed here (run 06):
  *   - getString(key, def) ignored `def` and returned "" for a missing key;
  *   - getFloat(key, def) never consulted the store at all (fell through to the
- *     orientation stub in jni_fake.c act_float and returned 0.0f). */
+ *     orientation stub in jni_fake.c act_float and returned 0.0f).
+ * MIT (see LICENSE). */
 #ifndef RD_PREFS_H
 #define RD_PREFS_H
 

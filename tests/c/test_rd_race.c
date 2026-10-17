@@ -1,4 +1,5 @@
 /* sources: source/game/rd_race.c */
+/* Host unit test of rd_race. MIT (see LICENSE). */
 #include "check.h"
 #include "rd_race.h"
 

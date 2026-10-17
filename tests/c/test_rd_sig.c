@@ -1,4 +1,5 @@
 /* sources: source/engine/rd_sig.c */
+/* Host unit test of rd_sig. MIT (see LICENSE). */
 #include "check.h"
 #include "rd_sig.h"
 

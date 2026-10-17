@@ -2,6 +2,7 @@
 #   git tag v1.0.0 && git push origin v1.0.0
 # The release contains realdrift_nx.nro, stage_sd.py (prepares the SD folder from the user's
 # own APK + OBB) and config.example.txt. No game files are involved at any point.
+# MIT (see LICENSE).
 name: release
 
 on:

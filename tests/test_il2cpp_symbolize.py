@@ -1,3 +1,8 @@
+"""tools/il2cpp_symbolize.py: libil2cpp addresses named from Il2CppDumper's script.json.
+
+MIT (see LICENSE).
+"""
+
 from tools.il2cpp_symbolize import Symbolizer
 
 METHODS = [

@@ -1,4 +1,7 @@
-"""tools/release.py: the released stage_sd.py must work alone, with plain Python."""
+"""tools/release.py: the released stage_sd.py must work alone, with plain Python.
+
+MIT (see LICENSE).
+"""
 
 import subprocess
 import sys

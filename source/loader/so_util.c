@@ -7,6 +7,8 @@
  *
  * Loads Android ARM64 shared objects into a reserved memory range and applies
  * the relocation types the game's arm64 libraries use.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #include <switch.h>
@@ -34,22 +36,6 @@
 #define DT_ANDROID_RELRENT 0x6fffe003
 
 static so_module *so_list = NULL;
-
-void hook_arm64(uintptr_t addr, uintptr_t dst) {
-  if (addr == 0)
-    return;
-  /* Build the 16-byte detour in a local buffer and write it through so_patch_code.
-   * A raw write to `addr` faults on real hardware: loaded .text is mapped read-execute,
-   * so the store permission-faults (ESR EC=0x24, DFSC=0x0f). so_patch_code maps a WRITABLE
-   * ALIAS of the code page via svcMapProcessMemory, writes there, unmaps, and flushes the
-   * D/I caches -- the only correct way to patch loaded code on Switch. (Same path the input
-   * and PlayerPrefs prologue hooks already use.) */
-  uint32_t stub[4];
-  stub[0] = 0x58000051u;            // LDR X17, #0x8
-  stub[1] = 0xd61f0220u;            // BR  X17
-  *(uint64_t *)(stub + 2) = dst;    // .quad dst
-  so_patch_code((void *)addr, stub, sizeof stub);
-}
 
 void so_flush_caches(so_module *mod) {
   armDCacheFlush(mod->load_virtbase, mod->load_size);
@@ -481,17 +467,6 @@ void so_execute_init_array(so_module *mod) {
   debugPrintf("[init] <<< done init_array for %s\n", mod->name);
 }
 
-uintptr_t so_find_addr(so_module *mod, const char *symbol) {
-  for (int i = 0; i < mod->num_syms; i++) {
-    char *name = mod->dynstrtab + mod->syms[i].st_name;
-    if (strcmp(name, symbol) == 0)
-      return (uintptr_t)mod->load_base + mod->syms[i].st_value;
-  }
-
-  fatal_error("Error: could not find symbol:\n%s\n", symbol);
-  return 0;
-}
-
 uintptr_t so_find_addr_rx(so_module *mod, const char *symbol) {
   const uintptr_t addr = so_try_find_addr_rx(mod, symbol);
   if (!addr)
@@ -505,54 +480,6 @@ uintptr_t so_try_find_addr_rx(so_module *mod, const char *symbol) {
     if (strcmp(name, symbol) == 0)
       return (uintptr_t)mod->load_virtbase + mod->syms[i].st_value;
   }
-  return 0;
-}
-
-DynLibFunction *so_find_import(DynLibFunction *funcs, int num_funcs, const char *name) {
-  for (int i = 0; i < num_funcs; ++i)
-    if (!strcmp(funcs[i].symbol, name))
-      return &funcs[i];
-  return NULL;
-}
-
-int so_unload(so_module *mod) {
-  if (mod->load_base == NULL)
-    return -1;
-
-  if (mod->so_base) {
-    // someone forgot to free the temp data
-    so_free_temp(mod);
-  }
-
-  // remap everything as RW
-  for (int i = 0; i < mod->phnum; i++) {
-    const Elf64_Phdr *p = &mod->phdr[i];
-    if (p->p_type != PT_LOAD || !(p->p_flags & PF_X))
-      continue;
-    const u64 seg_start = ((u64)mod->load_virtbase + p->p_vaddr) & ~0xFFFull;
-    const u64 seg_end = ALIGN_MEM((u64)mod->load_virtbase + p->p_vaddr + p->p_memsz, 0x1000);
-    svcSetProcessMemoryPermission(envGetOwnProcessHandle(), seg_start, seg_end - seg_start, Perm_Rw);
-  }
-  // unmap everything
-  svcUnmapProcessCodeMemory(envGetOwnProcessHandle(), (u64)mod->load_virtbase, (u64)mod->load_base, mod->load_size);
-
-  // release virtual address range
-  virtmemLock();
-  virtmemRemoveReservation(mod->load_memrv);
-  virtmemUnlock();
-
-  // remove from list
-  if (so_list == mod) {
-    so_list = mod->next;
-  } else {
-    for (so_module *m = so_list; m; m = m->next) {
-      if (m->next == mod) {
-        m->next = mod->next;
-        break;
-      }
-    }
-  }
-
   return 0;
 }
 
@@ -577,80 +504,6 @@ int so_dl_iterate_phdr(int (*callback)(void *info, size_t size, void *data), voi
       break;
   }
   return ret;
-}
-
-/* ------------------------------------------------------------------------- */
-/* Neutralize bionic TLS stack-canary checks in a loaded module.
- *
- * The engine reads its stack guard from tpidr_el0+0x28, but it installs its own
- * bionic TLS partway through init, so a function that runs across that swap sees
- * a different guard at exit than it saved at entry and calls __stack_chk_fail
- * (a false positive -- the stack isn't actually corrupted). We can't keep the
- * guard perfectly consistent through the engine's own TLS management, so instead
- * we patch the check: find the canary epilogue and NOP the conditional branch to
- * the fail block, so it always falls through to the normal return.
- *
- * Pattern (AArch64):
- *    ldr  Xt, [Xn, #0x28]      ; live guard  (imm12 == 5)
- *    ldr  Xs, [sp, #imm]       ; saved canary
- *    ... (0-4 insns) ...
- *    b.ne <fail>               ; <- NOP this
- *  <fail> contains a bl __stack_chk_fail within a few insns (confirmation).
- *
- * Must run while the code is still writable (load_base), before so_finalize.
- */
-void so_patch_stack_canaries(so_module *mod) {
-  for (int s = 0; s < mod->elf_hdr->e_shnum; s++) {
-    char *sh_name = mod->shstrtab + mod->sec_hdr[s].sh_name;
-    if (strcmp(sh_name, ".text") != 0)
-      continue;
-    uintptr_t text_base = (uintptr_t)mod->load_base + mod->sec_hdr[s].sh_addr;
-    uint32_t *code = (uint32_t *)text_base;
-    int n = (int)(mod->sec_hdr[s].sh_size / 4);
-    int patched = 0;
-    long first_vaddr = -1, first_word = 0;
-    for (int i = 0; i + 12 < n; i++) {
-      uint32_t w = code[i];
-      /* guard load: ldr Xt,[Xn,#0x28]  (64-bit unsigned-offset, imm12==5) */
-      if ((w & 0xFFC00000) != 0xF9400000 || ((w >> 10) & 0xFFF) != 5)
-        continue;
-      /* saved-canary load from sp within next 2 insns: ldr Xs,[sp,#imm] (Rn==31) */
-      int has_sp = 0;
-      for (int k = 1; k <= 2; k++) {
-        uint32_t w2 = code[i + k];
-        if ((w2 & 0xFFC00000) == 0xF9400000 && ((w2 >> 5) & 0x1F) == 31)
-          has_sp = 1;
-      }
-      if (!has_sp)
-        continue;
-      /* first b.ne within next 8 insns */
-      for (int k = 2; k <= 8 && i + k < n; k++) {
-        uint32_t w3 = code[i + k];
-        if ((w3 & 0xFF000010) == 0x54000000 && (w3 & 0xF) == 1) { /* b.ne */
-          int32_t off = (int32_t)((w3 >> 5) & 0x7FFFF);
-          if (off & 0x40000) off -= 0x80000;            /* sign-extend imm19 */
-          int tgt = i + k + off;
-          int has_bl = 0;
-          for (int m = 0; m <= 8 && tgt + m < n && tgt >= 0; m++)
-            if (rd_a64_is_bl(code[tgt + m])) { has_bl = 1; break; }
-          if (has_bl) {
-            code[i + k] = 0xD503201F; /* NOP */
-            if (first_vaddr < 0) { first_vaddr = (long)(mod->sec_hdr[s].sh_addr + (i + k) * 4); }
-            patched++;
-          }
-          break;
-        }
-      }
-    }
-    /* Flush the patched region: we wrote through load_base, but the CPU will fetch
-     * from load_virtbase after so_finalize aliases them. Clean dcache for what we
-     * wrote so it reaches physical memory before the icache is invalidated. */
-    armDCacheFlush((void *)text_base, mod->sec_hdr[s].sh_size);
-    if (first_vaddr >= 0)
-      first_word = (long)((uint32_t *)((uintptr_t)mod->load_base + first_vaddr))[0];
-    debugPrintf("[patch] %s: neutralized %d stack-canary checks (first@0x%lx readback=0x%08lx)\n",
-                mod->name, patched, (unsigned long)first_vaddr, (unsigned long)first_word);
-  }
 }
 
 // ---------------------------------------------------------------------------

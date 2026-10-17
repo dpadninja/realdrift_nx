@@ -1,5 +1,6 @@
 /* rd_codeaddr.h -- is a stack word a plausible return address into a loaded module?
- * Host-testable (tests/c/test_rd_codeaddr.c). */
+ * Host-testable (tests/c/test_rd_codeaddr.c).
+ * MIT (see LICENSE). */
 #ifndef RD_CODEADDR_H
 #define RD_CODEADDR_H
 

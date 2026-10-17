@@ -2,7 +2,9 @@
  * dynamic loading); also where il2cpp_add_internal_call is swapped for the icall override
  * wrapper.
  *
- * Split out of libc_shim.c (inherited from the so-loader lineage, MIT). MIT (see LICENSE). */
+ * Split out of libc_shim.c, forked from badpiggies_nx by ChanseyIsTheBest
+ * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
+ * MIT (see LICENSE). */
 #define _GNU_SOURCE
 
 #include <string.h>

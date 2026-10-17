@@ -7,7 +7,8 @@
  * Button values are one or more button names separated by ',' '+' or spaces (any of them
  * triggers the action); "NONE" or an empty value unbinds. Names: A B X Y L R ZL ZR PLUS MINUS
  * UP DOWN LEFT RIGHT LSTICK RSTICK (case-insensitive). Bit values follow libnx
- * HidNpadButton_* (checked at compile time in rd_drive_hook.c). */
+ * HidNpadButton_* (checked at compile time in rd_drive_hook.c).
+ * MIT (see LICENSE). */
 #ifndef RD_SETTINGS_H
 #define RD_SETTINGS_H
 

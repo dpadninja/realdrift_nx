@@ -1,5 +1,7 @@
 /* unity_input_hook.h -- the Switch touch state as UnityEngine.Input sees it (icall
- * replacements). See unity_input_hook.c. */
+ * replacements). See unity_input_hook.c.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE). */
 #ifndef UNITY_INPUT_HOOK_H
 #define UNITY_INPUT_HOOK_H
 

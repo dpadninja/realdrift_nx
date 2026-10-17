@@ -1,4 +1,5 @@
 /* sources: source/bionic/rd_iov.c */
+/* Host unit test of rd_iov. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_iov.h"

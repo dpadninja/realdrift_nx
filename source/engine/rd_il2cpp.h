@@ -1,6 +1,7 @@
 /* rd_il2cpp.h -- the exported il2cpp runtime API the port calls, resolved ONCE from
  * libil2cpp.so (main.c: rd_il2cpp_load), plus small helpers built on it.
- * Host-testable (tests/c/test_rd_il2cpp.c): the symbol lookup is a callback. */
+ * Host-testable (tests/c/test_rd_il2cpp.c): the symbol lookup is a callback.
+ * MIT (see LICENSE). */
 #ifndef RD_IL2CPP_H
 #define RD_IL2CPP_H
 
@@ -31,9 +32,10 @@ typedef struct {
 
 extern rd_il2cpp_api g_il2cpp;
 
-/* Fills *api from `sym(ctx, "il2cpp_...")`. Returns how many functions were NOT found
- * (each is logged by the caller via `missing`, may be NULL). */
+/* Symbol lookup callback: the address of `name`, or NULL. */
 typedef void *(*rd_sym_fn)(void *ctx, const char *name);
+/* Fills *api from `sym(ctx, "il2cpp_...")`. Returns how many functions were NOT found
+ * (each is reported through `missing`, which may be NULL). */
 int rd_il2cpp_load(rd_il2cpp_api *api, rd_sym_fn sym, void *ctx,
                    void (*missing)(const char *name));
 
@@ -60,10 +62,11 @@ int rd_il2cpp_str_eq(const rd_il2cpp_api *api, void *str, const char *s);
 int rd_il2cpp_field_offset(const rd_il2cpp_api *api, void *klass, const char *name,
                            uint32_t *offset);
 
-/* Offsets of n fields by name. Returns 1 and fills out[0..n) only if EVERY field was found
- * (offset 0 is the object header, never a field). `lookup(ctx, name, &off)`. */
 #define RD_MAX_FIELDS 32
+/* Field offset lookup callback: 1 and *offset if `name` exists. */
 typedef int (*rd_field_offset_fn)(void *ctx, const char *name, uint32_t *offset);
+/* Offsets of n fields by name. Returns 1 and fills out[0..n) only if EVERY field was found
+ * (offset 0 is the object header, never a field); rd_il2cpp_fields looks them up in klass. */
 int rd_resolve_fields(rd_field_offset_fn lookup, void *ctx, const char *const names[], int n,
                       uint32_t out[]);
 int rd_il2cpp_fields(const rd_il2cpp_api *api, void *klass, const char *const names[], int n,

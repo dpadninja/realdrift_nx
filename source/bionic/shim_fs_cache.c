@@ -2,7 +2,9 @@
  * big archives, synthetic inode numbers, the open-fd cache for files Unity re-opens all the
  * time, and the SD-card commit after a written file is closed.
  *
- * Split out of libc_shim.c (inherited from the so-loader lineage, MIT). MIT (see LICENSE). */
+ * Split out of libc_shim.c, forked from badpiggies_nx by ChanseyIsTheBest
+ * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
+ * MIT (see LICENSE). */
 #define _GNU_SOURCE
 
 #include <string.h>
@@ -143,32 +145,19 @@ static unsigned char g_write_fd[WFD_MAX];
 int nx_sd_dirty = 0;   /* a file has been opened for writing since the last commit */
 void mark_write_fd(int fd)   { nx_sd_dirty = 1; if (fd >= 0 && fd < WFD_MAX) g_write_fd[fd] = 1; }
 
-/* Close of a file that was written.
+/* Close of a file that was written: commit the SD card now.
  *
- * This used to call fsdevCommitDevice("sdmc") INLINE, on every such close. That is a full SD
- * filesystem commit -- tens of milliseconds on Switch -- and it ran on the game thread, so any
- * action that produced a file write stalled the frame. The game writes on interaction (Flurry
- * analytics appends to FlurryLog.txt, PlayerPrefs -> prefs.kv, progress saves), which is why
- * discrete TAPS hitched while a sustained hold did not: a hold is one gesture, but each tap
- * completes an action that writes. A phone never shows this -- there is no fsdevCommitDevice
- * there; the OS just buffers in the page cache.
- *
- * The commit is also redundant. The port already commits from two places: the render loop every
- * 120 frames (~2s, dirty-gated) and nx_applet_hook on focus-change / exit-request, which covers
- * quitting via HOME. So we simply leave the dirty flag set and let those do the work -- saves
- * are still durable within ~2s and guaranteed on exit, without stalling the frame that wrote. */
+ * libnx buffers sdmc: writes; without a commit a save exists only in RAM and is lost if the
+ * process is killed (HOME). A commit costs tens of milliseconds on the game thread, but saves are
+ * rare (end of a level, a settings change) and the tap path never writes, so paying it here is
+ * free during play and makes a save durable the moment the game finishes writing it.
+ * nx_sd_flush() (every RD_SD_FLUSH_FRAMES and on exit) stays as the safety net.
+ * History: the commit was once deferred to nx_sd_flush() on the theory that it caused tap
+ * stutter; the stutter was Unity re-reading its own .so to symbolicate, and deferring lost
+ * progress across reloads. */
 void commit_write_fd(int fd) {
   if (fd < 0 || fd >= WFD_MAX || !g_write_fd[fd]) return;
   g_write_fd[fd] = 0;
-  /* Commit the write to the physical card here, at close.
-   *
-   * I removed this earlier on the theory that it caused the tap stutter, and deferred it to the
-   * periodic nx_sd_flush(). That theory was wrong -- the stutter was Unity re-reading its own
-   * .so to symbolicate -- and deferring cost real durability: libnx buffers sdmc: writes, so
-   * without a commit the save exists only in RAM. Combined with the rename jam, progress did not
-   * survive a reload. Saves are rare (end of a level, settings change) and the tap path never
-   * writes, so paying the commit here costs nothing during play and makes a save durable the
-   * moment the game finishes writing it. nx_sd_flush() stays as the periodic safety net. */
   nx_sd_dirty = 0;
   nx_stat_commit++;
   fsdevCommitDevice("sdmc");

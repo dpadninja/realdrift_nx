@@ -6,7 +6,8 @@
  * rd_add_internal_call() instead; for names in the override table we register our function,
  * everything else goes through unchanged. Unlike the inherited RVA hooks this needs no
  * per-build offsets: icall names are stable across builds of the same Unity version.
- * An override with `orig` set receives the engine's function there, so it can wrap it. */
+ * An override with `orig` set receives the engine's function there, so it can wrap it.
+ * MIT (see LICENSE). */
 #ifndef RD_ICALL_H
 #define RD_ICALL_H
 

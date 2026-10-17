@@ -1,4 +1,5 @@
 /* sources: source/android/rd_apkpath.c */
+/* Host unit test of rd_apkpath. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_apkpath.h"

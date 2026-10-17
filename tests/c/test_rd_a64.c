@@ -1,4 +1,5 @@
 /* sources: source/engine/rd_a64.c */
+/* Host unit test of rd_a64. MIT (see LICENSE). */
 #include <stdint.h>
 #include "check.h"
 #include "rd_a64.h"

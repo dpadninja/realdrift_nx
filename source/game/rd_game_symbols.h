@@ -2,7 +2,8 @@
  * modules that the port hooks or calls. Everything is resolved BY NAME at run time
  * (il2cpp_class_from_name / _get_method_from_name / _get_field_from_name), so a new game build
  * only breaks if one of these names changes. Check them against Il2CppDumper's dump.cs
- * (analysis/research/10-patch-sites.md). Input icall names: unity_input_hook.c. */
+ * (analysis/research/10-patch-sites.md). Input icall names: unity_input_hook.c.
+ * MIT (see LICENSE). */
 #ifndef RD_GAME_SYMBOLS_H
 #define RD_GAME_SYMBOLS_H
 

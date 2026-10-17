@@ -16,7 +16,7 @@ Go through the diff with these questions. Report each problem with file:line and
 ## Readability (`docs/CODING_STYLE.md`)
 - File header comment present, still true after the change, and stating the license
   (forked code: upstream copyright, author, repository)?
-- Every function declared in a header has a comment (`uv run python tools/doc_check.py`)?
+- Every function declared in a header has a comment (`uv run python -m tools.doc_check`)?
 - Comments explain why; no stale comments describing old behaviour; no `#if 0` or dead code.
 - Names follow `module_verb_object`; `static` where possible; `(void)`, `const`.
 

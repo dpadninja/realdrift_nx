@@ -1,4 +1,5 @@
 /* sources: source/engine/rd_gcbridge.c */
+/* Host unit test of rd_gcbridge. MIT (see LICENSE). */
 #include <stdint.h>
 #include "check.h"
 #include <string.h>

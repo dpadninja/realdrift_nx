@@ -6,7 +6,8 @@
  * mounted (unity.build-id matches) Unity switches to archive mode and opens the package
  * path as a ZIP: globalgamemanagers / level0 / sharedassets0 live only in the APK, so a
  * folder there fails with "No GlobalGameManagers file was found" (run 05). We therefore
- * ship the original APK as <game folder>/base.apk and report that path when present. */
+ * ship the original APK as <game folder>/base.apk and report that path when present.
+ * MIT (see LICENSE). */
 #ifndef RD_APKPATH_H
 #define RD_APKPATH_H
 

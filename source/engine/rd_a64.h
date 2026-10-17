@@ -1,5 +1,6 @@
 /* rd_a64.h -- AArch64 encode/decode helpers for the pattern-found code patches.
- * Host-testable (tests/c/test_rd_a64.c). */
+ * Host-testable (tests/c/test_rd_a64.c).
+ * MIT (see LICENSE). */
 #ifndef RD_A64_H
 #define RD_A64_H
 
@@ -33,6 +34,7 @@ int rd_a64_add_x_imm(uint32_t insn, unsigned *rd, unsigned *rn, uint32_t *imm);
 #define RD_A64_BL_OPCODE    0x94000000u   /* bl <imm26>: (insn & MASK) == OPCODE */
 #define RD_A64_BL_MASK      0xfc000000u
 
+/* 1 if insn is a BL (branch with link). */
 static inline int rd_a64_is_bl(uint32_t insn) {
   return (insn & RD_A64_BL_MASK) == RD_A64_BL_OPCODE;
 }

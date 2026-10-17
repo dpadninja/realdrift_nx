@@ -1,3 +1,8 @@
+"""tools/jni_natives.py: JNINativeMethod tables recovered from relocations.
+
+MIT (see LICENSE).
+"""
+
 import pytest
 
 from tools.game import RELEASES

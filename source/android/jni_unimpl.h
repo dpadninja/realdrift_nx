@@ -1,4 +1,6 @@
-/* jni_unimpl.h -- generated: indexed unimplemented-slot stubs for diagnosis */
+/* jni_unimpl.h -- generated: indexed unimplemented-slot stubs for diagnosis
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE). */
 #ifndef __JNI_UNIMPL_H__
 #define __JNI_UNIMPL_H__
 #include <stdint.h>

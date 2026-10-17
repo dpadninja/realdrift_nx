@@ -1,7 +1,9 @@
 /* egl.c -- EGL/GLES glue between the engine and switch-mesa: the window surface kept alive and
  * sized, the eglSwapBuffers wrapper (FPS counter and cursor overlay, swap timing), and timed
  * wrappers for the GL calls that can wait for the GPU (counted for the [perf] log).
- * Inherited from the so-loader lineage (MIT) and extended for realdrift_nx. MIT (see LICENSE). */
+ * Split out of imports.c, forked from badpiggies_nx by ChanseyIsTheBest
+ * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); extended for realdrift_nx.
+ * MIT (see LICENSE). */
 #define _GNU_SOURCE
 
 #include <string.h>

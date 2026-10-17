@@ -1,4 +1,5 @@
 /* sources: source/loader/rd_codeaddr.c */
+/* Host unit test of rd_codeaddr. MIT (see LICENSE). */
 #include <elf.h>
 #include "check.h"
 #include "rd_codeaddr.h"

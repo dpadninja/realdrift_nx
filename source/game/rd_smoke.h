@@ -6,7 +6,8 @@
  * icall ParticleSystem::Internal_EmitOld(ref Particle). That icall is wrapped (rd_icall.h):
  * for the smoke systems it scales the particle's start size and lets only a share of the
  * particles through. Both knobs at 100 % = the original game (the default).
- * Pure logic here (host-tested, tests/c/test_rd_smoke.c); the il2cpp glue in rd_smoke_hook.c. */
+ * Pure logic here (host-tested, tests/c/test_rd_smoke.c); the il2cpp glue in rd_smoke_hook.c.
+ * MIT (see LICENSE). */
 #ifndef RD_SMOKE_H
 #define RD_SMOKE_H
 
@@ -28,8 +29,10 @@ float rd_smoke_scale_size(float size, int percent);
 
 /* The smoke systems' GameObjects (found by material each rescan). */
 typedef struct { const void *go[RD_SMOKE_MAX_SYSTEMS]; int n; } rd_smoke_set;
+/* 1 if go is in the set. */
 int  rd_smoke_set_has(const rd_smoke_set *s, const void *go);
-void rd_smoke_set_add(rd_smoke_set *s, const void *go);   /* ignores NULL, duplicates, full */
+/* Adds go; NULL, duplicates and additions to a full set are ignored. */
+void rd_smoke_set_add(rd_smoke_set *s, const void *go);
 
 /* ---- glue (rd_smoke_hook.c) ---------------------------------------------------------- */
 /* Called every race frame (rd_race_hook.c); rescans the smoke systems now and then. */

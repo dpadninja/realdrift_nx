@@ -4,7 +4,8 @@
  *
  * Every presented frame calls rd_fps_frame(); each RD_FPS_WINDOW_NS it publishes the
  * frame rate of that window and its slowest frame. rd_fps_layout() turns the text into
- * rectangles of a built-in 3x5 pixel font, so no font or texture is needed. */
+ * rectangles of a built-in 3x5 pixel font, so no font or texture is needed.
+ * MIT (see LICENSE). */
 #ifndef RD_FPS_H
 #define RD_FPS_H
 

@@ -3,7 +3,8 @@
  *
  * Target: Real Drift (full version) 5.0.8, versionCode 76, Unity 2018.4.14f1 / IL2CPP,
  * arm64-v8a. Values from the APK's AndroidManifest.xml; tools/stage_sd.py refuses any other
- * APK (e.g. Real Drift Lite, com.realdriftportnew.sipon). History: analysis/research/10-patch-sites.md. */
+ * APK (e.g. Real Drift Lite, com.realdriftportnew.sipon). History: analysis/research/10-patch-sites.md.
+ * MIT (see LICENSE). */
 #ifndef RD_GAME_H
 #define RD_GAME_H
 

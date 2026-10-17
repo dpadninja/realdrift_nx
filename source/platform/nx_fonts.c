@@ -21,6 +21,8 @@
  * module extracts them once, converts them to plain TTF, caches them under the
  * game directory, and synthesises the Android config files that point Unity at
  * them. Nothing is redistributed: the fonts come off the console at runtime.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #include <stdint.h>

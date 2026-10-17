@@ -10,6 +10,8 @@
  * (android_native_unity.c) and a few liblog/cxxabi helpers. unity_imports.c and
  * rd_imports.c add further tables; nx_resolve_imports() resolves against all of them.
  * tests/test_import_coverage.py checks that every import of the game's libraries is covered.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #define _GNU_SOURCE

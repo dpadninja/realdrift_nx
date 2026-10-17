@@ -1,4 +1,5 @@
 /* sources: source/game/config.c source/game/rd_settings.c */
+/* Host unit test of config. MIT (see LICENSE). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

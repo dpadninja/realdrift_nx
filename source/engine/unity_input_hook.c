@@ -5,6 +5,8 @@
  * when libunity registers them (rd_icall.h, table g_input_icalls below) and answers them from
  * the finger state android_native_feed_hid pushes every frame (nx_input_hook_update_multi).
  * UnityEngine.Touch's layout (0x44 bytes) is checked against dump.cs (NxTouch below).
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 #include <stdint.h>
 #include <string.h>

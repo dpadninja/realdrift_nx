@@ -1,5 +1,7 @@
 /* config.c -- config.txt (RD_CONFIG_FILE) load/save. The keys, defaults and help texts are
- * the table in rd_settings.c. MIT (see LICENSE). */
+ * the table in rd_settings.c. MIT (see LICENSE).
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE). */
 #include <stdio.h>
 #include "config.h"
 

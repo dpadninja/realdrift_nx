@@ -1,4 +1,5 @@
 /* sources: source/android/rd_meta.c */
+/* Host unit test of rd_meta. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "config.h"

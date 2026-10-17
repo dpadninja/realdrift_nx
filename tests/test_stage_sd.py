@@ -1,3 +1,8 @@
+"""tools/stage_sd.py: identity checks of the APK/OBB and the staged SD folder.
+
+MIT (see LICENSE).
+"""
+
 import struct
 import zipfile
 from pathlib import Path

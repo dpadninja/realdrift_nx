@@ -1,4 +1,5 @@
 /* sources: source/platform/rd_overlay.c */
+/* Host unit test of rd_overlay. MIT (see LICENSE). */
 #include "check.h"
 #include "rd_overlay.h"
 

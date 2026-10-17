@@ -1,6 +1,8 @@
 /* jni_objects.c -- the fake Java object model behind the JNIEnv: local references and frames,
  * objects, strings, primitive and object arrays, interned classes and method/field IDs.
- * Split out of jni_fake.c (inherited from the so-loader lineage, MIT). MIT (see LICENSE). */
+ * Split out of jni_fake.c, forked from badpiggies_nx by ChanseyIsTheBest
+ * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
+ * MIT (see LICENSE). */
 
 #include <stdlib.h>
 #include <switch.h>

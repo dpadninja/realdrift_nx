@@ -1,7 +1,9 @@
 /* rd_gcbridge_hook.c -- Boehm GC stop-the-world on Horizon: pthread_kill for the collector's
  * suspend signal, done from outside the target thread (see rd_gcbridge.h).
  *
- * Split out of libc_shim.c (inherited from the so-loader lineage, MIT). MIT (see LICENSE). */
+ * Split out of libc_shim.c, forked from badpiggies_nx by ChanseyIsTheBest
+ * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
+ * MIT (see LICENSE). */
 #define _GNU_SOURCE
 
 

@@ -33,7 +33,10 @@ Code forked from other projects follows them where we touch it.
 
 - **Every function declared in a header has a comment** right above its declaration: what it
   does, what the arguments and return value mean, ownership of pointers, and the thread it may be
-  called from when that matters. `tools/doc_check.py` enforces this.
+  called from when that matters. One comment may cover a group of related declarations that
+  follow it without a blank line (e.g. a family of bionic wrappers that all behave the same
+  way). `tools/doc_check.py` enforces this (run by `make test`; alone:
+  `uv run python -m tools.doc_check`).
 - A `static` function gets a comment when its name and signature do not tell the whole story.
 - Comment the *why*: the constraint, the Horizon/bionic/Unity quirk, the log line that proved it.
   Do not narrate what the next line obviously does.

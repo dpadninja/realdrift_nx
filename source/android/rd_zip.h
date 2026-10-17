@@ -3,7 +3,8 @@
  *
  * The fake AssetManager (unity_jni.c) serves assets straight from base.apk instead of an
  * extracted copy on the SD card. Entries may be stored or deflated (Real Drift's APKs deflate
- * almost everything under assets/). */
+ * almost everything under assets/).
+ * MIT (see LICENSE). */
 #ifndef RD_ZIP_H
 #define RD_ZIP_H
 

@@ -10,7 +10,8 @@
  * and the whole live stack (run 12: without this, objects held only by the timer thread were
  * collected while the thread kept running -> "Unable to cast object" crashes).
  *
- * The globals are located by instruction patterns (rd_patchsites.c rd_find_gc_vars). */
+ * The globals are located by instruction patterns (rd_patchsites.c rd_find_gc_vars).
+ * MIT (see LICENSE). */
 #ifndef RD_GCBRIDGE_H
 #define RD_GCBRIDGE_H
 

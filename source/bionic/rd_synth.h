@@ -1,5 +1,6 @@
 /* rd_synth.h -- stdio access to synthetic /proc and /sys files. Host-testable
- * (tests/c/test_rd_synth.c). */
+ * (tests/c/test_rd_synth.c).
+ * MIT (see LICENSE). */
 #ifndef RD_SYNTH_H
 #define RD_SYNTH_H
 

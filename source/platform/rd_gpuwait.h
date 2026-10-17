@@ -1,5 +1,6 @@
 /* rd_gpuwait.h -- display/GPU wait counters (nx_stat_dequeue_ns, nx_stat_fence_ns) and the
- * clock log; see rd_gpuwait.c. */
+ * clock log; see rd_gpuwait.c.
+ * MIT (see LICENSE). */
 #ifndef RD_GPUWAIT_H
 #define RD_GPUWAIT_H
 

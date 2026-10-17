@@ -12,7 +12,8 @@
  *   shim_mmap.c     mmap/munmap/mprotect: heap arena, overcommit window, file-map cache
  *   shim_dl.c       dlopen/dlsym over the loaded modules
  *   shim_pthread.c  rwlocks, semaphores, timed waits
- * Inherited from the so-loader lineage (MIT); split and documented for realdrift_nx.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; split and documented for realdrift_nx.
  * MIT (see LICENSE). */
 
 #ifndef __LIBC_SHIM_H__
@@ -25,17 +26,15 @@
 #include <time.h>
 #include <pthread.h>
 
-// Return `p` with any leading "device:" (e.g. "sdmc:") stripped, so the result
-// is a Unix-rooted path ("/switch/realdrift_nx"). Paths handed to managed code
-// (Mono/IL2CPP) MUST be device-less: ":" isn't a Unix root marker, so a
-// "sdmc:/..." path is treated as relative and Path.Combine() concatenates it
-// after a relative asset path -> "assets/bin/Data/sdmc:/switch/realdrift_nx",
-// which newlib then mis-parses (embedded device) and null-derefs. newlib still
-// resolves device-less absolute paths via the default device (sdmc, set by our
-// boot chdir), so file I/O is unaffected.
+/* ---- shim_libc.c ------------------------------------------------------------------------ */
+
+/* `p` without its leading "device:" (e.g. "sdmc:"), i.e. a Unix-rooted path. Paths handed to
+ * managed code must be device-less: Mono/IL2CPP see "sdmc:/..." as relative and Path.Combine
+ * builds "assets/bin/Data/sdmc:/switch/realdrift_nx", which newlib then mis-parses. newlib
+ * resolves device-less absolute paths through the default device, so file I/O still works. */
 const char *managed_path(const char *p);
 
-// fortify
+/* Fortify (_chk) variants: the object-size arguments are ignored, the plain function runs. */
 void *__memcpy_chk_fake(void *dst, const void *src, size_t n, size_t dstlen);
 void *__memmove_chk_fake(void *dst, const void *src, size_t n, size_t dstlen);
 void *__memset_chk_fake(void *dst, int c, size_t n, size_t dstlen);
@@ -57,7 +56,8 @@ long __pread_chk_fake(int fd, void *buf, size_t count, long off, size_t buflen);
 void __FD_SET_chk_fake(int fd, void *set, size_t setlen);
 int  __FD_ISSET_chk_fake(int fd, const void *set, size_t setlen);
 
-// misc bionic
+/* bionic-only functions: system properties answer from rd_device.h (the fake device), futex
+ * and syscall() are emulated over libnx, sysconf reports the fake device's cores and pages. */
 int __system_property_get_fake(const char *name, char *value);
 unsigned long getauxval_fake(unsigned long type);
 int gettid_fake(void);
@@ -72,27 +72,7 @@ int __cxa_thread_atexit_impl_fake(void (*fn)(void *), void *arg, void *dso);
 long sysconf_fake(int name);
 long pathconf_fake(const char *path, int name);
 
-// fs
-int open_fake(const char *path, int flags, ...);
-int mkdir_fake(const char *path, unsigned mode);
-int openat_fake(int dirfd, const char *path, int flags, ...);
-int unlinkat_fake(int dirfd, const char *path, int flags);
-struct bionic_stat;
-void *opendir_fake(const char *path);
-int stat_fake(const char *path, struct bionic_stat *st);
-/* POSIX rename(): replaces an existing destination (Horizon's does not). */
-int rename_fake(const char *oldp, const char *newp);
-
-int fstat_fake(int fd, struct bionic_stat *st);
-int lstat_fake(const char *path, struct bionic_stat *st);
-void *readdir_fake(void *dirp);
-char *realpath_fake(const char *path, char *resolved);
-int strerror_r_fake(int err, char *buf, size_t len);
-int statvfs_fake(const char *path, void *buf);
-int statfs_fake(const char *path, void *buf);
-FILE *fopen_fake(const char *path, const char *mode);
-
-// locale
+/* *_l locale variants: the locale argument is ignored, the C locale is used. */
 void *newlocale_fake(int mask, const char *locale, void *base);
 void freelocale_fake(void *loc);
 void *uselocale_fake(void *loc);
@@ -113,7 +93,94 @@ size_t wcsxfrm_l_fake(wchar_t *dst, const wchar_t *src, size_t n, void *loc);
 size_t mbsnrtowcs_fake(wchar_t *dst, const char **src, size_t nms, size_t len, void *ps);
 size_t wcsnrtombs_fake(char *dst, const wchar_t **src, size_t nwc, size_t len, void *ps);
 
-// stdio over fake __sF
+/* Networking: online play is dead, so every call fails cleanly (sockets cannot be created,
+ * names do not resolve) and the engine stays offline. */
+int socket_fake(int d, int t, int p);
+int connect_fake(int s, const void *a, unsigned l);
+int bind_fake(int s, const void *a, unsigned l);
+int listen_fake(int s, int b);
+int accept_fake(int s, void *a, void *l);
+long send_fake(int s, const void *b, size_t l, int f);
+long recv_fake(int s, void *b, size_t l, int f);
+long sendto_fake(int s, const void *b, size_t l, int f, const void *a, unsigned al);
+long recvfrom_fake(int s, void *b, size_t l, int f, void *a, void *al);
+int shutdown_fake(int s, int how);
+int setsockopt_fake(int s, int lv, int n, const void *v, unsigned l);
+int socketpair_fake(int d, int t, int p, int sv[2]);
+int getsockopt_fake(int s, int lv, int n, void *v, void *l);
+int getsockname_fake(int s, void *a, void *l);
+int getpeername_fake(int s, void *a, void *l);
+int getaddrinfo_fake(const char *node, const char *svc, const void *hints, void **res);
+void freeaddrinfo_fake(void *res);
+int getnameinfo_fake(const void *a, unsigned al, char *h, unsigned hl, char *s, unsigned sl, int f);
+int gethostname_fake(char *name, size_t len);
+void *getservbyname_fake(const char *n, const char *p);
+unsigned if_nametoindex_fake(const char *n);
+char *if_indextoname_fake(unsigned i, char *buf);
+int *__get_h_errno_fake(void);
+
+/* Process control: fork/exec are unavailable (fail with ENOSYS); the process is pid 1, has a
+ * home directory in the game folder, and getcwd drops the "sdmc:" device. */
+extern char **fake_environ;
+int fork_fake(void);
+int execvp_fake(const char *f, char *const argv[]);
+int waitpid_fake(int pid, int *status, int opts);
+int kill_fake(int pid, int sig);
+int getpid_fake(void);
+int sched_yield_fake(void);
+void *getpwuid_fake(int uid);
+char *getenv_fake(const char *name);
+char *getcwd_fake(char *buf, size_t size);
+int getrusage_fake(int who, void *usage);
+
+/* ---- shim_fs.c (with shim_fs_path.c, shim_fs_cache.c) ------------------------------------ */
+
+/* Files: open translates bionic flags, applies the path redirects and caches (shim_fs.h);
+ * stat/fstat/lstat/readdir convert to the bionic aarch64 layouts (struct bionic_stat). */
+struct bionic_stat;
+int open_fake(const char *path, int flags, ...);
+int openat_fake(int dirfd, const char *path, int flags, ...);
+int mkdir_fake(const char *path, unsigned mode);
+int unlinkat_fake(int dirfd, const char *path, int flags);
+void *opendir_fake(const char *path);
+void *readdir_fake(void *dirp);
+int stat_fake(const char *path, struct bionic_stat *st);
+int fstat_fake(int fd, struct bionic_stat *st);
+int lstat_fake(const char *path, struct bionic_stat *st);
+char *realpath_fake(const char *path, char *resolved);
+int strerror_r_fake(int err, char *buf, size_t len);
+int statvfs_fake(const char *path, void *buf);
+int statfs_fake(const char *path, void *buf);
+
+/* POSIX rename(): replaces an existing destination (Horizon's does not), closing our own open
+ * handles on it first. */
+int rename_fake(const char *oldp, const char *newp);
+
+/* Descriptor I/O: fake-pipe fds go to fakefd.c, read-only archives through the read-ahead
+ * window, everything else to newlib. close() commits the SD card after a written file. */
+long read_fake(int fd, void *buf, size_t count);
+long write_fake(int fd, const void *buf, size_t count);
+int  close_fake(int fd);
+int  pipe_fake(int fds[2]);
+int  poll_fake(void *fds, unsigned long nfds, int timeout);
+int  select_fake(int n, void *r, void *w, void *e, void *t);
+/* lseek (off_t is 64-bit on arm64, so this also serves lseek64), aware of read-ahead. */
+long z_lseek(int fd, long off, int whence);
+
+/* Debug trace of reads on one fd (g_watch_fd, -1 = off): logs offsets and the first bytes. */
+extern int g_watch_fd;
+void watch_dump(const char *tag, int fd, long a, long b, const void *buf, long got);
+
+/* Commits pending SD card writes (saves); called every RD_SD_FLUSH_FRAMES and on exit. */
+void nx_sd_flush(void);
+
+/* ---- shim_stdio.c ------------------------------------------------------------------------ */
+
+/* fopen with the path redirects, synthetic /proc files and a large buffer for the APK/OBB. */
+FILE *fopen_fake(const char *path, const char *mode);
+
+/* stdio over the fake bionic __sF block: the engine's stdin/stdout/stderr are &fake_sF[0..2]
+ * (output goes to debug.log); any other FILE * is a newlib stream. */
 extern uint8_t fake_sF[3][0x100];
 size_t fwrite_fake(const void *ptr, size_t size, size_t n, FILE *f);
 size_t fread_fake(void *ptr, size_t size, size_t n, FILE *f);
@@ -133,77 +200,31 @@ int ungetc_fake(int c, FILE *f);
 int fprintf_fake(FILE *f, const char *fmt, ...);
 int vfprintf_fake(FILE *f, const char *fmt, va_list va);
 
-// memory
+/* ---- shim_mmap.c ------------------------------------------------------------------------- */
+
+/* mmap/munmap/mprotect/madvise over the page arena (and the overcommit window for large
+ * PROT_NONE reservations); file maps are read in, read-only ones deduplicated. */
 int posix_memalign_fake(void **out, size_t align, size_t size);
 void *mmap_fake(void *addr, size_t length, int prot, int flags, int fd, long offset);
 int munmap_fake(void *addr, size_t length);
 int mprotect_fake(void *addr, size_t len, int prot);
 int madvise_fake(void *addr, size_t len, int advice);
 
-// fd routing (fake pipe vs real files)
-long read_fake(int fd, void *buf, size_t count);
-long z_lseek(int fd, long off, int whence);   /* real lseek; also services lseek64 */
-
 /* Arms the stack-region overcommit arena: window = a reserved stack-region range, pool = a
  * page-aligned heap buffer that backs committed pages. Called once from main() after the
  * newlib heap exists. Returns 1 if armed, 0 if mmap stays heap-backed. */
 int  oc_arena_init(void *window, size_t window_bytes, void *pool, size_t pool_bytes);
-extern int g_watch_fd;
-void watch_dump(const char *tag, int fd, long a, long b, const void *buf, long got);
-long write_fake(int fd, const void *buf, size_t count);
-int  close_fake(int fd);
-int  pipe_fake(int fds[2]);
-int  poll_fake(void *fds, unsigned long nfds, int timeout);
-int  select_fake(int n, void *r, void *w, void *e, void *t);
 
-// networking (offline stubs)
-int socket_fake(int d, int t, int p);
-int connect_fake(int s, const void *a, unsigned l);
-int bind_fake(int s, const void *a, unsigned l);
-int listen_fake(int s, int b);
-int accept_fake(int s, void *a, void *l);
-long send_fake(int s, const void *b, size_t l, int f);
-long recv_fake(int s, void *b, size_t l, int f);
-long sendto_fake(int s, const void *b, size_t l, int f, const void *a, unsigned al);
-long recvfrom_fake(int s, void *b, size_t l, int f, void *a, void *al);
-int shutdown_fake(int s, int how);
-int setsockopt_fake(int s, int lv, int n, const void *v, unsigned l);
-int socketpair_fake(int d, int t, int p, int sv[2]);
-extern char **fake_environ;
-int getsockopt_fake(int s, int lv, int n, void *v, void *l);
-int getsockname_fake(int s, void *a, void *l);
-int getpeername_fake(int s, void *a, void *l);
-int getaddrinfo_fake(const char *node, const char *svc, const void *hints, void **res);
-void freeaddrinfo_fake(void *res);
-int getnameinfo_fake(const void *a, unsigned al, char *h, unsigned hl, char *s, unsigned sl, int f);
-int gethostname_fake(char *name, size_t len);
-void *getservbyname_fake(const char *n, const char *p);
-unsigned if_nametoindex_fake(const char *n);
-char *if_indextoname_fake(unsigned i, char *buf);
-int *__get_h_errno_fake(void);
+/* ---- shim_dl.c --------------------------------------------------------------------------- */
 
-// process control (stubs)
-int fork_fake(void);
-int execvp_fake(const char *f, char *const argv[]);
-int waitpid_fake(int pid, int *status, int opts);
-int kill_fake(int pid, int sig);
-int getpid_fake(void);
-int sched_yield_fake(void);
-void *getpwuid_fake(int uid);
-char *getenv_fake(const char *name);
-char *getcwd_fake(char *buf, size_t size);
-int getrusage_fake(int who, void *usage);
-
-// dynamic loader
+/* dlopen returns a dummy handle; dlsym looks up exports of the loaded modules, then our
+ * shim tables, then GLES/EGL through eglGetProcAddress. */
 void *dlopen_fake(const char *name, int flags);
 int dlclose_fake(void *h);
 const char *dlerror_fake(void);
 void *dlsym_fake(void *handle, const char *symbol);
 
-// pthread extras
-int pthread_rwlock_rdlock_fake(void **rw);
-int pthread_rwlock_wrlock_fake(void **rw);
-/* ---- pthread (shim_pthread.c) ----------------------------------------------------------
+/* ---- shim_pthread.c ---------------------------------------------------------------------
  * bionic allocates pthread_mutex_t / pthread_cond_t inline and zero-initialises them; each is
  * backed lazily by a heap-allocated newlib object whose pointer is stored in the caller's slot
  * (the `**` arguments). Return values follow POSIX (0 or an error number). */
@@ -242,6 +263,9 @@ int pthread_key_create_fake(unsigned *key, void (*dtor)(void *));
 int pthread_key_delete_fake(unsigned key);
 void *pthread_getspecific_fake(unsigned key);
 int pthread_setspecific_fake(unsigned key, const void *value);
+/* rwlocks and semaphores, lazily backed by libnx RwLock / newlib semaphores like the mutexes. */
+int pthread_rwlock_rdlock_fake(void **rw);
+int pthread_rwlock_wrlock_fake(void **rw);
 int pthread_rwlock_unlock_fake(void **rw);
 int sem_init_fake(void **s, int pshared, unsigned int value);
 int sem_destroy_fake(void **s);
@@ -250,8 +274,5 @@ int sem_wait_fake(void **s);
 int sem_trywait_fake(void **s);
 int sem_timedwait_fake(void **s, const struct timespec *abs);
 int sem_getvalue_fake(void **s, int *val);
-
-/* Commits pending SD card writes (saves); called every RD_SD_FLUSH_FRAMES. */
-void nx_sd_flush(void);
 
 #endif

@@ -1,5 +1,6 @@
 /* rd_platform.h -- timing and size constants of the Switch side of the port, and the frame
- * clock the main loop publishes. Game identity/paths: rd_game.h. */
+ * clock the main loop publishes. Game identity/paths: rd_game.h.
+ * MIT (see LICENSE). */
 #ifndef RD_PLATFORM_H
 #define RD_PLATFORM_H
 

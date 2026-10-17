@@ -14,6 +14,8 @@
  * feed into nx_pointer and the input hook (android_native_feed_hid).
  *
  * Needs devkitA64 + libnx (switch.h) + switch-mesa. Not host-compilable.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #include <stdint.h>
@@ -202,20 +204,12 @@ void android_get_orientation(float *x, float *y, float *z){
   if (z) *z = 0.0f;
 }
 
-/* ==========================================================================
- * HID polling -> Unity input.
- * Unity ingests input through the Java UnityPlayer (touch -> nativeInjectEvent /
- * key path). The exact native event struct is engine-internal: recover the
- * registered "injectEvent"/"nativePointer*" method from libunity's JNI_OnLoad
- * (PORTING_PLAN.md S4) and fill in feed_one_touch(). Until then this reads HID
- * but doesn't yet hand it to the engine.
- * ========================================================================== */
 /* HID -> Unity input. The Switch touchscreen passes straight through (all fingers) into
  * il2cpp UnityEngine.Input via the hooks in unity_input_hook.c.
  *
  * On top of that, the reusable nx_pointer module (nx_pointer.{c,h}) provides the on-screen
  * cursor, USB mouse, gyro pointing and the +/-/stick/A controls, plus its own GL overlay
- * (drawn from the eglSwapBuffers wrapper in imports.c). We feed it a NxpConfig once, pump
+ * (drawn from the eglSwapBuffers wrapper in egl.c). We feed it a NxpConfig once, pump
  * it each frame, and merge its pointer events into the same multi-touch stream the panel
  * uses -- so a cursor tap is just another finger and rides the same slot allocator. */
 

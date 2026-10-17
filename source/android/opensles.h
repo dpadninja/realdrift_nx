@@ -8,6 +8,8 @@
  * (Engine -> OutputMix / AudioPlayer with an Android simple buffer queue, plus
  * the Play and Volume interfaces) and back the buffer-queue players with a
  * single SDL2 audio device that software-mixes them.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #ifndef __OPENSLES_H__
@@ -22,10 +24,12 @@
 #define RD_AUDIO_REPORTED_RATE     24000
 #define RD_AUDIO_FRAMES_PER_BUFFER 256
 
+/* OpenSL ES entry point: creates the engine object (SL_RESULT_SUCCESS = 0 or an SL error). */
 uint32_t slCreateEngine(void **pEngine, uint32_t numOptions, const void *pEngineOptions,
                         uint32_t numInterfaces, const void *pInterfaceIds,
                         const void *pInterfaceRequired);
 
+/* Closes the SDL audio device (at exit). */
 void opensles_shutdown(void);
 
 

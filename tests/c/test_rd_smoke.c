@@ -1,4 +1,5 @@
 /* sources: source/game/rd_smoke.c */
+/* Host unit test of rd_smoke. MIT (see LICENSE). */
 #include "check.h"
 #include "rd_smoke.h"
 

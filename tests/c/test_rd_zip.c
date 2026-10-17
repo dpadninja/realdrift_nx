@@ -1,4 +1,5 @@
 /* sources: source/android/rd_zip.c */
+/* Host unit test of rd_zip. MIT (see LICENSE). */
 /* libs: -lz */
 /* Reads the zip that tests/test_c_units.py writes next to the binary (argv[1]/test.zip):
  *   stored.txt   (stored)    "hello stored"

@@ -8,7 +8,8 @@
  * back, so the engine never sees our draws.
  *
  * rd_overlay.c is the GL-free part (host-tested, tests/c/test_rd_overlay.c);
- * rd_overlay_gl.c holds the shader and the GL calls. */
+ * rd_overlay_gl.c holds the shader and the GL calls.
+ * MIT (see LICENSE). */
 #ifndef RD_OVERLAY_H
 #define RD_OVERLAY_H
 

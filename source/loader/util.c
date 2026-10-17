@@ -4,6 +4,8 @@
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the LICENSE file for details.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #include <switch.h>
@@ -17,6 +19,11 @@
 #include "config.h"
 #include "rd_log.h"
 #include "rd_platform.h"
+
+/* TPIDR_EL0, the user read/write thread pointer bionic code takes its TLS from. */
+static inline void armSetTlsRw(void *addr) {
+  __asm__ ("msr s3_3_c13_c0_2, %0" : : "r"(addr));
+}
 
 // File-only logger (DEBUG_LOG builds only): open once + flush per line so the tail survives a
 // crash, mutex-serialised across engine threads. Drops the high-frequency dlsym/dlopen/JNI spam.

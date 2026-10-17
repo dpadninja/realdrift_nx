@@ -6,6 +6,8 @@
  * ANativeWindow/ALooper/ASensor implementations (android_native_unity.c), and
  * benign stubs for Android/Linux-only calls the game does not actually need.
  * Resolved as a second table by nx_resolve_imports().
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 #include <stdint.h>
 #include <stddef.h>

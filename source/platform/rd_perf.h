@@ -1,5 +1,6 @@
 /* rd_perf.h -- render resolution choice and CPU boost during loads (pure logic).
- * Host-testable (tests/c/test_rd_perf.c). */
+ * Host-testable (tests/c/test_rd_perf.c).
+ * MIT (see LICENSE). */
 #ifndef RD_PERF_H
 #define RD_PERF_H
 

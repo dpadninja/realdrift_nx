@@ -4,7 +4,8 @@
  * Every finder requires its pattern to match EXACTLY ONCE and cross-checks the result
  * (string contents, branch targets, the call between two functions), so a different binary
  * yields "not found" instead of a wrong address. Verified on Real Drift 5.0.7 and 5.0.8
- * (tests/test_patch_sites.py). */
+ * (tests/test_patch_sites.py).
+ * MIT (see LICENSE). */
 #ifndef RD_PATCHSITES_H
 #define RD_PATCHSITES_H
 

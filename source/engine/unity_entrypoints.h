@@ -19,7 +19,9 @@
  *   nativeDone                     ()V
  *
  * (nativeApplicationUnload and nativeUnityPlayerSetRunning of newer Unity versions do not
- * exist in 2018.4.) */
+ * exist in 2018.4.)
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE). */
 #ifndef UNITY_ENTRYPOINTS_H
 #define UNITY_ENTRYPOINTS_H
 

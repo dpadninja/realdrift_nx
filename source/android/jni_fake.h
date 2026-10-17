@@ -6,6 +6,8 @@
  *
  * This software may be modified and distributed under the terms
  * of the MIT license. See the LICENSE file for details.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #ifndef __JNI_FAKE_H__
@@ -19,6 +21,7 @@ extern void *fake_env; // JNIEnv *
 // set when the engine asks the activity to finish
 extern volatile int jni_quit_requested;
 
+/* Builds the JNIEnv and JavaVM function tables; call once before JNI_OnLoad. */
 void jni_init(void);
 
 // the fake MyNativeActivity jobject handed to ANativeActivity.clazz

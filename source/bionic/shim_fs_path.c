@@ -2,7 +2,9 @@
  * case-sensitivity probe redirected into the game folder, the inherited basename read
  * fallback, mkdir -p that never touches the SD root, and /proc + /sys served through open().
  *
- * Split out of libc_shim.c (inherited from the so-loader lineage, MIT). MIT (see LICENSE). */
+ * Split out of libc_shim.c, forked from badpiggies_nx by ChanseyIsTheBest
+ * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
+ * MIT (see LICENSE). */
 #define _GNU_SOURCE
 
 #include <string.h>
@@ -93,7 +95,6 @@ int mkdir_fake(const char *path, unsigned mode) {
   return r;
 }
 
-int g_watch_fd = -1;   /* data.unity3d fd: trace its reads/seeks to debug header load */
 
 // Synthetic /proc and /sys files. Unity reads /proc/meminfo (MemTotal) to size
 // its allocator reservations and /proc/cpuinfo + /sys cpu range to count cores

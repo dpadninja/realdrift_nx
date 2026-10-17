@@ -1,4 +1,5 @@
 /* sources: source/engine/rd_icall.c */
+/* Host unit test of rd_icall. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_icall.h"

@@ -1,4 +1,5 @@
 /* sources: source/loader/rd_log.c */
+/* Host unit test of rd_log. MIT (see LICENSE). */
 #include "check.h"
 #include "rd_log.h"
 

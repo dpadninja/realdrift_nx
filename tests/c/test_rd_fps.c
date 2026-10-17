@@ -1,4 +1,5 @@
 /* sources: source/platform/rd_fps.c */
+/* Host unit test of rd_fps. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_fps.h"

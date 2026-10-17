@@ -1,4 +1,5 @@
 /* sources: source/bionic/rd_synth.c */
+/* Host unit test of rd_synth. MIT (see LICENSE). */
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>

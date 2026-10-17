@@ -9,6 +9,8 @@
  * AndroidSimpleBufferQueue interfaces. Players are software-mixed into one SDL2
  * audio device; the buffer-queue completion callback is fired from the SDL
  * audio thread, exactly like Android's fast-track callback.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #include <stdlib.h>

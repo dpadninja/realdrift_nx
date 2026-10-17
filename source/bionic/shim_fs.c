@@ -2,7 +2,9 @@
  * read/write/close routing (fake fds, read-ahead), stat/fstat/lstat and dirent conversion to
  * the bionic aarch64 layouts, POSIX rename, realpath.
  *
- * Split out of libc_shim.c (inherited from the so-loader lineage, MIT). MIT (see LICENSE). */
+ * Split out of libc_shim.c, forked from badpiggies_nx by ChanseyIsTheBest
+ * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
+ * MIT (see LICENSE). */
 #define _GNU_SOURCE
 
 #include <string.h>
@@ -41,6 +43,8 @@ static int convert_open_flags(int flags) {
 }
 
 
+
+int g_watch_fd = -1;   /* data.unity3d fd: trace its reads/seeks to debug header load */
 void watch_dump(const char *tag, int fd, long a, long b, const void *buf, long got) {
   if (fd != g_watch_fd) return;
   char h[64]; int n = (got > 16 ? 16 : (got < 0 ? 0 : (int)got));

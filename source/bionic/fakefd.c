@@ -5,6 +5,8 @@
  * real OS fd table. Inherited from the so-loader lineage, standalone: Unity
  * uses ALooper only as a wait/wake primitive (no addFd), so this needs no looper
  * coupling. Thread-safe; lazily initialised.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 
 #include <stdint.h>

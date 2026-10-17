@@ -1,4 +1,5 @@
 /* sources: source/loader/rd_modimage.c */
+/* Host unit test of rd_modimage. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_modimage.h"

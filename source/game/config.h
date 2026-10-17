@@ -4,6 +4,8 @@
  * The fake Android device: rd_device.h. config.txt keys: rd_settings.h.
  *
  * MIT license -- see LICENSE.
+ * Forked from badpiggies_nx by ChanseyIsTheBest (https://github.com/ChanseyIsTheBest/badpiggies_nx,
+ * commit 7726be3), from the so-loader lineage; changed for realdrift_nx. MIT (see LICENSE).
  */
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
@@ -37,7 +39,10 @@ extern int screen_height;
 typedef rd_settings Config;   /* config.txt (rd_settings.h) */
 extern Config config;
 
+/* Reads config.txt into `config`: 0 = read clean, -1 = missing, 1 = keys missing or invalid
+ * (the caller then rewrites the file so it follows the current schema). */
 int read_config(const char *file);
+/* Writes `config` with every key and its help text. Returns 0, or -1 if the file cannot open. */
 int write_config(const char *file);
 
 #endif

@@ -1,4 +1,7 @@
-"""tools/game.py must read source/game/rd_game.h exactly as the C compiler does."""
+"""tools/game.py must read source/game/rd_game.h exactly as the C compiler does.
+
+MIT (see LICENSE).
+"""
 
 import subprocess
 from pathlib import Path

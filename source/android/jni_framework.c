@@ -1,7 +1,9 @@
 /* jni_framework.c -- what the fake Android framework answers: return values of Java methods
  * the engine calls on framework classes (Activity, Context, Display, Build, ...) and of the
  * Java fields it reads. Classes with real behaviour live in unity_jni.c.
- * Split out of jni_fake.c (inherited from the so-loader lineage, MIT). MIT (see LICENSE). */
+ * Split out of jni_fake.c, forked from badpiggies_nx by ChanseyIsTheBest
+ * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
+ * MIT (see LICENSE). */
 
 #include <stdlib.h>
 

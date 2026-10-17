@@ -1,5 +1,6 @@
 /* rd_patches.h -- runtime patches of libunity.so and the background clock thread (rd_patches.c).
- * Patch sites are found by instruction pattern (rd_patchsites.c), not by fixed offsets. */
+ * Patch sites are found by instruction pattern (rd_patchsites.c), not by fixed offsets.
+ * MIT (see LICENSE). */
 #ifndef RD_PATCHES_H
 #define RD_PATCHES_H
 
