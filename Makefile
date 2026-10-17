@@ -52,7 +52,7 @@ INCLUDES := $(SOURCES)
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
 # Warnings are errors, as in the host tests (docs/CODING_STYLE.md).
-WARNINGS := -Wall -Wextra -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Werror
+WARNINGS := -Wall -Wextra -Wshadow -Wundef -Wstrict-prototypes -Wmissing-prototypes -Werror
 CFLAGS  := -std=gnu11 -g $(WARNINGS) -O2 -ffunction-sections $(ARCH) $(DEFINES) \
            -DCRASH_LOG_PRINTF=debugPrintf \
            $(INCLUDE) -D__SWITCH__

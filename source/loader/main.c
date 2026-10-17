@@ -50,6 +50,8 @@ volatile int      g_rd_in_frame = 0;
 #include "diag.h"
 #include "nx_crash_handler.h"
 #include "unity_jni.h"
+#include "rd_perfstat.h"
+#include "rd_gcbridge.h"
 
 static void *heap_so_base = NULL;
 static size_t heap_so_limit = 0;
@@ -87,8 +89,6 @@ int crash_resolve_module(uintptr_t addr, char *name_out, size_t name_cap, uintpt
   return 0;
 }
 
-extern uintptr_t g_il2cpp_base;       /* libc_shim.c: GC stop-the-world bridge */
-extern size_t    g_il2cpp_size;       /* libc_shim.c: bounds guard for the same */
 
 /* audio warmup gate for opensles.c (frames since boot) */
 static volatile uint32_t g_frame_count = 0;

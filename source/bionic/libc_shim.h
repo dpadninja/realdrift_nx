@@ -1,8 +1,19 @@
-/* libc_shim.h -- bionic-compatible libc wrappers for the game's Android libraries.
+/* libc_shim.h -- the bionic C library functions we implement for the game's Android libraries.
  *
- * This software may be modified and distributed under the terms
- * of the MIT license. See the LICENSE file for details.
- */
+ * libmain/libunity/libil2cpp are linked against bionic. Where the bionic and newlib ABIs differ
+ * (struct layouts, flag values, missing functions) we provide converting wrappers, declared
+ * here and referenced from the import tables (imports.c, unity_imports.c, rd_imports.c);
+ * everything that matches is passed straight through. Online/IPC functionality (sockets,
+ * fork/exec, dlopen of system libs) is dead on the Switch and stubbed to fail cleanly so the
+ * engine falls back to offline behaviour. The implementations:
+ *   shim_libc.c     fortify, system properties, futex/syscall, sysconf, locale, stubs
+ *   shim_fs.c       open/read/write/close/stat/rename/readdir (+ shim_fs_path.c, shim_fs_cache.c)
+ *   shim_stdio.c    fopen and the fake stdin/stdout/stderr streams
+ *   shim_mmap.c     mmap/munmap/mprotect: heap arena, overcommit window, file-map cache
+ *   shim_dl.c       dlopen/dlsym over the loaded modules
+ *   shim_pthread.c  rwlocks, semaphores, timed waits
+ * Inherited from the so-loader lineage (MIT); split and documented for realdrift_nx.
+ * MIT (see LICENSE). */
 
 #ifndef __LIBC_SHIM_H__
 #define __LIBC_SHIM_H__
@@ -72,16 +83,6 @@ int stat_fake(const char *path, struct bionic_stat *st);
 /* POSIX rename(): replaces an existing destination (Horizon's does not). */
 int rename_fake(const char *oldp, const char *newp);
 
-/* frame-spike counters (libc_shim.c); main.c reports their per-frame delta on a hitch */
-extern unsigned nx_stat_open, nx_stat_commit, nx_stat_mmap, nx_stat_gcstop;
-/* Bytes / time spent in read()+fread() (loading profile in [perf] lines). */
-extern volatile unsigned long long nx_stat_read_bytes, nx_stat_read_ns;
-/* Time spent in eglSwapBuffers (imports.c): large on slow frames = waiting for the GPU. */
-extern volatile unsigned long long nx_stat_swap_ns;
-/* Time spent in GL calls that can wait for the GPU (buffer uploads/maps, syncs; imports.c). */
-extern volatile unsigned long long nx_stat_glwait_ns;
-/* Time mesa waits for a free window buffer / for GPU fences (rd_gpuwait.c, --wrap). */
-extern volatile unsigned long long nx_stat_dequeue_ns, nx_stat_fence_ns;
 int fstat_fake(int fd, struct bionic_stat *st);
 int lstat_fake(const char *path, struct bionic_stat *st);
 void *readdir_fake(void *dirp);
@@ -211,20 +212,7 @@ int sem_trywait_fake(void **s);
 int sem_timedwait_fake(void **s, const struct timespec *abs);
 int sem_getvalue_fake(void **s, int *val);
 
-/* Boehm GC stop-the-world bridge (see libc_shim.c). Set g_il2cpp_base to the
- * loaded libil2cpp exec base once it is mapped; pthread_kill_gc then answers the
- * GC's suspend/restart signals by posting the ack semaphore the (undeliverable)
- * signal handler would have posted. */
-extern uintptr_t g_il2cpp_base;
-extern size_t    g_il2cpp_size;
-int pthread_kill_gc(pthread_t t, int sig);
-
 /* Commits pending SD card writes (saves); called every RD_SD_FLUSH_FRAMES. */
 void nx_sd_flush(void);
-
-/* Boehm GC stop-the-world bridge (rd_gcbridge.h). Finds the GC globals in
- * libil2cpp.so by pattern; call after so_finalize. Returns 1 if the bridge is live. */
-struct so_module;
-int rd_gc_bridge_init(const struct so_module *il2cpp);
 
 #endif

@@ -10,10 +10,10 @@
  * rd_log_clocks() logs the clocks the console is really running at (overclock tools apply per
  * title, so this shows whether they reach this process). MIT (see LICENSE). */
 #include <switch.h>
-#include "libc_shim.h"   /* nx_stat_* */
 #include "rd_platform.h"
 #include "util.h"        /* debugPrintf */
 #include "rd_gpuwait.h"
+#include "rd_perfstat.h"
 
 /* Linker hooks: -Wl,--wrap=X sends mesa's calls of X to __wrap_X; __real_X is libnx's X. */
 Result __wrap_nwindowDequeueBuffer(NWindow *nw, s32 *out_slot, NvMultiFence *out_fence);

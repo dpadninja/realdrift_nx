@@ -50,6 +50,8 @@
 #include "imports.h"
 #include "android_native_unity.h"
 #include "unity_imports.h"
+#include "rd_perfstat.h"
+#include "rd_gcbridge.h"
 
 extern int *__errno(void);              // newlib
 

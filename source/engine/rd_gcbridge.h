@@ -14,7 +14,9 @@
 #ifndef RD_GCBRIDGE_H
 #define RD_GCBRIDGE_H
 
+#include <stddef.h>
 #include <stdint.h>
+#include <pthread.h>
 
 typedef struct {
   uint64_t sig_suspend;     /* int  GC_sig_suspend        */
@@ -65,5 +67,18 @@ uint64_t rd_gc_emulate_suspend(const rd_mem *m, uint64_t entry, uint64_t stop_co
 
 /* What the handler does after the restart signal: last_stop_count = stop_count | 1. */
 void rd_gc_emulate_restart(const rd_mem *m, uint64_t entry, uint64_t stop_count);
+
+/* ---- glue (rd_gcbridge_hook.c) -------------------------------------------------------- */
+struct so_module;
+/* Finds the GC globals in libil2cpp.so by pattern; call after so_finalize. Returns 1 if the
+ * bridge is live, 0 if the patterns did not match (GC then runs without the bridge). */
+int rd_gc_bridge_init(const struct so_module *il2cpp);
+/* pthread_kill for the engine: the GC's suspend/restart signals are carried out from outside
+ * the target thread (paused with svcSetThreadActivity); other signals are ignored. Returns 0. */
+int pthread_kill_gc(pthread_t t, int sig);
+/* Where libil2cpp is mapped (set by main.c after so_finalize); bounds the stack/register
+ * accesses of the bridge. g_il2cpp_size 0 = unknown, the bounds guard stays inert. */
+extern uintptr_t g_il2cpp_base;
+extern size_t    g_il2cpp_size;
 
 #endif

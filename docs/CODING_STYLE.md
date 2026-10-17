@@ -60,7 +60,7 @@ Code forked from other projects follows them where we touch it.
 - `bool`-like results are `int` 0/1 (the existing convention); errors are negative return values
   or `NULL`, explained in the function comment.
 - No `#if 0` and no commented-out code: git keeps the history.
-- Warnings are errors on both builds (`-Wall -Wextra -Wshadow -Wstrict-prototypes
+- Warnings are errors on both builds (`-Wall -Wextra -Wshadow -Wundef -Wstrict-prototypes
   -Wmissing-prototypes -Werror`).
 - Formatting: `.clang-format` (2 spaces, 100 columns). Align related initializers and table rows
   when it helps reading.

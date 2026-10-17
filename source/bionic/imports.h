@@ -17,7 +17,7 @@ uintptr_t dynlib_find_export(const char *name);  /* search shim table (for dlsym
 extern size_t dynlib_numfunctions;
 
 /* eglGetProcAddress for the engine: GL calls that can wait for the GPU come back wrapped
- * so their time is counted (nx_stat_glwait_ns, libc_shim.h). */
+ * so their time is counted (nx_stat_glwait_ns, rd_perfstat.h). */
 void *egl_GetProcAddress_timed(const char *name);
 
 

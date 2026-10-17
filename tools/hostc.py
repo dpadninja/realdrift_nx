@@ -25,6 +25,7 @@ CFLAGS = [
     "-std=gnu11",
     "-Wall",
     "-Wextra",
+    "-Wundef",
     "-Werror",
     *(f"-I{d}" for d in LAYER_DIRS),
     f"-I{ROOT / 'tests/c'}",
