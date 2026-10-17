@@ -3,7 +3,9 @@
 MIT (see LICENSE).
 """
 
-from tools.il2cpp_symbolize import Symbolizer
+import json
+
+from tools.il2cpp_symbolize import Symbolizer, main
 
 METHODS = [
     {"Address": 0x2000, "Name": "B$$Run"},
@@ -31,3 +33,14 @@ def test_annotate_log_line():
     assert (
         s.annotate(line) == "[wd]     bt[4] libil2cpp.so+0x2010 [B$$Run+0x10] then libunity.so+0x10"
     )
+
+
+def test_command_line_names_addresses_and_annotates_a_log(tmp_path, capsys):
+    script = tmp_path / "script.json"
+    script.write_text(json.dumps({"ScriptMethod": METHODS}))
+    assert main([str(script), "0x2004"]) == 0
+    assert "B$$Run+0x4" in capsys.readouterr().out
+    log = tmp_path / "debug.log"
+    log.write_text("crash at libil2cpp.so+0x1008\n")
+    assert main([str(script), "--log", str(log)]) == 0
+    assert "[A$$Start+0x8]" in capsys.readouterr().out

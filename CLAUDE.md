@@ -40,6 +40,8 @@ Porting the Android game **Real Drift** (`com.realdrift.sipon`, Unity 2018.4.14f
 
 ```sh
 make test                                       # all tests (Python + host C) = uv run pytest -q
+make lint                                       # ruff + mypy (docs/PYTHON_STYLE.md)
+make coverage                                   # tests with coverage; fails below COV_MIN_C / COV_MIN_PY (Makefile)
 make tools                                      # build-host/find_patch_sites
 make config-example                             # regenerate config.example.txt
 uv run pytest tests/test_c_units.py -k rd_iov   # one C test file

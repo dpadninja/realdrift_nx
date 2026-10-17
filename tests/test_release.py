@@ -9,7 +9,7 @@ from pathlib import Path
 
 from tests.test_stage_sd import OBB, write_apk, write_obb
 from tools.game import GAME
-from tools.release import build, standalone_stage_sd
+from tools.release import build, main, standalone_stage_sd
 
 
 def test_identity_block_is_replaced_by_literals():
@@ -45,3 +45,11 @@ def test_released_script_runs_standalone(tmp_path: Path):
     assert sorted(p.name for p in out.iterdir()) == sorted(
         [*GAME.libs, GAME.base_apk, OBB, "realdrift_nx.nro"]
     )
+
+
+def test_command_line(tmp_path: Path, capsys):
+    nro = tmp_path / "realdrift_nx.nro"
+    nro.write_bytes(b"NRO")
+    assert main([str(nro), str(tmp_path / "out")]) == 0
+    assert "release package in" in capsys.readouterr().out
+    assert (tmp_path / "out" / "stage_sd.py").is_file()

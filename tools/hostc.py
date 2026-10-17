@@ -11,6 +11,7 @@ MIT (see LICENSE).
 """
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -31,6 +32,15 @@ CFLAGS = [
     f"-I{ROOT / 'tests/c'}",
 ]
 SANITIZE = ["-fsanitize=address,undefined"]
+# make coverage sets RD_COVERAGE=1: test programs are then instrumented for gcov and built in
+# COVERAGE_DIR, where gcovr finds the .gcno/.gcda files.
+COVERAGE_FLAGS = ["--coverage", "-O0"]
+COVERAGE_DIR = ROOT / "build-host" / "cov"
+
+
+def coverage_enabled() -> bool:
+    """Whether this run measures coverage (RD_COVERAGE=1 in the environment)."""
+    return os.environ.get("RD_COVERAGE") == "1"
 
 
 def linked_sources(program: Path) -> list[Path]:
@@ -45,13 +55,16 @@ def extra_libs(program: Path) -> list[str]:
     return m.group(1).split() if m else []
 
 
-def build(program: Path, out: Path, sanitize: bool = False) -> subprocess.CompletedProcess[str]:
+def build(
+    program: Path, out: Path, sanitize: bool = False, coverage: bool = False
+) -> subprocess.CompletedProcess[str]:
     """Compiles `program` and its `sources:` into `out`.
 
     Args:
         program: the C file with the `sources:` header.
         out: the executable to write (its directory is created).
         sanitize: build with ASan/UBSan (the unit tests do).
+        coverage: instrument for gcov (the .gcno/.gcda files land next to `out`).
 
     Returns:
         The finished compiler run; check `returncode` and `stderr`.
@@ -66,6 +79,7 @@ def build(program: Path, out: Path, sanitize: bool = False) -> subprocess.Comple
         CC,
         *CFLAGS,
         *(SANITIZE if sanitize else []),
+        *(COVERAGE_FLAGS if coverage else []),
         str(program),
         *map(str, linked_sources(program)),
         "-o",

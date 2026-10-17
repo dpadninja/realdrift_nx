@@ -115,6 +115,7 @@ make test             # all unit tests: Python tools + host-side C tests (ASan/U
 make tools            # build-host/find_patch_sites: run the loader's pattern finders on .so files
 make config-example   # regenerate config.example.txt from the settings table
 make lint             # ruff + mypy for the Python tools
+make coverage         # tests with line coverage (C + tools/), HTML in build-host/coverage/
 ```
 
 These targets need a host C compiler and uv, not devkitPro. Tests that need extracted game libraries in `analysis/` are skipped when those are missing.
@@ -123,6 +124,7 @@ These targets need a host C compiler and uv, not devkitPro. Tests that need extr
 |---|---|
 | `source/` | the loader, one directory per layer: `loader`, `bionic`, `android`, `engine`, `platform`, `game` (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Our modules are `rd_*`. Named values live in one place: `rd_game.h` (game identity and files), `rd_game_symbols.h` (C# names), `rd_platform.h`, `rd_device.h`, `rd_settings.c` (config keys) |
 | `tools/` | `stage_sd.py`, `release.py` (release package), `game.py`, `import_coverage.py`, `jni_natives.py`, `il2cpp_symbolize.py`, `find_patch_sites.c` |
+| `.github/workflows/ci.yml` | on every push / pull request: lint, tests with coverage floors, the Switch build |
 | `.github/workflows/release.yml` | on a `vX.Y.Z` tag: builds the `.nro`, runs the tests, publishes the release zip |
 | `tests/` | pytest suite; `tests/c/` host-side C unit tests |
 | `docs/` | [architecture](docs/ARCHITECTURE.md), [C style](docs/CODING_STYLE.md), [Python style](docs/PYTHON_STYLE.md) |

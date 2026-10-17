@@ -27,8 +27,9 @@ def write_sample_zip(path: Path) -> None:
 @pytest.mark.skipif(hostc.CC is None, reason="no host C compiler")
 @pytest.mark.parametrize("test", C_TESTS, ids=[t.stem for t in C_TESTS])
 def test_c_unit(test: Path, tmp_path: Path):
-    exe = tmp_path / test.stem
-    build = hostc.build(test, exe, sanitize=True)
+    coverage = hostc.coverage_enabled()
+    exe = (hostc.COVERAGE_DIR if coverage else tmp_path) / test.stem
+    build = hostc.build(test, exe, sanitize=True, coverage=coverage)
     assert build.returncode == 0, build.stderr
     write_sample_zip(tmp_path / "test.zip")
     run = subprocess.run([str(exe), str(tmp_path)], capture_output=True, text=True)
