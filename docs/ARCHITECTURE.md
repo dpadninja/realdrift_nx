@@ -95,6 +95,7 @@ One line per module; each file's header comment has the details.
 | `rd_modimage.{c,h}` | a loaded module as an `rd_image` for the pattern search |
 | `rd_codeaddr.{c,h}` | is a stack word a plausible return address into a loaded module (backtraces) |
 | `util.{c,h}` | `debugPrintf`, the buffered `debug.log` |
+| `rd_perfstat.{c,h}` | frame-spike counters for the `[perf]` line (opens, commits, mmaps, GPU waits, ...) |
 | `rd_log.{c,h}` | which log lines `debug_log=0` keeps and which must reach the SD card at once |
 | `error.{c,h}` | fatal error screen |
 | `nx_crash_handler.{c,h}` | CPU exception handler: registers and backtrace into the log |
@@ -104,9 +105,17 @@ One line per module; each file's header comment has the details.
 
 | File | Purpose |
 |---|---|
-| `imports.{c,h}` | the main import table (libc, libm, pthread, EGL/GLES, NDK) and import resolution |
+| `imports.{c,h}` | the main import table (libc, libm, pthread, EGL/GLES, NDK), the one-line stubs it points at, and import resolution |
 | `rd_imports.c` | imports of this game build the inherited tables did not have |
-| `libc_shim.{c,h}` | bionic ABI on top of newlib: struct conversions, file system, mmap, stdio, stubs |
+| `libc_shim.h` | declarations of every bionic function below, for the import tables |
+| `shim_libc.c` | fortify wrappers, system properties, futex/syscall, sysconf, locale, network/process stubs |
+| `shim_fs.{c,h}` | open/read/write/close/stat/rename/readdir; `shim_fs.h` is the internal interface of the three fs files |
+| `shim_fs_path.c` | path rewrites: APK asset root, case-sensitivity probe, `mkdir -p`, synthetic `/proc` and `/sys` |
+| `shim_fs_cache.c` | per-fd state: read-ahead windows, synthetic inodes, open-fd cache for `.so` files, SD commit after writes |
+| `shim_stdio.c` | `fopen` and the fake `stdin`/`stdout`/`stderr` streams |
+| `shim_mmap.c` | `mmap`/`munmap`/`mprotect`: heap arena, stack-region overcommit window, read-only file-map cache |
+| `shim_dl.c` | `dlopen`/`dlsym` over the loaded modules (and the icall override hand-over) |
+| `shim_pthread.c` | pthread on newlib: lazily backed mutexes/conditions, thread start, TLS keys, rwlocks, semaphores |
 | `fakefd.{c,h}` | in-process pipes for the engine's pipe()-based thread signalling |
 | `rd_iov.{c,h}` | `writev` on top of `write` |
 | `rd_synth.{c,h}` | stdio access to the synthetic `/proc` and `/sys` files |
@@ -115,11 +124,16 @@ One line per module; each file's header comment has the details.
 
 | File | Purpose |
 |---|---|
-| `jni_fake.{c,h}` | the fake `JNIEnv` / `JavaVM` and the generic Java object model |
+| `jni_fake.{c,h}` | the fake `JNIEnv` / `JavaVM` function tables and call dispatch |
+| `jni_objects.c` | the fake Java object model: local references, objects, strings, arrays, classes, IDs |
+| `jni_framework.c` | what framework methods and fields answer for classes without real behaviour |
+| `jni_internal.h` | shared types and helpers of the three JNI files |
 | `jni_unimpl.h` | generated stubs that log any JNI function slot nobody implemented |
 | `unity_jni.{c,h}` | real behaviour for the Java classes Unity needs (Context, AssetManager, prefs, ...) |
 | `android_native_unity.{c,h}` | NDK: `ANativeWindow` over the Switch window, `ALooper`, sensors, input |
 | `opensles.{c,h}` | the OpenSL ES subset FMOD uses, mixed into one SDL2 audio device |
+| `egl.{c,h}` | EGL/GLES wrappers: surface size and lifetime, `eglSwapBuffers` with overlays, GL wait timing |
+| `android_log.{c,h}` | liblog and `__assert2` into `debug.log` |
 | `rd_zip.{c,h}` | read single entries of `base.apk` (stored or deflated) for the AssetManager |
 | `rd_meta.{c,h}` | `ApplicationInfo.metaData` values from the manifest |
 | `rd_features.{c,h}` | `PackageManager.hasSystemFeature()` answers |
@@ -135,7 +149,7 @@ One line per module; each file's header comment has the details.
 | `rd_patchsites.{c,h}` | the patterns that locate every engine patch site and GC variable |
 | `rd_patches.{c,h}` | apply the libunity patches; the background clock thread (CPU boost, log flush) |
 | `rd_a64.{c,h}` | AArch64 instruction encode/decode helpers |
-| `rd_gcbridge.{c,h}` | Boehm GC stop-the-world without POSIX signals |
+| `rd_gcbridge.{c,h}`, `rd_gcbridge_hook.c` | Boehm GC stop-the-world without POSIX signals: register publishing (pure) and `pthread_kill` for the collector |
 | `unity_imports.{c,h}` | imports specific to the Unity/IL2CPP engine |
 | `unity_glue.c` | the fake UnityPlayer / Context / Surface objects the engine is driven with |
 | `unity_input_hook.{c,h}` | `UnityEngine.Input` icalls fed from the Switch touch screen and cursor |
@@ -166,4 +180,5 @@ One line per module; each file's header comment has the details.
 | `rd_smoke.{c,h}`, `rd_smoke_hook.c` | lighter tyre smoke through the particle Emit icall |
 | `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
 
-`main.c` is the composition root: it may include headers of every layer to wire them together.
+`main.c` and the import tables (`imports.c`, `unity_imports.c`, `rd_imports.c`) are composition
+points: they may include headers of every layer to wire implementations to the engine.
