@@ -90,7 +90,8 @@ One line per module; each file's header comment has the details.
 
 | File | Purpose |
 |---|---|
-| `main.c` | entry point: memory layout, loading the libraries, the Unity lifecycle, the main loop |
+| `main.c` | entry point: `main()` as a list of boot steps (load libraries, JNI, Unity lifecycle) and the main loop |
+| `mem_layout.{c,h}` | memory layout before `main()`: newlib heap, `.so` region, mmap arena; arming the overcommit window |
 | `so_util.{c,h}` | load an arm64 ELF shared object into the reserved region, relocate it, find symbols |
 | `rd_modimage.{c,h}` | a loaded module as an `rd_image` for the pattern search |
 | `rd_codeaddr.{c,h}` | is a stack word a plausible return address into a loaded module (backtraces) |
@@ -113,7 +114,9 @@ One line per module; each file's header comment has the details.
 | `shim_fs_path.c` | path rewrites: APK asset root, case-sensitivity probe, `mkdir -p`, synthetic `/proc` and `/sys` |
 | `shim_fs_cache.c` | per-fd state: read-ahead windows, synthetic inodes, open-fd cache for `.so` files, SD commit after writes |
 | `shim_stdio.c` | `fopen` and the fake `stdin`/`stdout`/`stderr` streams |
-| `shim_mmap.c` | `mmap`/`munmap`/`mprotect`: heap arena, stack-region overcommit window, read-only file-map cache |
+| `shim_mmap.{c,h}` | `mmap`/`munmap`/`mprotect`/`madvise`, memalign fallback, read-only file-map cache; `shim_mmap.h` is internal |
+| `shim_mmap_arena.c` | the page arena on the newlib heap |
+| `shim_mmap_oc.c` | the stack-region overcommit window for Unity's huge `PROT_NONE` reservations |
 | `shim_dl.c` | `dlopen`/`dlsym` over the loaded modules (and the icall override hand-over) |
 | `shim_pthread.c` | pthread on newlib: lazily backed mutexes/conditions, thread start, TLS keys, rwlocks, semaphores |
 | `fakefd.{c,h}` | in-process pipes for the engine's pipe()-based thread signalling |
@@ -131,7 +134,9 @@ One line per module; each file's header comment has the details.
 | `jni_unimpl.h` | generated stubs that log any JNI function slot nobody implemented |
 | `unity_jni.{c,h}` | real behaviour for the Java classes Unity needs (Context, AssetManager, prefs, ...) |
 | `android_native_unity.{c,h}` | NDK: `ANativeWindow` over the Switch window, `ALooper`, sensors, input |
-| `opensles.{c,h}` | the OpenSL ES subset FMOD uses, mixed into one SDL2 audio device |
+| `opensles.{c,h}` | the OpenSL ES subset FMOD uses: interfaces, objects, engine, `slCreateEngine` |
+| `opensles_mixer.c` | the SDL2 audio device, the player registry and the software mixer |
+| `opensles_internal.h` | OpenSL ES types, vtables and the shim's objects (internal) |
 | `egl.{c,h}` | EGL/GLES wrappers: surface size and lifetime, `eglSwapBuffers` with overlays, GL wait timing |
 | `android_log.{c,h}` | liblog and `__assert2` into `debug.log` |
 | `rd_zip.{c,h}` | read single entries of `base.apk` (stored or deflated) for the AssetManager |
@@ -161,7 +166,9 @@ One line per module; each file's header comment has the details.
 |---|---|
 | `rd_platform.h` | timing constants, main-loop cadences, buffer sizes, `rd_now_ns()`, the frame clock |
 | `rd_device.h` | the Android device the port pretends to be (SDK level, ABI, cores, RAM) |
-| `nx_pointer.{c,h}` | pad, touch screen, USB mouse, gyro and the on-screen cursor |
+| `nx_pointer.{c,h}` | pad, touch screen, USB mouse, gyro, cursor movement and its settings file |
+| `nx_pointer_draw.c` | the cursor image (`cursor.png` or the built-in arrow), drawn through `rd_overlay` |
+| `nx_pointer_internal.h` | state shared by the two nx_pointer files (internal) |
 | `nx_fonts.{c,h}` | the console's shared fonts as Android system fonts for Unity's fallback |
 | `rd_overlay.{c,h}`, `rd_overlay_gl.c` | 2D drawing on top of the finished frame (cursor, FPS counter) |
 | `rd_fps.{c,h}` | the debug FPS counter: counting and the built-in pixel font |
