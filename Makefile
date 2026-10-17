@@ -42,7 +42,9 @@ INCLUDES := source
 
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
-CFLAGS  := -g -Wall -O2 -ffunction-sections $(ARCH) $(DEFINES) \
+# Warnings are errors, as in the host tests (docs/CODING_STYLE.md).
+WARNINGS := -Wall -Wextra -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Werror
+CFLAGS  := -std=gnu11 -g $(WARNINGS) -O2 -ffunction-sections $(ARCH) $(DEFINES) \
            -DCRASH_LOG_PRINTF=debugPrintf \
            $(INCLUDE) -D__SWITCH__
 # The reserved region where the game .so are loaded (keep in sync with so_util.c).
@@ -71,8 +73,8 @@ SFILES   := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 export LD := $(CXX)
 export OFILES  := $(SFILES:.s=.o) $(CPPFILES:.cpp=.o) $(CFILES:.c=.o)
 export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
-                  $(foreach dir,$(LIBDIRS),-I$(dir)/include) \
-                  -I$(PORTLIBS)/include/SDL2 -I$(CURDIR)/$(BUILD)
+                  $(foreach dir,$(LIBDIRS),-isystem $(dir)/include) \
+                  -isystem $(PORTLIBS)/include/SDL2 -I$(CURDIR)/$(BUILD)
 export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
 .PHONY: all clean

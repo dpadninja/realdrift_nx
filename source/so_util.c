@@ -284,7 +284,7 @@ int so_relocate(so_module *mod) {
     char *sh_name = mod->shstrtab + mod->sec_hdr[i].sh_name;
     if (strcmp(sh_name, ".rela.dyn") == 0 || strcmp(sh_name, ".rela.plt") == 0) {
       Elf64_Rela *rels = (Elf64_Rela *)((uintptr_t)mod->load_base + mod->sec_hdr[i].sh_addr);
-      for (int j = 0; j < mod->sec_hdr[i].sh_size / sizeof(Elf64_Rela); j++) {
+      for (size_t j = 0; j < mod->sec_hdr[i].sh_size / sizeof(Elf64_Rela); j++) {
         uintptr_t *ptr = (uintptr_t *)((uintptr_t)mod->load_base + rels[j].r_offset);
         Elf64_Sym *sym = &mod->syms[ELF64_R_SYM(rels[j].r_info)];
 
@@ -419,7 +419,7 @@ int so_resolve(so_module *mod, DynLibFunction *funcs, int num_funcs, int taint_m
     char *sh_name = mod->shstrtab + mod->sec_hdr[i].sh_name;
     if (strcmp(sh_name, ".rela.dyn") == 0 || strcmp(sh_name, ".rela.plt") == 0) {
       Elf64_Rela *rels = (Elf64_Rela *)((uintptr_t)mod->load_base + mod->sec_hdr[i].sh_addr);
-      for (int j = 0; j < mod->sec_hdr[i].sh_size / sizeof(Elf64_Rela); j++) {
+      for (size_t j = 0; j < mod->sec_hdr[i].sh_size / sizeof(Elf64_Rela); j++) {
         uintptr_t *ptr = (uintptr_t *)((uintptr_t)mod->load_base + rels[j].r_offset);
         Elf64_Sym *sym = &mod->syms[ELF64_R_SYM(rels[j].r_info)];
 
@@ -464,7 +464,7 @@ void so_execute_init_array(so_module *mod) {
   for (int i = 0; i < mod->elf_hdr->e_shnum; i++) {
     char *sh_name = mod->shstrtab + mod->sec_hdr[i].sh_name;
     if (strcmp(sh_name, ".init_array") == 0) {
-      int (** init_array)() = (void *)((uintptr_t)mod->load_virtbase + mod->sec_hdr[i].sh_addr);
+      int (**init_array)(void) = (void *)((uintptr_t)mod->load_virtbase + mod->sec_hdr[i].sh_addr);
       int n = (int)(mod->sec_hdr[i].sh_size / 8);
       debugPrintf("[init] %s: %d ctors\n", mod->name, n);
       for (int j = 0; j < n; j++) {

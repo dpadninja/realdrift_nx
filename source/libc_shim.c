@@ -439,7 +439,7 @@ static struct RaCache *ra_find(int fd) {
   for (int i = 0; i < RA_SLOTS; i++) if (g_ra[i].fd == fd) return &g_ra[i];
   return NULL;
 }
-void ra_attach(int fd, long size) {
+static void ra_attach(int fd, long size) {
   mutexLock(&g_ra_lock);
   for (int i = 0; i < RA_SLOTS; i++) if (g_ra[i].fd < 0) {
     if (!g_ra[i].buf) g_ra[i].buf = malloc(RA_WIN);
@@ -448,7 +448,7 @@ void ra_attach(int fd, long size) {
   }
   mutexUnlock(&g_ra_lock);
 }
-void ra_detach(int fd) {
+static void ra_detach(int fd) {
   mutexLock(&g_ra_lock);
   struct RaCache *c = ra_find(fd);
   if (c) c->fd = -1;   /* keep buf allocated for reuse */

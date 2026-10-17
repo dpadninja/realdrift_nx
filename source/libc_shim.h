@@ -142,6 +142,11 @@ int madvise_fake(void *addr, size_t len, int advice);
 // fd routing (fake pipe vs real files)
 long read_fake(int fd, void *buf, size_t count);
 long z_lseek(int fd, long off, int whence);   /* real lseek; also services lseek64 */
+
+/* Arms the stack-region overcommit arena: window = a reserved stack-region range, pool = a
+ * page-aligned heap buffer that backs committed pages. Called once from main() after the
+ * newlib heap exists. Returns 1 if armed, 0 if mmap stays heap-backed. */
+int  oc_arena_init(void *window, size_t window_bytes, void *pool, size_t pool_bytes);
 extern int g_watch_fd;
 void watch_dump(const char *tag, int fd, long a, long b, const void *buf, long got);
 long write_fake(int fd, const void *buf, size_t count);

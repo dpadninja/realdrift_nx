@@ -19,8 +19,9 @@ checklist below is what reviews catch most often.
 
 ## While you write
 
-- File header comment: purpose, callers, thread, the facts a reader needs. Forked code: origin
-  author + repository URL + commit + license.
+- File header comment: purpose, callers, thread, the facts a reader needs, and the license
+  (`MIT (see LICENSE).` for ours). Forked code: origin author + repository URL + commit +
+  upstream copyright and license. Every file of code: C, Python, Makefile, scripts, CI.
 - A comment above every function declared in a header (what / arguments / return / ownership /
   thread). Comment `static` functions whose name does not say it all. Explain *why*.
 - `static` unless another file needs it; then a prototype in the module header.

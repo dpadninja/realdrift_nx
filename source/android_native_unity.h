@@ -51,11 +51,6 @@ int         ASensor_getMinDelay(const void *);
 
 void android_get_orientation(float *x, float *y, float *z); /* no sensor: always level */
 
-/* fake-fd pipe layer (fakefd.c) -- libc_shim.c routes pipe()/read/write/close here */
-int  fakefd_is_fake(int fd);
-int  fakefd_pipe(int fds[2]);
-long fakefd_read(int fd, void *buf, unsigned long n);
-long fakefd_write(int fd, const void *buf, unsigned long n);
-int  fakefd_close(int fd);
+#include "fakefd.h"   /* libc_shim.c routes pipe()/read/write/close there */
 
 #endif /* ANDROID_NATIVE_UNITY_H */

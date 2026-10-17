@@ -21,6 +21,10 @@
 /* FakeID is defined in jni_fake.c; we only read .cls/.name/.sig (all char[]). */
 
 void  unity_jni_init(const char *data_root);
+
+/* unity_glue.c: creates the fake UnityPlayer / Context / Surface objects and registers the
+ * Java classes (unity_jni_init). Called once by main.c after jni_init(). */
+void  unity_environment_init(const char *data_root);
 int   unity_owns_class(const char *cls);          /* 1 if this module handles it */
 
 void     *unity_dispatch_object(void *recv, const void *id, va_list va);

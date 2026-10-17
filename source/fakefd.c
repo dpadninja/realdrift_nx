@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <switch.h>
+#include "fakefd.h"
 
 #define FAKE_FD_BASE 0x40000000
 #define MAX_FAKE_FDS 32

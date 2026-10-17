@@ -48,12 +48,8 @@ volatile uint64_t g_rd_frame_start_ns = 0;   /* Read by rd_patches.c clock threa
 volatile int      g_rd_in_frame = 0;
 
 #include "diag.h"
-
-
-/* jni_fake.c: recover a UnityPlayer native by name from the captured RegisterNatives table */
-void *jni_lookup_unity_native(const char *name);
-/* unity_glue.c */
-void unity_environment_init(const char *data_root);
+#include "nx_crash_handler.h"
+#include "unity_jni.h"
 
 static void *heap_so_base = NULL;
 static size_t heap_so_limit = 0;
@@ -68,7 +64,6 @@ int      g_oc_hint_map = 0, g_oc_hint_unmap = 0;
 unsigned g_oc_alias_mb = 0;
 void    *g_oc_win = NULL;
 int      g_oc_probe_tried = 0, g_oc_shrink_tried = 0;
-extern int oc_arena_init(void *window, size_t window_bytes, void *pool, size_t pool_bytes);
 unsigned g_oc_probe_rc = 0, g_oc_shrink_rc = 0;
 unsigned long g_oc_win_addr = 0;
 u64      g_oc_sysres = 0;
@@ -160,6 +155,8 @@ static int overcommit_setup(void *addr, size_t size, size_t so_zone,
   return 0;   /* no system resource -> svcMapPhysicalMemory unusable; heap-backed */
 }
 
+/* Called by libnx before main() to set up the newlib heap (overrides libnx's default). */
+void __libnx_initheap(void);
 void __libnx_initheap(void) {
   void *addr;
   size_t size = 0;

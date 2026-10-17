@@ -24,33 +24,14 @@
 #include <switch.h>
 #include <unistd.h>      /* dup */
 #include "imports.h"   /* DynLibFunction */
+#include "unity_imports.h"
+#include "android_native_unity.h"
+#include "libc_shim.h"   /* z_lseek */
+#include "util.h"        /* debugPrintf */
 #include "diag.h"
 
-extern int debugPrintf(char *text, ...);  /* util.c */
-extern long z_lseek(int fd, long off, int whence);  /* libc_shim.c */
 
-/* our own implementations (android_native_unity.c); generic decls just to take
- * the address -- the real signatures live in that .c and resolve at link time */
-extern void ALooper_acquire();
-extern void ALooper_forThread();
-extern void ALooper_release();
-extern void ALooper_wake();
-extern void ANativeWindow_acquire();
-extern void ANativeWindow_fromSurface();
-extern void ANativeWindow_getHeight();
-extern void ANativeWindow_getWidth();
-extern void ANativeWindow_release();
-extern void ASensorEventQueue_hasEvents();
-extern void ASensorManager_createEventQueue();
-extern void ASensorManager_destroyEventQueue();
-extern void ASensorManager_getDefaultSensor();
-extern void ASensorManager_getInstance();
-extern void ASensorManager_getSensorList();
-extern void ASensor_getMinDelay();
-extern void ASensor_getName();
-extern void ASensor_getResolution();
-extern void ASensor_getType();
-extern void ASensor_getVendor();
+/* our own implementations: android_native_unity.h (included above) */
 
 /* _ctype_ table: char-class flags indexed directly by byte value (modern
  * bionic style). Padded to 384 so (_ctype_+1)[255] style access stays in-bounds.
@@ -98,7 +79,7 @@ static int z_pthread_setname_np(void *thread, const char *name){
  * the calling thread, so the GC stays in bounds. The GC calls getattr_np then
  * getstack back-to-back on the same (self) thread, so computing live from SP in
  * getstack is correct. */
-int z_pthread_attr_getstack(const void *attr, void **stackaddr, size_t *stacksize){
+static int z_pthread_attr_getstack(const void *attr, void **stackaddr, size_t *stacksize){
   (void)attr;
   uintptr_t sp; __asm__ volatile("mov %0, sp" : "=r"(sp));
   void *base; size_t sz;
@@ -115,13 +96,13 @@ int z_pthread_attr_getstack(const void *attr, void **stackaddr, size_t *stacksiz
   return 0;
 }
 /* opaque to us; the bounds are produced live by z_pthread_attr_getstack */
-int z_pthread_getattr_np(void *thread, void *attr){ (void)thread; (void)attr; return 0; }
+static int z_pthread_getattr_np(void *thread, void *attr){ (void)thread; (void)attr; return 0; }
 
 /* dedicated stubs */
-int z_getpagesize(void){ return 0x1000; }
-int z_pthread_equal(unsigned long a, unsigned long b){ return a==b; }
-int z_gettid(void){ return 1; }
-int z_dup(int fd){
+static int z_getpagesize(void){ return 0x1000; }
+static int z_pthread_equal(unsigned long a, unsigned long b){ return a==b; }
+static int z_gettid(void){ return 1; }
+static int z_dup(int fd){
   /* il2cpp's MemoryMappedFile::Map dup()s the metadata fd; a -1 here sent the
    * loader down its error path, so global-metadata.dat never mapped and every
    * managed class (System.Object included) resolved to NULL. Do a real dup;
@@ -136,7 +117,7 @@ int z_dup(int fd){
  * (from JNI android.os.Build.*) against names like "Amazon"/"KFTT". In our fake
  * JNI those getters return NULL, so the raw libc strcasecmp deref-NULL-crashes.
  * Treat NULL as an empty string that matches nothing, so the checks just fail. */
-int z_strcasecmp(const char *a, const char *b){
+static int z_strcasecmp(const char *a, const char *b){
   if (a == b) return 0;
   if (!a) return -1;
   if (!b) return 1;
@@ -150,7 +131,7 @@ int z_strncasecmp(const char *a, const char *b, unsigned long n){
 }
 /* GNU-style basename: pointer to the final path component, no modification.
  * Was mapped to a stub returning NULL, which would crash any caller. */
-char *z_basename(const char *path){
+static char *z_basename(const char *path){
   if (!path || !*path) return (char *)".";
   const char *s = strrchr(path, '/');
   return (char *)(s ? s + 1 : path);
@@ -158,14 +139,14 @@ char *z_basename(const char *path){
 /* locale-aware ctype: the _l variants ignore the locale and defer to the base
  * function. Were stubbed to return 0 -- which made tolower_l(c)=NUL and every
  * isX_l() false, silently corrupting any locale-path string/number parsing. */
-int z_isdigit_l (int c, void *l){ (void)l; return isdigit(c); }
-int z_islower_l (int c, void *l){ (void)l; return islower(c); }
-int z_isupper_l (int c, void *l){ (void)l; return isupper(c); }
-int z_isxdigit_l(int c, void *l){ (void)l; return isxdigit(c); }
-int z_tolower_l (int c, void *l){ (void)l; return tolower(c); }
-int z_toupper_l (int c, void *l){ (void)l; return toupper(c); }
-void z_sincos(double x,double*s,double*c){ if(s)*s=sin(x); if(c)*c=cos(x); }
-void*z_memrchr(const void*s,int c,unsigned long n){ const unsigned char*p=(const unsigned char*)s+n; while(n--){ if(*--p==(unsigned char)c) return (void*)p; } return 0; }
+static int z_isdigit_l (int c, void *l){ (void)l; return isdigit(c); }
+static int z_islower_l (int c, void *l){ (void)l; return islower(c); }
+static int z_isupper_l (int c, void *l){ (void)l; return isupper(c); }
+static int z_isxdigit_l(int c, void *l){ (void)l; return isxdigit(c); }
+static int z_tolower_l (int c, void *l){ (void)l; return tolower(c); }
+static int z_toupper_l (int c, void *l){ (void)l; return toupper(c); }
+static void z_sincos(double x,double*s,double*c){ if(s)*s=sin(x); if(c)*c=cos(x); }
+static void*z_memrchr(const void*s,int c,unsigned long n){ const unsigned char*p=(const unsigned char*)s+n; while(n--){ if(*--p==(unsigned char)c) return (void*)p; } return 0; }
 
 DynLibFunction unity_dynlib_functions[] = {
   { "ALooper_acquire", (uintptr_t)&ALooper_acquire },

@@ -13,6 +13,12 @@
 #include "libc_shim.h"   /* nx_stat_* */
 #include "rd_platform.h"
 #include "util.h"        /* debugPrintf */
+#include "rd_gpuwait.h"
+
+/* Linker hooks: -Wl,--wrap=X sends mesa's calls of X to __wrap_X; __real_X is libnx's X. */
+Result __wrap_nwindowDequeueBuffer(NWindow *nw, s32 *out_slot, NvMultiFence *out_fence);
+Result __wrap_nvFenceWait(NvFence *f, s32 timeout_us);
+Result __wrap_nwindowSetSwapInterval(NWindow *nw, u32 swap_interval);
 
 Result __real_nwindowDequeueBuffer(NWindow *nw, s32 *out_slot, NvMultiFence *out_fence);
 Result __wrap_nwindowDequeueBuffer(NWindow *nw, s32 *out_slot, NvMultiFence *out_fence) {

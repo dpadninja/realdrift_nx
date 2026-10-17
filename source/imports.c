@@ -21,7 +21,6 @@
 #include <string.h>
 #include <strings.h>
 #include <malloc.h>
-extern int z_strncasecmp(const char *, const char *, unsigned long);  /* NULL-safe, unity_imports.c */
 #include <unistd.h>
 #include <ctype.h>
 #include <math.h>
@@ -58,7 +57,7 @@ extern int *__errno(void);              // newlib
 // liblog
 // ---------------------------------------------------------------------------
 
-int __android_log_print(int prio, const char *tag, const char *fmt, ...) {
+static int __android_log_print(int prio, const char *tag, const char *fmt, ...) {
   (void)prio;
 #if DEBUG_LOG
   va_list list; static char string[0x1000];
@@ -69,10 +68,10 @@ int __android_log_print(int prio, const char *tag, const char *fmt, ...) {
 #endif
   return 0;
 }
-int __android_log_write(int prio, const char *tag, const char *text) {
+static int __android_log_write(int prio, const char *tag, const char *text) {
   (void)prio; debugPrintf("%s: %s\n", tag, text); return 0;
 }
-int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list va) {
+static int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list va) {
   (void)prio;
 #if DEBUG_LOG
   static char string[0x1000]; vsnprintf(string, sizeof(string), fmt, va);
@@ -82,7 +81,7 @@ int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list va)
 #endif
   return 0;
 }
-void __assert2(const char *file, int line, const char *func, const char *expr) {
+static void __assert2(const char *file, int line, const char *func, const char *expr) {
   debugPrintf("assert: %s:%d (%s): %s\n", file, line, func, expr); abort();
 }
 
@@ -91,10 +90,10 @@ void __assert2(const char *file, int line, const char *func, const char *expr) {
 // ---------------------------------------------------------------------------
 
 uint64_t __stack_chk_guard_fake = 0x0ull; /* match install_bionic_tls's zeroed tpidr+0x28 slot */
-void __stack_chk_fail_fake(void) { debugPrintf("__stack_chk_fail\n"); abort(); }
+static void __stack_chk_fail_fake(void) { debugPrintf("__stack_chk_fail\n"); abort(); }
 
-int  __cxa_atexit_fake(void (*fn)(void *), void *arg, void *dso) { (void)fn; (void)arg; (void)dso; return 0; }
-void __cxa_finalize_fake(void *dso) { (void)dso; }
+static int  __cxa_atexit_fake(void (*fn)(void *), void *arg, void *dso) { (void)fn; (void)arg; (void)dso; return 0; }
+static void __cxa_finalize_fake(void *dso) { (void)dso; }
 
 // stdin/stdout/stderr point into the fake __sF block (see libc_shim.c)
 FILE *stderr_fake = (FILE *)&fake_sF[2];
@@ -105,7 +104,7 @@ FILE *stderr_fake = (FILE *)&fake_sF[2];
 // caller's pointer slot.
 // ---------------------------------------------------------------------------
 
-int pthread_mutex_init_fake(pthread_mutex_t **uid, const int *attr) {
+static int pthread_mutex_init_fake(pthread_mutex_t **uid, const int *attr) {
   pthread_mutex_t *m = calloc(1, sizeof(pthread_mutex_t));
   if (!m) return -1;
   const int recursive = (attr && *attr == 1); // bionic PTHREAD_MUTEX_RECURSIVE == 1
@@ -120,7 +119,7 @@ int pthread_mutex_init_fake(pthread_mutex_t **uid, const int *attr) {
   if (ret != 0) { free(m); return -1; }
   *uid = m; return 0;
 }
-int pthread_mutex_destroy_fake(pthread_mutex_t **uid) {
+static int pthread_mutex_destroy_fake(pthread_mutex_t **uid) {
   if (uid && *uid && (uintptr_t)*uid > 0x8000) { pthread_mutex_destroy(*uid); free(*uid); *uid = NULL; }
   return 0;
 }
@@ -137,7 +136,7 @@ static int ensure_mutex(pthread_mutex_t **uid) {
   }
   return 0;
 }
-int pthread_mutex_lock_fake(pthread_mutex_t **uid) {
+static int pthread_mutex_lock_fake(pthread_mutex_t **uid) {
   if (ensure_mutex(uid) < 0) return -1;
   if (pthread_mutex_trylock(*uid) == 0) return 0;        // uncontended: no beacon
   diag_wait_enter(DIAG_W_MUTEX, *uid);
@@ -145,9 +144,9 @@ int pthread_mutex_lock_fake(pthread_mutex_t **uid) {
   diag_wait_exit();
   return r;
 }
-int pthread_mutex_trylock_fake(pthread_mutex_t **uid) { if (ensure_mutex(uid) < 0) return -1; return pthread_mutex_trylock(*uid); }
-int pthread_mutex_unlock_fake(pthread_mutex_t **uid) { if (ensure_mutex(uid) < 0) return -1; return pthread_mutex_unlock(*uid); }
-int pthread_mutex_timedlock_fake(pthread_mutex_t **uid, const struct timespec *abs) {
+static int pthread_mutex_trylock_fake(pthread_mutex_t **uid) { if (ensure_mutex(uid) < 0) return -1; return pthread_mutex_trylock(*uid); }
+static int pthread_mutex_unlock_fake(pthread_mutex_t **uid) { if (ensure_mutex(uid) < 0) return -1; return pthread_mutex_unlock(*uid); }
+static int pthread_mutex_timedlock_fake(pthread_mutex_t **uid, const struct timespec *abs) {
   (void)abs;
   if (ensure_mutex(uid) < 0) return -1;
   for (int i = 0; i < 1000; i++) {
@@ -157,7 +156,7 @@ int pthread_mutex_timedlock_fake(pthread_mutex_t **uid, const struct timespec *a
   return ETIMEDOUT;
 }
 
-int pthread_cond_init_fake(pthread_cond_t **cnd, const int *attr) {
+static int pthread_cond_init_fake(pthread_cond_t **cnd, const int *attr) {
   (void)attr;
   pthread_cond_t *c = calloc(1, sizeof(pthread_cond_t));
   if (!c) return -1;
@@ -171,11 +170,11 @@ static int ensure_cond(pthread_cond_t **cnd) {
   if ((uintptr_t)*cnd < 0x10000) return pthread_cond_init_fake(cnd, NULL);
   return 0;
 }
-int pthread_cond_broadcast_fake(pthread_cond_t **cnd) { if (ensure_cond(cnd) < 0) return -1; return pthread_cond_broadcast(*cnd); }
-int pthread_cond_signal_fake(pthread_cond_t **cnd) { if (ensure_cond(cnd) < 0) return -1; return pthread_cond_signal(*cnd); }
-int pthread_cond_destroy_fake(pthread_cond_t **cnd) { if (cnd && (uintptr_t)*cnd >= 0x10000) { pthread_cond_destroy(*cnd); free(*cnd); *cnd = NULL; } return 0; }
+static int pthread_cond_broadcast_fake(pthread_cond_t **cnd) { if (ensure_cond(cnd) < 0) return -1; return pthread_cond_broadcast(*cnd); }
+static int pthread_cond_signal_fake(pthread_cond_t **cnd) { if (ensure_cond(cnd) < 0) return -1; return pthread_cond_signal(*cnd); }
+static int pthread_cond_destroy_fake(pthread_cond_t **cnd) { if (cnd && (uintptr_t)*cnd >= 0x10000) { pthread_cond_destroy(*cnd); free(*cnd); *cnd = NULL; } return 0; }
 #define COND_WAIT_CAP_MS 16
-int pthread_cond_wait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx) {
+static int pthread_cond_wait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx) {
   if (ensure_cond(cnd) < 0 || ensure_mutex(mtx) < 0) return -1;
   diag_wait_enter(DIAG_W_COND, *cnd);
   // Cap the UNTIMED wait too (not just the timed one below). Unity's engine
@@ -206,7 +205,7 @@ int pthread_cond_wait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx) {
 // regardless of which clock newlib uses, so the pacer hits its timeout fallback
 // and keeps pacing. Spurious/early wakeups are POSIX-legal (every correct waiter
 // re-checks its predicate), so this is safe in general.
-int pthread_cond_timedwait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx, const struct timespec *t) {
+static int pthread_cond_timedwait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx, const struct timespec *t) {
   if (ensure_cond(cnd) < 0 || ensure_mutex(mtx) < 0) return -1;
   struct timespec now, cap;
   clock_gettime(CLOCK_MONOTONIC, &now);
@@ -224,23 +223,23 @@ int pthread_cond_timedwait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx, con
   return r;
 }
 
-int pthread_once_fake(volatile int *once, void (*init)(void)) {
+static int pthread_once_fake(volatile int *once, void (*init)(void)) {
   if (!once || !init) return -1;
   if (__sync_lock_test_and_set(once, 1) == 0) (*init)();
   return 0;
 }
 
-int pthread_mutexattr_init_fake(int *a) { if (a) *a = 0; return 0; }
-int pthread_mutexattr_settype_fake(int *a, int t) { if (a) *a = t; return 0; }
+static int pthread_mutexattr_init_fake(int *a) { if (a) *a = 0; return 0; }
+static int pthread_mutexattr_settype_fake(int *a, int t) { if (a) *a = t; return 0; }
 
 // bionic pthread_attr_t is opaque storage we own; stash size/detach there
 #define ATTR_MAGIC 0x41545452 /* 'ATTR' */
 typedef struct { uint32_t magic; uint32_t detach; size_t stacksize; } OurAttr;
 
-int pthread_attr_init_fake(void *a) { if (a) { OurAttr *o = a; o->magic = ATTR_MAGIC; o->detach = 0; o->stacksize = 0; } return 0; }
-int pthread_attr_destroy_fake(void *a) { (void)a; return 0; }
-int pthread_attr_setdetachstate_fake(void *a, int s) { if (a) { OurAttr *o = a; if (o->magic == ATTR_MAGIC) o->detach = (uint32_t)s; } return 0; }
-int pthread_attr_setstacksize_fake(void *a, size_t s) { if (a) { OurAttr *o = a; if (o->magic == ATTR_MAGIC) o->stacksize = s; } return 0; }
+static int pthread_attr_init_fake(void *a) { if (a) { OurAttr *o = a; o->magic = ATTR_MAGIC; o->detach = 0; o->stacksize = 0; } return 0; }
+static int pthread_attr_destroy_fake(void *a) { (void)a; return 0; }
+static int pthread_attr_setdetachstate_fake(void *a, int s) { if (a) { OurAttr *o = a; if (o->magic == ATTR_MAGIC) o->detach = (uint32_t)s; } return 0; }
+static int pthread_attr_setstacksize_fake(void *a, size_t s) { if (a) { OurAttr *o = a; if (o->magic == ATTR_MAGIC) o->stacksize = s; } return 0; }
 
 typedef struct { void *(*entry)(void *); void *arg; int is_main; uint8_t tls[BIONIC_TLS_SIZE]; } ThreadStart;
 static volatile int g_first_engine_thread_taken = 0;
@@ -252,7 +251,7 @@ static void *thread_trampoline(void *p) {
   diag_thread_unregister();
   return r;
 }
-int pthread_create_fake(pthread_t *thread, const void *bionic_attr, void *entry, void *arg) {
+static int pthread_create_fake(pthread_t *thread, const void *bionic_attr, void *entry, void *arg) {
   ThreadStart *ts = malloc(sizeof(*ts));
   if (!ts) return -1;
   ts->entry = (void *(*)(void *))entry;
@@ -271,14 +270,14 @@ int pthread_create_fake(pthread_t *thread, const void *bionic_attr, void *entry,
   if (r != 0) { free(ts); return r; }
   return 0;
 }
-int pthread_join_fake(pthread_t thread, void **retval) {
+static int pthread_join_fake(pthread_t thread, void **retval) {
   diag_wait_enter(DIAG_W_JOIN, (const void *)(uintptr_t)thread);
   int r = pthread_join(thread, retval);
   diag_wait_exit();
   return r;
 }
-int pthread_setschedparam_fake(pthread_t t, int policy, const void *p) { (void)t; (void)policy; (void)p; return 0; }
-int pthread_sigmask_fake(int how, const void *set, void *old) { (void)how; (void)set; (void)old; return 0; }
+static int pthread_setschedparam_fake(pthread_t t, int policy, const void *p) { (void)t; (void)policy; (void)p; return 0; }
+static int pthread_sigmask_fake(int how, const void *set, void *old) { (void)how; (void)set; (void)old; return 0; }
 
 // ---------------------------------------------------------------------------
 // pthread TLS keys, multiplexed over a single real newlib key.
@@ -312,7 +311,7 @@ static void master_key_dtor(void *p) {
   free(kv);
 }
 
-int pthread_key_create_fake(unsigned *key, void (*dtor)(void *)) {
+static int pthread_key_create_fake(unsigned *key, void (*dtor)(void *)) {
   pthread_mutex_lock(&g_key_mutex);
   if (!g_master_key_ready) {
     if (pthread_key_create(&g_master_key, master_key_dtor) != 0) {
@@ -336,7 +335,7 @@ int pthread_key_create_fake(unsigned *key, void (*dtor)(void *)) {
   return EAGAIN;
 }
 
-int pthread_key_delete_fake(unsigned key) {
+static int pthread_key_delete_fake(unsigned key) {
   if (key == 0 || key > FAKE_KEYS_MAX) return EINVAL;
   pthread_mutex_lock(&g_key_mutex);
   g_key_table[key - 1].used = 0;
@@ -345,13 +344,13 @@ int pthread_key_delete_fake(unsigned key) {
   return 0;
 }
 
-void *pthread_getspecific_fake(unsigned key) {
+static void *pthread_getspecific_fake(unsigned key) {
   if (key == 0 || key > FAKE_KEYS_MAX || !g_master_key_ready) return NULL;
   KeyValues *kv = pthread_getspecific(g_master_key);
   return kv ? kv->values[key - 1] : NULL;
 }
 
-int pthread_setspecific_fake(unsigned key, const void *value) {
+static int pthread_setspecific_fake(unsigned key, const void *value) {
   if (key == 0 || key > FAKE_KEYS_MAX || !g_master_key_ready) return EINVAL;
   KeyValues *kv = pthread_getspecific(g_master_key);
   if (!kv) {

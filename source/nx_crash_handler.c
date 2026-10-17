@@ -53,6 +53,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "rd_log.h"
+#include "nx_crash_handler.h"
 
 #ifndef CRASH_STACK_BYTES
 #define CRASH_STACK_BYTES 0x200
@@ -127,6 +128,8 @@ static const char *sym(uintptr_t v, char *buf, size_t cap) {
 }
 
 /* ---- the handler ---------------------------------------------------------- */
+/* Called by libnx on a CPU exception in any thread (overrides libnx's weak default). */
+void __libnx_exception_handler(ThreadExceptionDump *ctx);
 void __libnx_exception_handler(ThreadExceptionDump *ctx) {
     char b1[96], b2[96];
 
@@ -181,26 +184,3 @@ void __libnx_exception_handler(ThreadExceptionDump *ctx) {
 #endif
     for (;;) svcSleepThread(1000000000ULL);
 }
-
-/* ===========================================================================
- * OPTIONAL: so-loader module resolver
- * ---------------------------------------------------------------------------
- * If you use an so-loader (dynamically map libunity.so / libil2cpp.so yourself),
- * copy this into your loader and adapt it to your module list so crash frames
- * inside those .so images get named. Delete this block if you don't need it --
- * the weak default above will just print raw hex.
- *
- *   // in your loader, NOT weak, overrides the weak stub above:
- *   int crash_resolve_module(uintptr_t addr, char *name_out, size_t cap,
- *                            uintptr_t *base_out) {
- *       for (my_module *m = g_module_list; m; m = m->next) {
- *           uintptr_t b = (uintptr_t)m->load_virtbase;
- *           if (addr >= b && addr < b + m->load_size) {
- *               snprintf(name_out, cap, "%s", m->name);
- *               *base_out = b;
- *               return 1;
- *           }
- *       }
- *       return 0;
- *   }
- * ==========================================================================*/

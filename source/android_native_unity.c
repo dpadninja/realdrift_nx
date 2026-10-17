@@ -20,6 +20,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <switch.h>
+#include "android_native_unity.h"
 #include "nx_pointer.h"
 #include "libc_shim.h"   /* RD_GAME_HOME, fopen_fake/fclose_fake (locked file IO) */
 #include "util.h"   /* debugPrintf */

@@ -51,14 +51,6 @@ static UHandle *uh_new(int kind){
   UHandle *h = calloc(1,sizeof *h);
   h->tag = UJ_TAG; h->kind = kind; h->fd = -1; return h;
 }
-/* jni_fake.c free_ref() should call this for UJ_TAG; until then streams that
- * the engine forgets to close() leak. Optional hardening, see header note. */
-void unity_handle_free(void *p){
-  UHandle *h = p; if (!h || h->tag!=UJ_TAG) return;
-  if (h->fp) fclose(h->fp);
-  if (h->fd>=0) close(h->fd);
-  free(h);
-}
 static int is_uh(void *p,int kind){ UHandle*h=p; return h && h->tag==UJ_TAG && h->kind==kind; }
 
 /* "assets/<name>" inside base.apk for AssetManager.open("bin/Data/x"). */

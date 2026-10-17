@@ -1,8 +1,9 @@
 # Coding style
 
 The loader is C11 (`-std=gnu11`) built with devkitA64 for the Switch, and the same sources are
-built on the host for the unit tests. These rules apply to all code in `source/`, `tests/c/` and
-`tools/*.c`. Code forked from other projects follows them where we touch it.
+built on the host for the unit tests. These rules apply to all C code in `source/`, `tests/c/` and
+`tools/*.c`; the header, license and comment rules apply to every file of code, Python included.
+Code forked from other projects follows them where we touch it.
 
 ## Files and modules
 
@@ -18,8 +19,11 @@ built on the host for the unit tests. These rules apply to all code in `source/`
    * Pure logic here (host-tested, tests/c/test_rd_smoke.c); the il2cpp glue in rd_smoke_hook.c. */
   ```
   A `.c` file whose header documents everything may start with `/* rd_x.c -- see rd_x.h. MIT (see LICENSE). */`.
-- Forked files keep their upstream copyright notice and name the origin: author, repository URL
-  and commit, license (see `nx_pointer.c`).
+- **Every file of code states its license** in its header comment -- C sources and headers,
+  tests, Python tools, the Makefile, scripts, CI workflows. Our files say `MIT (see LICENSE).`
+  (in Python: `# MIT (see LICENSE).` in the module docstring or header comment); forked files keep
+  their upstream copyright notice and name the origin: author, repository URL and commit, license
+  (see `nx_pointer.c`). `tools/doc_check.py` enforces it.
 - **Pure logic and glue live apart.** Decisions, parsing, maths and tables go into a file that
   builds on the host without libnx (`rd_drive.c`, `rd_smoke.c`); the code that touches libnx, GL,
   il2cpp or the game goes into a thin `*_hook.c` / `*_gl.c` file next to it. The pure file gets a
