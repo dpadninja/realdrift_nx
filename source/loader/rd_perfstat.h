@@ -1,0 +1,21 @@
+/* rd_perfstat.h -- frame-spike counters.
+ *
+ * Cheap counters bumped by hot paths in several layers (file opens, SD commits, mmaps, GC stops,
+ * read volume, time waiting for the GPU or the display). main.c times each frame and, when one
+ * is slow, prints the DELTA of these since the frame began in its [perf] line -- so a hitch names
+ * its own cause. The time counters are updated with __atomic_add_fetch (they may be bumped from
+ * engine threads); the others are plain ints, single writer in practice, read for magnitudes.
+ * MIT (see LICENSE). */
+#ifndef RD_PERFSTAT_H
+#define RD_PERFSTAT_H
+
+/* Counts: open() calls, SD commits, mmap calls, GC stop-the-world pauses. */
+extern unsigned nx_stat_open, nx_stat_commit, nx_stat_mmap, nx_stat_gcstop;
+/* Bytes / time spent in read() + fread() (loading profile). */
+extern volatile unsigned long long nx_stat_read_bytes, nx_stat_read_ns;
+/* Time in eglSwapBuffers, and in GL calls that can wait for the GPU (android/egl). */
+extern volatile unsigned long long nx_stat_swap_ns, nx_stat_glwait_ns;
+/* Time mesa waits for a free window buffer / for GPU fences (platform/rd_gpuwait.c). */
+extern volatile unsigned long long nx_stat_dequeue_ns, nx_stat_fence_ns;
+
+#endif

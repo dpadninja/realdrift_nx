@@ -1,4 +1,5 @@
-/* sources: source/rd_iov.c */
+/* sources: source/bionic/rd_iov.c */
+/* Host unit test of rd_iov. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_iov.h"
@@ -20,6 +21,8 @@ static long fake_write(int fd, const void *buf, size_t len) {
 
 static void reset(long limit) { memset(g_out, 0, sizeof g_out); g_out_len = 0; g_limit = limit; g_calls = 0; }
 
+/* writev concatenates the buffers in order and skips empty ones without a write call (the
+ * engine's logging passes empty iovecs). */
 static void test_writes_all_buffers_in_order(void) {
   reset(100);
   rd_iovec iov[] = { { "ab", 2 }, { "", 0 }, { "cde", 3 } };
@@ -28,6 +31,8 @@ static void test_writes_all_buffers_in_order(void) {
   CHECK(g_calls == 2);   /* empty buffer skipped */
 }
 
+/* After a short write it stops and returns the bytes written, like POSIX writev; continuing
+ * would reorder the output. */
 static void test_stops_after_short_write(void) {
   reset(1);
   rd_iovec iov[] = { { "ab", 2 }, { "cd", 2 } };
@@ -35,12 +40,15 @@ static void test_stops_after_short_write(void) {
   CHECK(strcmp(g_out, "a") == 0);
 }
 
+/* An error before anything was written is reported as -1, not as 0 bytes. */
 static void test_error_on_first_write_returns_minus_one(void) {
   reset(-1);
   rd_iovec iov[] = { { "ab", 2 } };
   CHECK(rd_writev_via(fake_write, 3, iov, 1) == -1);
 }
 
+/* Zero buffers write nothing; a NULL array with a count or a negative count is an error and
+ * never calls write. */
 static void test_zero_and_invalid_counts(void) {
   reset(100);
   CHECK(rd_writev_via(fake_write, 3, NULL, 0) == 0);

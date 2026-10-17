@@ -1,8 +1,11 @@
-/* sources: source/rd_settings.c source/rd_perf.c */
+/* sources: source/game/rd_settings.c source/platform/rd_perf.c */
+/* Host unit test of rd_settings. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_settings.h"
 
+/* Button lists accept any case, commas, plus signs and spaces, NONE and empty unbind, and an
+ * unknown or overlong name is an error that leaves the binding untouched. */
 static void test_parse_buttons(void) {
   uint64_t m = 0;
   CHECK(rd_parse_buttons("ZR", &m) == 0 && m == RD_BTN_ZR);
@@ -14,6 +17,8 @@ static void test_parse_buttons(void) {
   CHECK(rd_parse_buttons("AAAAAAAAAAAAAAAAAAAA", &m) == -1);  /* too long */
 }
 
+/* Formatted button lists parse back to the same mask, an empty mask is written as NONE, and a
+ * buffer too small is an error rather than a cut-off name. */
 static void test_format_roundtrip(void) {
   char buf[64]; uint64_t m;
   CHECK(rd_format_buttons(RD_BTN_ZR | RD_BTN_A, buf, sizeof buf) == 0);
@@ -23,6 +28,8 @@ static void test_format_roundtrip(void) {
   CHECK(rd_format_buttons(RD_BTN_ZR | RD_BTN_A, buf, 3) == -1);
 }
 
+/* The defaults match the README: driving on the triggers, gears on the D-pad, pause on +, and
+ * both smoke knobs at 100 so the game looks original. */
 static void test_defaults_put_gears_on_dpad(void) {
   rd_settings s = RD_SETTINGS_DEFAULT;
   const rd_bindings b = s.binds;
@@ -44,6 +51,8 @@ static int idx(const char *key) {
   return -99;
 }
 
+/* Each key validates its own type and range and keeps the old value on a bad one; removed
+ * options (gc_mode, language) are reported as unknown so the file gets rewritten. */
 static void test_settings_set(void) {
   rd_settings s = RD_SETTINGS_DEFAULT;
   CHECK(rd_settings_set(&s, "bind_handbrake", "A,B") == idx("bind_handbrake"));
@@ -80,6 +89,8 @@ static void test_settings_set(void) {
   CHECK(rd_settings_count() == 17 && idx("bind_throttle") == 0);
 }
 
+/* config.txt written with non-default values reads back identically, and a file with missing
+ * or bad keys asks for a rewrite while keeping defaults for them. */
 static void test_write_then_read_roundtrip(const char *dir) {
   char path[256]; snprintf(path, sizeof path, "%s/settings.txt", dir);
   rd_settings in = RD_SETTINGS_DEFAULT;

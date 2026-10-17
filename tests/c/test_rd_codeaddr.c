@@ -1,4 +1,5 @@
-/* sources: source/rd_codeaddr.c */
+/* sources: source/loader/rd_codeaddr.c */
+/* Host unit test of rd_codeaddr. MIT (see LICENSE). */
 #include <elf.h>
 #include "check.h"
 #include "rd_codeaddr.h"
@@ -12,17 +13,22 @@ static const Elf64_Phdr PH[] = {
 #define BASE 0x2ab516000ull
 #define N ((int)(sizeof PH / sizeof PH[0]))
 
+/* The module base itself is not a return address (run 05 crashed reading base-4 while walking
+ * the stack for a backtrace). */
 static void test_module_base_is_rejected(void) {
   /* run 05 crash: v == base -> read of base-4 */
   CHECK(!rd_is_code_return_addr(BASE, BASE, PH, N));
 }
 
+/* Aligned addresses inside the executable segment, up to its end, count as return addresses. */
 static void test_text_addresses_accepted(void) {
   CHECK(rd_is_code_return_addr(BASE + 4, BASE, PH, N));
   CHECK(rd_is_code_return_addr(BASE + 0x73ecfc, BASE, PH, N));
   CHECK(rd_is_code_return_addr(BASE + 0x1c72f54, BASE, PH, N));   /* slot ends at segment end */
 }
 
+/* Addresses in the gap after text, in data, misaligned, below the module or with no program
+ * headers are rejected, so the backtrace never reads garbage. */
 static void test_data_gap_and_misaligned_rejected(void) {
   CHECK(!rd_is_code_return_addr(BASE + 0x1c72f58, BASE, PH, N));  /* gap after text */
   CHECK(!rd_is_code_return_addr(BASE + 0x1c90010, BASE, PH, N));  /* RW data */

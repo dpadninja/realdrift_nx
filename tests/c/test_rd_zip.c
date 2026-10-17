@@ -1,4 +1,5 @@
-/* sources: source/rd_zip.c */
+/* sources: source/android/rd_zip.c */
+/* Host unit test of rd_zip. MIT (see LICENSE). */
 /* libs: -lz */
 /* Reads the zip that tests/test_c_units.py writes next to the binary (argv[1]/test.zip):
  *   stored.txt   (stored)    "hello stored"
@@ -11,6 +12,7 @@
 
 static FILE *g_f;
 
+/* A stored (uncompressed) APK entry is found and read whole. */
 static void test_stored(void) {
   rd_zip_entry e;
   CHECK(rd_zip_find(g_f, "stored.txt", &e) == 0 && e.method == 0 && e.size == 12);
@@ -19,6 +21,8 @@ static void test_stored(void) {
   free(s);
 }
 
+/* Deflated entries, also in subdirectories (Real Drift's APK deflates almost everything under
+ * assets/), inflate to their full size. */
 static void test_deflated(void) {
   rd_zip_entry e;
   CHECK(rd_zip_find(g_f, "deflated.txt", &e) == 0 && e.method == 8 && e.size == 1500);
@@ -32,6 +36,8 @@ static void test_deflated(void) {
   free(s);
 }
 
+/* A missing name, a name that is only a prefix of an entry, NULL, an unsupported method and a
+ * file that is not a zip all fail cleanly. */
 static void test_missing_and_bad_input(void) {
   rd_zip_entry e;
   CHECK(rd_zip_find(g_f, "nope.txt", &e) == -1);

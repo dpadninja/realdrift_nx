@@ -1,12 +1,12 @@
-/* sources: source/rd_patchsites.c source/rd_sig.c source/rd_a64.c */
-/* find_patch_sites -- run the loader's pattern finders (source/rd_patchsites.c) on .so files.
+/* sources: source/engine/rd_patchsites.c source/engine/rd_sig.c source/engine/rd_a64.c */
+/* find_patch_sites -- run the loader's pattern finders (source/engine/rd_patchsites.c) on .so files.
  *
  *   make tools        (or: python -m tools.hostc tools/find_patch_sites.c build-host/find_patch_sites)
  *   build-host/find_patch_sites analysis/lib64_508/libunity.so analysis/lib64_508/libil2cpp.so
  *
  * Prints key=value lines (addresses are link-time, i.e. relative to the module base) and
  * exits non-zero if a finder fails. tests/test_patch_sites.py checks the output for Real
- * Drift 5.0.7 and 5.0.8. */
+ * Drift 5.0.7 and 5.0.8. MIT (see LICENSE). */
 #include <elf.h>
 #include <stdio.h>
 #include <stdlib.h>

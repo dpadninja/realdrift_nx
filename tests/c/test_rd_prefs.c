@@ -1,20 +1,25 @@
-/* sources: source/rd_prefs.c */
+/* sources: source/game/rd_prefs.c */
+/* Host unit test of rd_prefs. MIT (see LICENSE). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "check.h"
 #include "rd_prefs.h"
 
+/* getString returns the caller's default for a missing key, including a Java null default (run
+ * 06: the inherited code returned "" and the game misread fresh saves). */
 static void test_string_default_when_missing(void) {
   CHECK(strcmp(rd_pref_string(NULL, "{not_found}"), "{not_found}") == 0);
   CHECK(rd_pref_string(NULL, NULL) == NULL);
 }
 
+/* A stored value wins over the default even when it is the empty string, as on Android. */
 static void test_string_stored_wins_even_if_empty(void) {
   CHECK(strcmp(rd_pref_string("abc", "def"), "abc") == 0);
   CHECK(strcmp(rd_pref_string("", "def"), "") == 0);
 }
 
+/* Values written by putFloat ("%.9g": decimals, negatives, exponents) read back exactly. */
 static void test_float_roundtrip_of_putfloat_format(void) {
   /* unity_jni.c putFloat stores "%.9g" */
   CHECK(rd_pref_float("0.75", 1.0f) == 0.75f);
@@ -22,6 +27,8 @@ static void test_float_roundtrip_of_putfloat_format(void) {
   CHECK(rd_pref_float("1e-05", 0.0f) == 1e-05f);
 }
 
+/* getFloat falls back to the default for a missing, empty or non-numeric value instead of
+ * returning 0 (run 06: it never consulted the store). */
 static void test_float_default_when_missing_or_garbage(void) {
   CHECK(rd_pref_float(NULL, 0.5f) == 0.5f);
   CHECK(rd_pref_float("", 0.5f) == 0.5f);
@@ -35,6 +42,8 @@ static void path_in_dir(char *out, size_t n, const char *name) {
   snprintf(out, n, "%s/%s", g_dir, name);
 }
 
+/* prefs.kv survives a 100 kB value (the game keeps its whole progress in one base64 string),
+ * tabs, newlines and backslashes in keys and values, and empty values. */
 static void test_file_roundtrip_long_and_special_values(void) {
   char path[300]; path_in_dir(path, sizeof path, "rt.kv");
   size_t big_n = 100000;                         /* far beyond any fixed line buffer */
@@ -59,6 +68,8 @@ static void test_file_roundtrip_long_and_special_values(void) {
   fclose(f); free(line); free(big);
 }
 
+/* Blank and malformed lines are skipped, and a last line without a newline (a save cut short)
+ * is still read. */
 static void test_skips_malformed_lines_and_reads_last_line_without_newline(void) {
   char path[300]; path_in_dir(path, sizeof path, "bad.kv");
   FILE *f = fopen(path, "wb");
@@ -71,6 +82,8 @@ static void test_skips_malformed_lines_and_reads_last_line_without_newline(void)
   fclose(f); free(line);
 }
 
+/* Saving replaces prefs.kv through the .tmp file, and loading picks the .tmp left by an
+ * interrupted save, so progress is never lost between the two steps. */
 static void test_commit_replaces_and_pick_recovers(void) {
   char path[300], tmp[300];
   path_in_dir(path, sizeof path, "p.kv"); path_in_dir(tmp, sizeof tmp, "p.kv.tmp");

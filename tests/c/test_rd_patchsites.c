@@ -1,4 +1,5 @@
-/* sources: source/rd_patchsites.c source/rd_sig.c source/rd_a64.c */
+/* sources: source/engine/rd_patchsites.c source/engine/rd_sig.c source/engine/rd_a64.c */
+/* Host unit test of rd_patchsites. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_patchsites.h"
@@ -29,6 +30,8 @@ static rd_image image(void) {
   return im;
 }
 
+/* The Choreographer gate pattern finds the b.lt and its skip target in a fragment shaped like
+ * the real libunity code. */
 static void test_found(void) {
   memset(g_code, 0, sizeof g_code); build(4);
   rd_image im = image(); uint64_t gate = 0, skip = 0;
@@ -37,6 +40,8 @@ static void test_found(void) {
   CHECK(skip == BASE + 4 * (4 + 16));
 }
 
+/* A match whose adrp/add does not point at the Choreographer log string is refused: the cross-
+ * check stops a look-alike sequence from being patched. */
 static void test_wrong_string_rejected(void) {
   memset(g_code, 0, sizeof g_code); build(4);
   strcpy(g_msg, "Something else");
@@ -45,6 +50,8 @@ static void test_wrong_string_rejected(void) {
   strcpy(g_msg, "Choreographer available: Enabling VSYNC timing");
 }
 
+/* A match whose b.lt does not land on the function epilogue is refused, so the patch can only
+ * ever skip the vsync setup. */
 static void test_branch_must_reach_epilogue(void) {
   memset(g_code, 0, sizeof g_code); build(4);
   g_code[4 + 16] = 0xd503201f;                  /* no ldp x19,x30 at the b.lt target */
@@ -52,6 +59,8 @@ static void test_branch_must_reach_epilogue(void) {
   CHECK(rd_find_choreo_gate(&im, &gate, &skip) == RD_SITE_BAD_CHECK);
 }
 
+/* Two matches are ambiguous and none is not found (also for the GC variables): the loader then
+ * skips the patch instead of guessing. */
 static void test_ambiguous_and_missing(void) {
   memset(g_code, 0, sizeof g_code); build(0); build(30);
   rd_image im = image(); uint64_t gate, skip;

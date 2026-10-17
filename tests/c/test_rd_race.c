@@ -1,7 +1,11 @@
-/* sources: source/rd_race.c */
+/* sources: source/game/rd_race.c */
+/* Host unit test of rd_race. MIT (see LICENSE). */
 #include "check.h"
 #include "rd_race.h"
 
+/* The pause button opens the pause menu and closes it again when open; in photo mode and after
+ * the race ended (results screen) it is ignored, so it never opens the race pause menu over a
+ * screen that is not a running race. */
 static void test_pause_action(void) {
   CHECK(rd_pause_action(0, 0, 0, 0) == RD_PAUSE_NONE);
   CHECK(rd_pause_action(1, 0, 0, 0) == RD_PAUSE_ENABLE);

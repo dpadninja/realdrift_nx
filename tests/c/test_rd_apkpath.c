@@ -1,4 +1,5 @@
-/* sources: source/rd_apkpath.c */
+/* sources: source/android/rd_apkpath.c */
+/* Host unit test of rd_apkpath. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
 #include "rd_apkpath.h"
@@ -7,6 +8,8 @@ static char g_last[256];
 static int yes(const char *p) { strcpy(g_last, p); return 1; }
 static int no(const char *p)  { strcpy(g_last, p); return 0; }
 
+/* getPackageCodePath returns base.apk in the game folder when it exists: Unity opens it as the
+ * APK to read assets from. */
 static void test_prefers_base_apk(void) {
   char buf[64];
   CHECK(strcmp(rd_package_code_path("/switch/realdrift_nx", yes, buf, sizeof buf),
@@ -14,6 +17,8 @@ static void test_prefers_base_apk(void) {
   CHECK(strcmp(g_last, "/switch/realdrift_nx/base.apk") == 0);
 }
 
+/* Without base.apk (or without an existence check) the game folder is returned, which still
+ * lets Unity start and log the missing file. */
 static void test_falls_back_to_folder(void) {
   char buf[64];
   CHECK(strcmp(rd_package_code_path("/switch/realdrift_nx", no, buf, sizeof buf),
@@ -22,6 +27,8 @@ static void test_falls_back_to_folder(void) {
                "/switch/realdrift_nx") == 0);
 }
 
+/* A buffer too small for "/base.apk" falls back to the folder, and one too small for anything
+ * returns NULL instead of overflowing. */
 static void test_small_buffer(void) {
   char buf[24];   /* fits the folder (20 chars) but not "/base.apk" */
   CHECK(strcmp(rd_package_code_path("/switch/realdrift_nx", yes, buf, sizeof buf),

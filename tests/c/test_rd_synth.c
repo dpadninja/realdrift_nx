@@ -1,4 +1,5 @@
-/* sources: source/rd_synth.c */
+/* sources: source/bionic/rd_synth.c */
+/* Host unit test of rd_synth. MIT (see LICENSE). */
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,6 +15,9 @@ static long gnustl_style_read(FILE *f, char *buf, size_t n) {
   return read(fileno(f), buf, n);
 }
 
+/* A synthetic /proc file opened as FILE* has a real fd: Unity's libstdc++ reads cpuinfo through
+ * read(fileno(f)), and with a fmemopen stream (fd -1) std::ifstream threw ios_base::failure in
+ * InitBigLittleConfiguration. */
 static void test_file_over_fd_is_readable_via_fileno(void) {
   FILE *f = rd_fopen_fd(open(g_path, O_RDONLY));
   CHECK(f != NULL);
@@ -25,6 +29,7 @@ static void test_file_over_fd_is_readable_via_fileno(void) {
   fclose(f);
 }
 
+/* The same FILE* also works with ordinary stdio reads. */
 static void test_stdio_reads_still_work(void) {
   FILE *f = rd_fopen_fd(open(g_path, O_RDONLY));
   CHECK(f != NULL);
@@ -35,11 +40,13 @@ static void test_stdio_reads_still_work(void) {
   fclose(f);
 }
 
+/* An invalid fd gives NULL instead of a FILE* that fails later. */
 static void test_invalid_fd_gives_null(void) {
   CHECK(rd_fopen_fd(-1) == NULL);
 }
 
 /* Documents the original bug: a memory-backed FILE has no fd to read() from. */
+/* Documents why fmemopen is not used: its streams have no fd. */
 static void test_fmemopen_has_no_fd(void) {
   char data[] = "x";
   FILE *f = fmemopen(data, 1, "r");

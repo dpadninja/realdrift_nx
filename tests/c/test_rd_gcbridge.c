@@ -1,4 +1,5 @@
-/* sources: source/rd_gcbridge.c */
+/* sources: source/engine/rd_gcbridge.c */
+/* Host unit test of rd_gcbridge. MIT (see LICENSE). */
 #include <stdint.h>
 #include "check.h"
 #include <string.h>
@@ -14,6 +15,8 @@ static void mwr(void *c, uint64_t a, uint64_t v) { (void)c; g_mem[(a - MEM_BASE)
 static const rd_mem MEM = { mrd, mwr, NULL };
 #define W(addr) g_mem[((addr) - MEM_BASE) / 8]
 
+/* The thread-table hash equals the one in Boehm's suspend handler; a different hash would look
+ * up the wrong bucket and never find the stopped thread. */
 static void test_hash_matches_handler(void) {
   /* h = lo32(id>>8) ^ lo32(id); h ^= h>>16; h &= 0xff */
   CHECK(rd_gc_hash(0) == 0);
@@ -24,6 +27,8 @@ static void test_hash_matches_handler(void) {
   CHECK(rd_gc_hash(id) == (h & 0xff));
 }
 
+/* Lookup follows the bucket's next chain to the matching thread id and returns 0 for unknown
+ * ids or a missing table instead of dereferencing garbage. */
 static void test_lookup_walks_bucket_chain(void) {
   memset(g_mem, 0, sizeof g_mem);
   const uint64_t table = MEM_BASE, e1 = MEM_BASE + 0x1000, e2 = MEM_BASE + 0x1100;
@@ -37,6 +42,9 @@ static void test_lookup_walks_bucket_chain(void) {
   CHECK(rd_gc_lookup_thread(&MEM, 0, id2) == 0);
 }
 
+/* Emulated suspend stores the registers 16-byte aligned below sp with the safety gap and
+ * publishes stack_ptr and the stop count; restart bumps the count and a new collection is seen
+ * as not stopped (run 12: without this, objects held only in registers were collected). */
 static void test_emulate_suspend_and_restart(void) {
   memset(g_mem, 0, sizeof g_mem);
   const uint64_t entry = MEM_BASE + 0x100, sp = MEM_BASE + 0x7f08;   /* misaligned on purpose */

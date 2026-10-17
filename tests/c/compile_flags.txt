@@ -1,3 +1,8 @@
 -std=gnu11
--I../../source
+-I../../source/loader
+-I../../source/bionic
+-I../../source/android
+-I../../source/engine
+-I../../source/platform
+-I../../source/game
 -I.

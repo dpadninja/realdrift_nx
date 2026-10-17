@@ -1,0 +1,12 @@
+# realdrift_nx C style (docs/CODING_STYLE.md). Not applied wholesale to inherited files;
+# use it for new code and for files being rewritten.
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 100
+PointerAlignment: Right
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments: true
+SortIncludes: Never

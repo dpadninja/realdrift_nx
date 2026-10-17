@@ -1,4 +1,5 @@
-/* Minimal host-side test harness: each test is a function; CHECK records failures. */
+/* Minimal host-side test harness: each test is a function; CHECK records failures.
+ * MIT (see LICENSE). */
 #ifndef CHECK_H
 #define CHECK_H
 #include <stdio.h>
