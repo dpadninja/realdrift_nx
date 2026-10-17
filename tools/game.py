@@ -174,3 +174,8 @@ def target_release() -> Release:
         if r.build_id == GAME.build_id:
             return r
     raise LookupError(f"no entry in RELEASES for build-id {GAME.build_id}")
+
+
+def user_archives() -> dict[str, Path]:
+    """The user's game archives by the name mods use for them (files/apk, files/obb)."""
+    return {"apk": target_release().apk, "obb": ROOT / "original" / GAME.obb_name}

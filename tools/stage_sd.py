@@ -1,12 +1,15 @@
 """Prepare the Switch SD-card folder for realdrift_nx from your own Real Drift APK and OBB.
 
     python3 stage_sd.py base.apk main.76.com.realdrift.sipon.obb
+    python3 stage_sd.py base.apk main.76.com.realdrift.sipon.obb --mods mods/hello mods/balance
+    python3 stage_sd.py --mods-only mods/hello          # update only the mods/ folder
 
 creates ./switch/realdrift_nx/ (copy the `switch` folder to the root of the SD card):
     realdrift_nx.nro                   (taken from next to this script, or --nro)
     libmain.so libunity.so libil2cpp.so  (lib/arm64-v8a/ from the APK)
     base.apk                           (the APK itself: the game data is read from it)
     main.<versionCode>.<package>.obb
+    mods/<id>/                         (with --mods: each mod folder, without its src/)
 
 The APK and OBB must be the game version the loader supports; anything else is refused.
 Needs Python 3.8+ and nothing else.
@@ -184,13 +187,38 @@ def stage(
         shutil.copyfile(nro, out / nro.name)
 
 
+MOD_INI = "mod.ini"
+MOD_SKIP = ("src",)  # source code stays on the PC
+
+
+def copy_mods(mods: list[Path], out: Path) -> list[str]:
+    """Copies each mod folder to out/mods/<folder name>, replacing an older copy.
+
+    Returns:
+        The ids (folder names) copied.
+
+    Raises:
+        ValueError: a folder has no mod.ini.
+    """
+    ids = []
+    for mod in mods:
+        if not (mod / MOD_INI).is_file():
+            raise ValueError(f"{mod}: not a mod folder (no {MOD_INI})")
+        dest = out / "mods" / mod.name
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(mod, dest, ignore=shutil.ignore_patterns(*MOD_SKIP))
+        ids.append(mod.name)
+    return ids
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command line; returns 0 on success, 1 with a one-line error otherwise."""
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("apk", type=Path, help="base.apk of Real Drift")
-    ap.add_argument("obb", type=Path, help=f"{GAME.obb_name} (or a zip containing it)")
+    ap.add_argument("apk", type=Path, nargs="?", help="base.apk of Real Drift")
+    ap.add_argument("obb", type=Path, nargs="?", help=f"{GAME.obb_name} (or a zip containing it)")
     ap.add_argument(
         "--out",
         type=Path,
@@ -203,11 +231,24 @@ def main(argv: list[str] | None = None) -> int:
         default=Path(__file__).resolve().parent / "realdrift_nx.nro",
         help="the loader (default: realdrift_nx.nro next to this script)",
     )
+    ap.add_argument("--mods", type=Path, nargs="+", default=[], help="mod folders to copy")
+    ap.add_argument("--mods-only", type=Path, nargs="+", help="copy only these mods, no game files")
     args = ap.parse_args(argv)
+    if args.mods_only:
+        try:
+            ids = copy_mods(args.mods_only, args.out)
+        except (ValueError, OSError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        print(f"done: {args.out / 'mods'} ({', '.join(ids)})")
+        return 0
+    if not args.apk or not args.obb:
+        ap.error("the APK and the OBB are required (or use --mods-only)")
     try:
         check_apk_identity(apk_strings(args.apk), GAME.package, GAME.build_id)
         nro = args.nro if args.nro.exists() else None
         stage(args.apk, args.obb, args.out, nro, GAME.version_code, GAME.build_id)
+        copy_mods(args.mods, args.out)
     except (ValueError, OSError, zipfile.BadZipFile) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

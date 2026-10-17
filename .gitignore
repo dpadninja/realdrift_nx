@@ -13,3 +13,7 @@ __pycache__/
 /build-host
 /dist
 .coverage
+
+# mods: build outputs and files made from the user's own game archives
+mods/**/mod.so
+mods/**/files/
