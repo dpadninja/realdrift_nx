@@ -15,6 +15,7 @@
 #include "shim_fs.h"
 #include "diag.h"
 #include "rd_perfstat.h"
+#include "rd_vfile.h"
 
 
 /* ---- read-ahead cache for big archive files (data.unity3d, sharedassets) ----
@@ -83,6 +84,7 @@ long ra_read(struct RaCache *c, int fd, void *buf, size_t count) {
  * archive reader see data.unity3d as empty/mis-positioned ("Unable to read
  * header from archive file"), since it lseek64(SEEK_END)s to size the file. */
 long z_lseek(int fd, long off, int whence) {
+  if (rd_vfile_is(fd)) return rd_vfile_lseek(fd, off, whence);
   struct RaCache *c = ra_find(fd);
   if (c) {   /* virtualized position -- don't touch the real fd here */
     mutexLock(&g_ra_lock);

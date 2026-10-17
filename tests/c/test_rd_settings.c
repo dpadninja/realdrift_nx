@@ -88,7 +88,8 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "smoke_amount", "5") == -1 && s.smoke_amount == 50);
   CHECK(rd_settings_set(&s, "smoke_amount", "101") == -1);
   CHECK(rd_settings_set(&s, "smoke_amount", "50%") == -1);
-  CHECK(rd_settings_count() == 18 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_count() == 19 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_set(&s, "mods", "0") == idx("mods") && s.mods == 0);   /* mods off */
 }
 
 /* config.txt written with non-default values reads back identically, and a file with missing

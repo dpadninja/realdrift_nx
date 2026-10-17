@@ -15,6 +15,7 @@ int rd_log_wanted(int level, const char *fmt) {
   return rd_log_urgent(fmt) ||
          starts(fmt, RD_LOG_TAG_BANNER) ||
          starts(fmt, RD_LOG_TAG_GC) ||
+         starts(fmt, RD_LOG_TAG_MODS) || starts(fmt, RD_LOG_TAG_MOD) ||
          (starts(fmt, "Unity:") && strstr(fmt, "Exception"));
 }
 

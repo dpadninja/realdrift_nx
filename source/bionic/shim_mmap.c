@@ -19,6 +19,7 @@
 #include "shim_fs.h"
 #include "rd_perfstat.h"
 #include "shim_mmap.h"
+#include "rd_vfile.h"
 
 // ---------------------------------------------------------------------------
 // memory
@@ -265,7 +266,10 @@ void *mmap_fake(void *addr, size_t length, int prot, int flags, int fd, long off
   } else {
     // File-backed mapping: pull [offset, offset+fill) into RAM (no real mmap).
     long got = 0;
-    if (fd >= 0) {
+    if (rd_vfile_is(fd)) {   /* a mod view of a game archive */
+      got = rd_vfile_pread(fd, p, fill, (long)offset);
+      if (got < 0) got = 0;
+    } else if (fd >= 0) {
       long cur = lseek(fd, 0, SEEK_CUR);
       if (lseek(fd, offset, SEEK_SET) >= 0) {
         while ((size_t)got < fill) {

@@ -4,7 +4,7 @@
  *
  * Every presented frame calls rd_fps_frame(); each RD_FPS_WINDOW_NS it publishes the
  * frame rate of that window and its slowest frame. rd_fps_layout() turns the text into
- * rectangles of a built-in 3x5 pixel font, so no font or texture is needed.
+ * rectangles of the built-in 3x5 pixel font (rd_text.h), so no font or texture is needed.
  * MIT (see LICENSE). */
 #ifndef RD_FPS_H
 #define RD_FPS_H
@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "rd_overlay.h"   /* rd_rect */
+#include "rd_text.h"
 
 typedef struct {
   uint64_t window_start, last;   /* ns; last == 0: no frame seen yet */
@@ -29,16 +30,14 @@ int rd_fps_frame(rd_fps *f, uint64_t now_ns, uint64_t window_ns);
 /* "59.9 FPS 17MS", or "-- FPS" before the first window. Returns the length. */
 int rd_fps_format(const rd_fps *f, char *buf, size_t n);
 
-#define RD_FPS_GLYPH_W 3
-#define RD_FPS_GLYPH_H 5
-#define RD_FPS_ADVANCE 4   /* glyph + 1 pixel gap */
+#define RD_FPS_GLYPH_W RD_TEXT_GLYPH_W
+#define RD_FPS_GLYPH_H RD_TEXT_GLYPH_H
+#define RD_FPS_ADVANCE RD_TEXT_ADVANCE
 
-/* Lays `text` out at (x, y) (top-left, y down) with font pixels of size `px`: each lit
- * horizontal run of a glyph row becomes one rectangle. Characters the font lacks are
- * blanks. Returns the number of rectangles written (at most `max`). */
+/* rd_text_layout() for the counter's text (see rd_text.h). */
 int rd_fps_layout(const char *text, float x, float y, float px, rd_rect *out, int max);
 
-/* Width of `text` laid out with pixel size `px` (no trailing gap). */
+/* rd_text_width() for the counter's text. */
 float rd_fps_text_width(const char *text, float px);
 
 #endif

@@ -36,6 +36,7 @@
 #include "android_native_unity.h"
 #include "unity_imports.h"
 #include "rd_gcbridge.h"
+#include "rd_vfile.h"
 
 extern int *__errno(void);              // newlib
 
@@ -79,6 +80,7 @@ static int dup2_stub(int a, int b) { (void)a; return b; }
 /* pread over lseek + read: seeks, reads until n bytes or EOF (fsdev can short-read), and
  * restores the file position. */
 static long pread_impl(int fd, void *buf, size_t n, long off) {
+  if (rd_vfile_is(fd)) return rd_vfile_pread(fd, buf, n, off);
   long cur = lseek(fd, 0, SEEK_CUR);
   if (cur < 0) return -1;
   if (lseek(fd, off, SEEK_SET) < 0) return -1;

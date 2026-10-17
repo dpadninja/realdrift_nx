@@ -18,6 +18,8 @@ enum { RD_LOG_MINIMAL = 0, RD_LOG_FULL = 1 };   /* config.txt debug_log=0|1 */
 #define RD_LOG_TAG_GC     "[gc]"         /* GC bridge: kept at debug_log=0 */
 #define RD_LOG_TAG_BANNER "[boot] ==="   /* start banner + build stamp: kept at debug_log=0 */
 #define RD_LOG_TAG_JNI    "[jni]"        /* per-method JNI trace: only if RD_LOG_JNI */
+#define RD_LOG_TAG_MODS   "[mods]"       /* the mod host: kept at debug_log=0 */
+#define RD_LOG_TAG_MOD    "[mod:"        /* a mod's own lines ("[mod:<id>] ..."): kept too */
 
 /* 1 if a line starting with `fmt` is written at `level`. */
 int rd_log_wanted(int level, const char *fmt);

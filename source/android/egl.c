@@ -80,6 +80,8 @@ EGLBoolean egl_SwapBuffers_log(EGLDisplay d, EGLSurface s) {
   static unsigned frame = 0;
   if (frame < 5) { frame++; nx_window_reassert(); }
   if (config.debug_fps_counter) fps_overlay_draw();
+  rd_overlay_draw_fn mod_draw = rd_overlay_mod_draw();   /* mods' text (mods/rd_mods.c) */
+  if (mod_draw) mod_draw(screen_width, screen_height);
   nxp_draw();   /* on-screen cursor overlay; saves/restores all GL state */
   const uint64_t t0 = rd_now_ns();
   const EGLBoolean r = eglSwapBuffers(d, s);

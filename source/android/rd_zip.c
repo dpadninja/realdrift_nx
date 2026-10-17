@@ -3,36 +3,7 @@
 #include <string.h>
 #include <zlib.h>
 #include "rd_zip.h"
-
-/* ZIP records (PKWARE APPNOTE 4.3): signatures, fixed sizes, field offsets used here. */
-#define ZIP_EOCD_SIG        0x06054b50u   /* end of central directory */
-#define ZIP_EOCD_SIZE       22
-#define ZIP_EOCD_MAX_COMMENT 65535
-#define ZIP_EOCD_CD_SIZE    12
-#define ZIP_EOCD_CD_OFFSET  16
-
-#define ZIP_CDH_SIG         0x02014b50u   /* central directory file header */
-#define ZIP_CDH_SIZE        46
-#define ZIP_CDH_METHOD      10
-#define ZIP_CDH_COMP_SIZE   20
-#define ZIP_CDH_SIZE_UNCOMP 24
-#define ZIP_CDH_NAME_LEN    28
-#define ZIP_CDH_EXTRA_LEN   30
-#define ZIP_CDH_COMMENT_LEN 32
-#define ZIP_CDH_LOCAL_OFF   42
-
-#define ZIP_LFH_SIG         0x04034b50u   /* local file header */
-#define ZIP_LFH_SIZE        30
-#define ZIP_LFH_NAME_LEN    26
-#define ZIP_LFH_EXTRA_LEN   28
-
-#define ZIP_STORED          0
-#define ZIP_DEFLATED        8
-
-static uint16_t le16(const uint8_t *p) { return (uint16_t)(p[0] | (p[1] << 8)); }
-/* Little-endian 32-bit value at p (zip headers are little-endian). */
-static uint32_t le32(const uint8_t *p) { return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
-                                                ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24); }
+#include "rd_zipfmt.h"
 
 /* Reads exactly n bytes at offset off; 0 or -1. */
 static int read_at(FILE *f, uint64_t off, void *buf, size_t n) {
@@ -50,9 +21,9 @@ static int find_eocd(FILE *f, uint64_t *cd_off, uint64_t *cd_size) {
   if (!buf || read_at(f, (uint64_t)end - win, buf, win)) { free(buf); return -1; }
   int ok = -1;
   for (size_t i = win - ZIP_EOCD_SIZE + 1; i-- > 0;) {
-    if (le32(buf + i) == ZIP_EOCD_SIG) {
-      *cd_size = le32(buf + i + ZIP_EOCD_CD_SIZE);
-      *cd_off = le32(buf + i + ZIP_EOCD_CD_OFFSET);
+    if (zip_le32(buf + i) == ZIP_EOCD_SIG) {
+      *cd_size = zip_le32(buf + i + ZIP_EOCD_CD_SIZE);
+      *cd_off = zip_le32(buf + i + ZIP_EOCD_CD_OFFSET);
       ok = 0;
       break;
     }
@@ -68,18 +39,18 @@ int rd_zip_find(FILE *f, const char *name, rd_zip_entry *e) {
   if (!cd || read_at(f, cd_off, cd, cd_size)) { free(cd); return -1; }
   size_t nlen = strlen(name);
   int found = -1;
-  for (uint64_t p = 0; p + ZIP_CDH_SIZE <= cd_size && le32(cd + p) == ZIP_CDH_SIG;) {
-    uint16_t fn = le16(cd + p + ZIP_CDH_NAME_LEN), ex = le16(cd + p + ZIP_CDH_EXTRA_LEN),
-             cm = le16(cd + p + ZIP_CDH_COMMENT_LEN);
+  for (uint64_t p = 0; p + ZIP_CDH_SIZE <= cd_size && zip_le32(cd + p) == ZIP_CDH_SIG;) {
+    uint16_t fn = zip_le16(cd + p + ZIP_CDH_NAME_LEN), ex = zip_le16(cd + p + ZIP_CDH_EXTRA_LEN),
+             cm = zip_le16(cd + p + ZIP_CDH_COMMENT_LEN);
     if (p + ZIP_CDH_SIZE + fn > cd_size) break;
     if (fn == nlen && !memcmp(cd + p + ZIP_CDH_SIZE, name, nlen)) {
       uint8_t lh[ZIP_LFH_SIZE];
-      uint64_t lho = le32(cd + p + ZIP_CDH_LOCAL_OFF);
-      if (read_at(f, lho, lh, sizeof lh) || le32(lh) != ZIP_LFH_SIG) break;
-      e->method = le16(cd + p + ZIP_CDH_METHOD);
-      e->comp_size = le32(cd + p + ZIP_CDH_COMP_SIZE);
-      e->size = le32(cd + p + ZIP_CDH_SIZE_UNCOMP);
-      e->data_offset = lho + ZIP_LFH_SIZE + le16(lh + ZIP_LFH_NAME_LEN) + le16(lh + ZIP_LFH_EXTRA_LEN);
+      uint64_t lho = zip_le32(cd + p + ZIP_CDH_LOCAL_OFF);
+      if (read_at(f, lho, lh, sizeof lh) || zip_le32(lh) != ZIP_LFH_SIG) break;
+      e->method = zip_le16(cd + p + ZIP_CDH_METHOD);
+      e->comp_size = zip_le32(cd + p + ZIP_CDH_COMP_SIZE);
+      e->size = zip_le32(cd + p + ZIP_CDH_SIZE_UNCOMP);
+      e->data_offset = lho + ZIP_LFH_SIZE + zip_le16(lh + ZIP_LFH_NAME_LEN) + zip_le16(lh + ZIP_LFH_EXTRA_LEN);
       found = 0;
       break;
     }

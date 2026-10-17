@@ -58,9 +58,9 @@ APP_ICON    := $(TOPDIR)/icon.jpg
 export APP_TITLE APP_AUTHOR APP_VERSION APP_ICON
 BUILD    := build
 # Layers (docs/ARCHITECTURE.md); headers are included by file name from any of them.
-LAYERS   := loader bionic android engine platform game
+LAYERS   := loader bionic android engine platform game mods
 SOURCES  := $(addprefix source/,$(LAYERS))
-INCLUDES := $(SOURCES)
+INCLUDES := $(SOURCES) sdk
 
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 

@@ -23,6 +23,11 @@ static const struct { const char *name; size_t off; } API[] = {
   { "il2cpp_string_chars",               offsetof(rd_il2cpp_api, string_chars) },
   { "il2cpp_class_get_nested_types",     offsetof(rd_il2cpp_api, class_get_nested_types) },
   { "il2cpp_class_get_name",             offsetof(rd_il2cpp_api, class_get_name) },
+  { "il2cpp_runtime_invoke",             offsetof(rd_il2cpp_api, runtime_invoke) },
+  { "il2cpp_object_new",                 offsetof(rd_il2cpp_api, object_new) },
+  { "il2cpp_object_get_class",           offsetof(rd_il2cpp_api, object_get_class) },
+  { "il2cpp_field_get_type",             offsetof(rd_il2cpp_api, field_get_type) },
+  { "il2cpp_type_get_type",              offsetof(rd_il2cpp_api, type_get_type) },
 };
 
 int rd_il2cpp_load(rd_il2cpp_api *api, rd_sym_fn sym, void *ctx,
@@ -75,6 +80,15 @@ int rd_il2cpp_field_offset(const rd_il2cpp_api *api, void *klass, const char *na
   if (!f) return 0;
   *offset = (uint32_t)api->field_get_offset(f);
   return 1;
+}
+
+int rd_il2cpp_field_info(const rd_il2cpp_api *api, void *klass, const char *name,
+                         uint32_t *offset, int *type) {
+  if (!api->field_get_type || !api->type_get_type) return 0;
+  if (!rd_il2cpp_field_offset(api, klass, name, offset)) return 0;
+  const void *t = api->field_get_type(api->class_get_field_from_name(klass, name));
+  *type = t ? api->type_get_type(t) : 0;
+  return t != NULL;
 }
 
 int rd_resolve_fields(rd_field_offset_fn lookup, void *ctx, const char *const names[], int n,

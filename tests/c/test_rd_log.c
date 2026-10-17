@@ -19,6 +19,8 @@ static void test_minimal_keeps_only_important(void) {
   CHECK(rd_log_wanted(RD_LOG_MINIMAL, "[boot] ===== realdrift_nx build %s %s =====\n"));
   CHECK(rd_log_wanted(RD_LOG_MINIMAL, "[gc] stop-the-world #%llu\n"));
   CHECK(rd_log_wanted(RD_LOG_MINIMAL, "Unity: NullReferenceException: %s"));
+  CHECK(rd_log_wanted(RD_LOG_MINIMAL, "[mods] loaded %s\n"));      /* mod problems stay visible */
+  CHECK(rd_log_wanted(RD_LOG_MINIMAL, "[mod:hello] %s\n"));
   CHECK(!rd_log_wanted(RD_LOG_MINIMAL, "Unity: LoadData\n"));
   CHECK(!rd_log_wanted(RD_LOG_MINIMAL, "[boot] frame %d rendered\n"));
   CHECK(!rd_log_wanted(RD_LOG_MINIMAL, "[io] fopen(%s,%s) -> %p\n"));

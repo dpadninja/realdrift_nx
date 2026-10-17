@@ -17,6 +17,11 @@ typedef void (*rd_add_icall_fn)(const char *name, const void *fn);
 /* n override tables (each NULL-name terminated) and the real il2cpp_add_internal_call. */
 void rd_icall_setup(const rd_icall_override *const tables[], int n, rd_add_icall_fn real);
 
+/* Adds a table consulted after the rd_icall_setup ones (mods register theirs at boot, before
+ * libunity registers its icalls). Up to RD_ICALL_MAX_EXTRA tables; returns 0, -1 if full. */
+#define RD_ICALL_MAX_EXTRA 4
+int rd_icall_add_table(const rd_icall_override *table);
+
 /* Replacement for il2cpp_add_internal_call. */
 void rd_add_internal_call(const char *name, const void *fn);
 

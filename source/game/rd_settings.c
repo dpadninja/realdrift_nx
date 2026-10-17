@@ -81,6 +81,8 @@ static const setting SETTINGS[] = {
   { "debug_fps_counter", T_SWITCH, F(debug_fps_counter),
     "# debug_fps_counter: 1 shows frames per second and the slowest frame (ms) of the last\n"
     "#   half second in the top-left corner.\n" },
+  { "mods", T_SWITCH, F(mods),
+    "\n# Mods: folders in mods/ next to this file (docs/MODDING.md). 0 = the original game.\n" },
 };
 #define NSETTINGS ((int)(sizeof SETTINGS / sizeof SETTINGS[0]))
 

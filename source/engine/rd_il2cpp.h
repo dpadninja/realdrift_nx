@@ -28,7 +28,24 @@ typedef struct {
   const uint16_t *(*string_chars)(void *str);          /* UTF-16 */
   void  *(*class_get_nested_types)(void *klass, void **iter);   /* NULL when done */
   const char *(*class_get_name)(void *klass);
+  /* Calls a method: obj is `this` (NULL for static), args points at the arguments (value types
+   * by pointer), *exc receives a thrown exception. Returns the result (boxed value types). */
+  void  *(*runtime_invoke)(const void *method, void *obj, void **args, void **exc);
+  void  *(*object_new)(void *klass);                   /* allocated, constructor NOT run */
+  void  *(*object_get_class)(void *obj);
+  const void *(*field_get_type)(void *field);
+  int    (*type_get_type)(const void *type);           /* RD_IL2CPP_TYPE_* */
 } rd_il2cpp_api;
+
+/* Il2CppTypeEnum values of the field types mods can patch (type_get_type). */
+enum {
+  RD_IL2CPP_TYPE_BOOLEAN = 0x02,
+  RD_IL2CPP_TYPE_I4      = 0x08,
+  RD_IL2CPP_TYPE_U4      = 0x09,
+  RD_IL2CPP_TYPE_I8      = 0x0a,
+  RD_IL2CPP_TYPE_R4      = 0x0c,
+  RD_IL2CPP_TYPE_R8      = 0x0d,
+};
 
 extern rd_il2cpp_api g_il2cpp;
 
@@ -61,6 +78,11 @@ int rd_il2cpp_str_eq(const rd_il2cpp_api *api, void *str, const char *s);
 /* Field offset by name; 1 on success. */
 int rd_il2cpp_field_offset(const rd_il2cpp_api *api, void *klass, const char *name,
                            uint32_t *offset);
+
+/* Offset and RD_IL2CPP_TYPE_* of a field by name; 1 on success, 0 if the field or the type
+ * API is missing. */
+int rd_il2cpp_field_info(const rd_il2cpp_api *api, void *klass, const char *name,
+                         uint32_t *offset, int *type);
 
 #define RD_MAX_FIELDS 32
 /* Field offset lookup callback: 1 and *offset if `name` exists. */

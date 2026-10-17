@@ -28,6 +28,8 @@ static inline uint64_t rd_now_ns(void) {
 #define RD_SD_FLUSH_FRAMES      120   /* commit pending SD writes (saves) ~every 2 s      */
 #define RD_CLOCK_LOG_FRAMES     3600  /* log the real CPU/GPU/EMC clocks ~every minute     */
 #define RD_SMOKE_SCAN_FRAMES    60    /* re-apply smoke settings in a race ~every second  */
+#define RD_MODS_SCENE_FRAMES    15    /* mods: check for a scene change ~4x a second       */
+#define RD_MODS_PATCH_FRAMES    60    /* mods: re-apply patch.ini to new objects ~1/s      */
 #define RD_FPS_WINDOW_NS        (RD_NS_PER_S / 2)  /* FPS overlay refresh (rd_fps.h) */
 /* A per-frame hook that ran within this many frames counts as "active" (in a race). */
 #define RD_ACTIVE_WINDOW_FRAMES 10u

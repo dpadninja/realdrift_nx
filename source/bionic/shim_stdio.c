@@ -16,6 +16,7 @@
 #include "nx_fonts.h"     /* system fonts served as /system/fonts */
 #include "rd_synth.h"
 #include "rd_perfstat.h"
+#include "rd_vfile.h"
 
 
 
@@ -34,6 +35,10 @@ FILE *fopen_fake(const char *path, const char *mode) {
     return sf;
   }
   const int writing = strpbrk(mode, "wa+") != NULL;
+  if (!writing) {   /* a game archive with mod files put in (rd_vfile.h) */
+    FILE *vf = rd_vfile_fopen(path);
+    if (vf) { debugPrintf("[io] fopen(%s,%s) -> %p [mods]\n", path, mode, (void *)vf); return vf; }
+  }
   FILE *f = fopen(path, mode);
   if (!f && writing) {            // save file: create the subdir and retry
     mkdir_parents(path);

@@ -1,4 +1,4 @@
-/* sources: source/platform/rd_fps.c */
+/* sources: source/platform/rd_fps.c source/platform/rd_text.c */
 /* Host unit test of rd_fps. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
@@ -48,7 +48,7 @@ static void test_layout(void) {
   CHECK(r[1].x == 10 && r[1].y == 22 && r[1].w == 4);
   CHECK(r[4].x == 10 && r[4].y == 28 && r[4].w == 6);
   /* the second glyph starts one advance later; space and unknown chars draw nothing */
-  CHECK(rd_fps_layout(" ?.", 0, 0, 1, r, 64) == 1 && r[0].x == 2 * RD_FPS_ADVANCE + 1 && r[0].y == 4);
+  CHECK(rd_fps_layout(" ~.", 0, 0, 1, r, 64) == 1 && r[0].x == 2 * RD_FPS_ADVANCE + 1 && r[0].y == 4);
   CHECK(rd_fps_layout("8888", 0, 0, 1, r, 3) == 3);       /* capped at max */
   CHECK(rd_fps_text_width("60", 3) == 7 * 3);
   CHECK(rd_fps_text_width("", 3) == 0);

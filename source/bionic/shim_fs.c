@@ -20,6 +20,7 @@
 #include "shim_fs.h"
 #include "nx_fonts.h"     /* system fonts served as /system/fonts */
 #include "fakefd.h"
+#include "rd_vfile.h"
 #include "diag.h"
 #include "rd_perfstat.h"
 
@@ -87,6 +88,9 @@ int open_fake(const char *path, int flags, ...) {
     // synthetic /proc, /sys (incl. self/maps)
     int sfd = synth_proc_open(path);
     if (sfd >= 0) { fd_ino_set(sfd, path); debugPrintf("[io] open(%s,0x%x) -> %d [synthetic]\n", path, flags, sfd); return sfd; }
+    /* a game archive with mod files put in (rd_vfile.h) */
+    int vfd = rd_vfile_open(path);
+    if (vfd >= 0) { debugPrintf("[io] open(%s,0x%x) -> %d [mods]\n", path, flags, vfd); return vfd; }
   }
   /* Repeat read-only open of a file we are already holding: hand back a dup and skip the
    * directory lookup entirely (see OPEN-FD CACHE above). */
@@ -324,10 +328,20 @@ int stat_fake(const char *path, struct bionic_stat *st) {
   if (r == 0) {
     convert_stat(&real, st);
     if (st->st_ino == 0) st->st_ino = path_ino(path);   // fsdev gives 0 -> synth
+    uint64_t vsize;
+    if (rd_vfile_path_size(path, &vsize) == 0) st->st_size = (long long)vsize;   /* mod view */
   }
   return r;
 }
 int fstat_fake(int fd, struct bionic_stat *st) {
+  uint64_t vsize;
+  if (rd_vfile_fd_size(fd, &vsize) == 0) {   /* a mod view: a regular read-only file */
+    memset(st, 0, sizeof *st);
+    st->st_mode = S_IFREG | 0444;
+    st->st_size = (long long)vsize;
+    st->st_ino = ((uint64_t)fd * 2654435761ULL) | 1;
+    return 0;
+  }
   struct stat real; const int r = fstat(fd, &real);
   if (r == 0) {
     convert_stat(&real, st);
@@ -392,6 +406,7 @@ long read_fake(int fd, void *buf, size_t count) {          /* [perf] read= */
  * newlib. */
 static long read_fake_inner(int fd, void *buf, size_t count) {
   if (fakefd_is_fake(fd)) return fakefd_read(fd, buf, count);
+  if (rd_vfile_is(fd)) return rd_vfile_read(fd, buf, count);
   { struct RaCache *c = ra_find(fd); if (c) return ra_read(c, fd, buf, count); }
   /* fsdev can return fewer bytes than requested for a large read; il2cpp's
    * global-metadata.dat loader (and others) assume a single read() fills the
@@ -416,6 +431,7 @@ long write_fake(int fd, const void *buf, size_t count) {
   return write(fd, buf, count);
 }
 int close_fake(int fd) {
+  if (rd_vfile_is(fd)) return rd_vfile_close(fd);
   /* Descriptor we are deliberately holding open for reuse (see OPEN-FD CACHE): swallow the
    * close. Keep g_fd_ino intact -- the mapping cache keys off it on the next open. */
   if (ofdcache_held(fd)) return 0;

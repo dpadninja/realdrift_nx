@@ -11,3 +11,7 @@ int rd_overlay_rect_tris(const rd_rect *r, int n, float *out, int max) {
   }
   return n < 0 ? 0 : n;
 }
+
+static rd_overlay_draw_fn g_mod_draw;
+void rd_overlay_set_mod_draw(rd_overlay_draw_fn fn) { g_mod_draw = fn; }
+rd_overlay_draw_fn rd_overlay_mod_draw(void) { return g_mod_draw; }

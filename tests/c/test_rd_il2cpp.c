@@ -57,6 +57,9 @@ static void *f_get_field(void *k, const char *n) {
   return k == &g_klass && !strcmp(n, "raceManager") ? &g_field : NULL;
 }
 static size_t f_field_offset(void *f) { return f == &g_field ? 0x18 : 0; }
+static int g_type;
+static const void *f_field_type(void *f) { return f == &g_field ? &g_type : NULL; }
+static int f_type_type(const void *t) { return t == &g_type ? RD_IL2CPP_TYPE_R4 : 0; }
 
 static void *fake_sym(void *ctx, const char *name) {
   (void)ctx;
@@ -76,12 +79,13 @@ static void *fake_sym(void *ctx, const char *name) {
 static int g_missing_calls;
 static void on_missing(const char *name) { (void)name; g_missing_calls++; }
 
-/* The API table reports each missing il2cpp export, and the class/field helpers work with the
- * functions that were found and return NULL/0 when the API is absent. */
+/* The API table reports each missing il2cpp export, and the class/field helpers (offset and
+ * type, which patch.ini needs) work with the functions that were found and return NULL/0 when
+ * the API is absent. */
 static void test_load_and_helpers(void) {
   rd_il2cpp_api api;
   int missing = rd_il2cpp_load(&api, fake_sym, NULL, on_missing);
-  CHECK(missing == 12 && g_missing_calls == 12);  /* all but the six provided below */
+  CHECK(missing == 17 && g_missing_calls == 17);  /* all but the six provided below */
   CHECK(api.domain_get == f_domain_get && api.field_get_offset == f_field_offset);
   CHECK(api.class_get_method_from_name == NULL && api.string_new == NULL);
   CHECK(rd_il2cpp_class(&api, "Assembly-CSharp", "", "UIManager") == &g_klass);
@@ -92,8 +96,14 @@ static void test_load_and_helpers(void) {
   const char *const names[] = { "raceManager" };
   uint32_t out[1] = { 0 };
   CHECK(rd_il2cpp_fields(&api, &g_klass, names, 1, out) && out[0] == 0x18);
+  int type = 0;
+  CHECK(!rd_il2cpp_field_info(&api, &g_klass, "raceManager", &off, &type));   /* no type API */
+  api.field_get_type = f_field_type; api.type_get_type = f_type_type;
+  CHECK(rd_il2cpp_field_info(&api, &g_klass, "raceManager", &off, &type));
+  CHECK(off == 0x18 && type == RD_IL2CPP_TYPE_R4);
+  CHECK(!rd_il2cpp_field_info(&api, &g_klass, "nope", &off, &type));
   rd_il2cpp_api none;
-  CHECK(rd_il2cpp_load(&none, NULL, NULL, NULL) == 18);
+  CHECK(rd_il2cpp_load(&none, NULL, NULL, NULL) == 23);
   CHECK(rd_il2cpp_class(&none, "Assembly-CSharp", "", "UIManager") == NULL);
 }
 

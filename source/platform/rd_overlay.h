@@ -42,4 +42,11 @@ void rd_overlay_textured(int prim, unsigned tex, const float *xy, const float *u
 /* Solid rectangles in one colour (at most RD_OVERLAY_MAX_RECTS). */
 void rd_overlay_rects(const rd_rect *rects, int n, float r, float g, float b, float a);
 
+/* A draw the mod layer adds on top of the frame (its own begin/end), called by the
+ * eglSwapBuffers wrapper; NULL = none. Set once at boot. */
+typedef void (*rd_overlay_draw_fn)(int screen_w, int screen_h);
+/* Sets the mod draw (rd_mods_boot) and returns it (the eglSwapBuffers wrapper). */
+void rd_overlay_set_mod_draw(rd_overlay_draw_fn fn);
+rd_overlay_draw_fn rd_overlay_mod_draw(void);
+
 #endif

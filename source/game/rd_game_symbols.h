@@ -58,6 +58,9 @@
  * particle API, e.g. maxParticleSize / maxParticles, is not: il2cpp_resolve_icall fails). */
 #define RD_ICALL_EMIT_OLD         "UnityEngine.ParticleSystem::Internal_EmitOld"   /* wrapped */
 #define RD_ICALL_FIND_OBJECTS     "UnityEngine.Object::FindObjectsOfType"
+/* Scene change detection for mods (mods/rd_mods.c): void (Scene *out), string (int handle) */
+#define RD_ICALL_ACTIVE_SCENE     "UnityEngine.SceneManagement.SceneManager::GetActiveScene_Injected"
+#define RD_ICALL_SCENE_NAME       "UnityEngine.SceneManagement.Scene::GetNameInternal"
 #define RD_ICALL_OBJECT_NAME      "UnityEngine.Object::GetName"
 #define RD_ICALL_GAME_OBJECT      "UnityEngine.Component::get_gameObject"
 #define RD_ICALL_SHARED_MATERIAL  "UnityEngine.Renderer::GetSharedMaterial"

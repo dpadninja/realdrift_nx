@@ -153,3 +153,12 @@ void mem_arm_overcommit(void) {
     debugPrintf("[oc] DISABLED: no usable stack hole -> heap-backed only\n");
   }
 }
+
+int mem_so_load(so_module *mod, const char *path) {
+  const int r = so_load(mod, path, heap_so_base, heap_so_limit);
+  if (r < 0) return r;
+  const size_t used = ALIGN_MEM(mod->load_size, 0x1000);
+  heap_so_base = (char *)heap_so_base + used;
+  heap_so_limit -= used;
+  return 0;
+}

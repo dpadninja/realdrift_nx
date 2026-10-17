@@ -20,6 +20,7 @@
 #include "rd_zip.h"
 #include "rd_perf.h"   /* RD_HANDHELD_* */
 #include "rd_platform.h"
+#include "rd_vfile.h"
 
 /* FakeID layout we read (must match jni_fake.c). Only the char[] fields. */
 struct FakeID { uint32_t tag; char cls[96]; char name[64]; char sig[160]; };
@@ -61,6 +62,17 @@ static int is_uh(void *p,int kind){ UHandle*h=p; return h && h->tag==UJ_TAG && h
 static void apk_asset_entry(char *out,size_t n,const char *name){
   while (name && name[0]=='/') name++;
   snprintf(out,n,"assets/%s",name?name:"");
+}
+
+/* base.apk as a stream and as a descriptor: the mod view when mods put files into it
+ * (rd_vfile.h), else the file itself. */
+static FILE *apk_fopen(const char *apk){
+  FILE *f = rd_vfile_fopen(apk);
+  return f ? f : fopen(apk,"rb");
+}
+static int apk_open(const char *apk){
+  int fd = rd_vfile_open(apk);
+  return fd >= 0 ? fd : open(apk,O_RDONLY);
 }
 
 /* Path handed to *managed* code (persistentDataPath / dataPath via the Context
@@ -220,7 +232,7 @@ void *unity_dispatch_object(void *recv, const void *id_, va_list va){ const stru
       char apk[RD_PATH_MAX], entry[RD_PATH_MAX]; rd_zip_entry e;
       snprintf(apk,sizeof apk,"%s/%s",g_root,RD_BASE_APK_NAME);
       apk_asset_entry(entry,sizeof entry,name);
-      FILE *zf = fopen(apk,"rb");
+      FILE *zf = apk_fopen(apk);
       int found = zf && rd_zip_find(zf,entry,&e)==0;
       if (zf) fclose(zf);
       /* Android can only hand out an fd for STORED entries (compressed -> exception). */
@@ -228,7 +240,7 @@ void *unity_dispatch_object(void *recv, const void *id_, va_list va){ const stru
         debugPrintf("[io] JNI AssetManager.openFd(%s) -> %s\n", name, found ? "compressed (no fd)" : "MISSING");
         return NULL;
       }
-      int fd = open(apk,O_RDONLY);
+      int fd = apk_open(apk);
       debugPrintf("[io] JNI AssetManager.openFd(%s) -> base.apk+0x%llx len %llu\n", name,
                   (unsigned long long)e.data_offset, (unsigned long long)e.size);
       if(fd<0) return NULL;
@@ -239,7 +251,7 @@ void *unity_dispatch_object(void *recv, const void *id_, va_list va){ const stru
       char apk[RD_PATH_MAX], entry[RD_PATH_MAX]; rd_zip_entry e;
       snprintf(apk,sizeof apk,"%s/%s",g_root,RD_BASE_APK_NAME);
       apk_asset_entry(entry,sizeof entry,name);
-      FILE *zf = fopen(apk,"rb");
+      FILE *zf = apk_fopen(apk);
       void *buf = (zf && rd_zip_find(zf,entry,&e)==0) ? rd_zip_read(zf,&e) : NULL;
       if (zf) fclose(zf);
       FILE *fp = buf ? fmemopen(buf, e.size ? e.size : 1, "rb") : NULL;

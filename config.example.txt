@@ -37,3 +37,6 @@ debug_log=0
 # debug_fps_counter: 1 shows frames per second and the slowest frame (ms) of the last
 #   half second in the top-left corner.
 debug_fps_counter=0
+
+# Mods: folders in mods/ next to this file (docs/MODDING.md). 0 = the original game.
+mods=1

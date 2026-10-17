@@ -71,10 +71,36 @@ static void test_second_table_captures_the_original(void) {
   CHECK(rd_icall_find(WRAPS, "UnityEngine.ParticleSystem::Internal_EmitOld") == &WRAPS[0]);
 }
 
+static int mod_fn(void) { return 5; }
+static void *g_mod_orig;
+static const rd_icall_override MOD[] = {
+  { "UnityEngine.Time::get_deltaTime", (void *)mod_fn, &g_mod_orig },
+  { "UnityEngine.Input::get_touchCount", (void *)mod_fn, NULL },   /* already the port's */
+  { NULL, NULL, NULL },
+};
+
+/* A table added by a mod is consulted after the port's own: its rows apply (with the engine
+ * function in orig), a name the port already overrides stays the port's, and the extra-table
+ * list refuses NULL and overflow. */
+static void test_extra_tables(void) {
+  g_n = 0;
+  CHECK(rd_icall_add_table(NULL) == -1);
+  CHECK(rd_icall_add_table(MOD) == 0);
+  rd_icall_setup(BOTH, 1, fake_real);
+  rd_add_internal_call("UnityEngine.Time::get_deltaTime", (void *)engine_fn);
+  rd_add_internal_call("UnityEngine.Input::get_touchCount", (void *)engine_fn);
+  CHECK(g_fn[0] == (void *)mod_fn && g_mod_orig == (void *)engine_fn);
+  CHECK(g_fn[1] == (void *)ours_touch);
+  int added = 1;
+  while (rd_icall_add_table(MOD) == 0) added++;
+  CHECK(added == RD_ICALL_MAX_EXTRA);
+}
+
 int main(void) {
   RUN(test_lookup);
   RUN(test_second_table_captures_the_original);
   RUN(test_wrapper_substitutes_known_and_forwards_others);
   RUN(test_without_real_does_not_crash);
+  RUN(test_extra_tables);   /* last: extra tables stay registered */
   return g_failures != 0;
 }

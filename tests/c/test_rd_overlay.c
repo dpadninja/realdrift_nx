@@ -26,8 +26,21 @@ static void test_capped_at_max(void) {
   CHECK(rd_overlay_rect_tris(r, -1, v, 2) == 0);
 }
 
+static int g_drawn;
+static void mod_draw(int w, int h) { g_drawn = w * h; }
+
+/* The mod draw hook starts empty (no mods: the swap wrapper draws nothing extra) and returns
+ * what rd_mods_boot set. */
+static void test_mod_draw_hook(void) {
+  CHECK(rd_overlay_mod_draw() == NULL);
+  rd_overlay_set_mod_draw(mod_draw);
+  rd_overlay_mod_draw()(2, 3);
+  CHECK(g_drawn == 6);
+}
+
 int main(void) {
   RUN(test_rect_to_two_triangles);
   RUN(test_capped_at_max);
+  RUN(test_mod_draw_hook);
   return g_failures != 0;
 }

@@ -30,6 +30,7 @@
 #include "opensles.h"
 #include "unity_entrypoints.h"
 #include "unity_input_hook.h"
+#include "rd_mods.h"
 #include "rd_gpuwait.h"
 
 volatile uint64_t g_rd_frame_start_ns = 0;   /* Read by rd_patches.c clock thread */
@@ -113,11 +114,8 @@ static void check_data(void) {
 static int load_module(so_module *mod, const char *name) {
   char path[RD_PATH_MAX];
   snprintf(path, sizeof path, "%s/%s", RD_GAME_HOME, name);
-  if (so_load(mod, path, heap_so_base, heap_so_limit) < 0)
+  if (mem_so_load(mod, path) < 0)
     return -1;
-  size_t used = ALIGN_MEM(mod->load_size, 0x1000);
-  heap_so_base = (char *)heap_so_base + used;
-  heap_so_limit -= used;
   nx_resolve_imports(mod);
   return 0;
 }
@@ -339,6 +337,7 @@ static void run_main_loop(void) {
     g_frame_count++;
     android_native_update_mode();
     android_native_feed_hid();
+    rd_mods_frame((uint32_t)frame);
 
     /* Time the engine's frame. When one blows the budget, print what happened DURING it --
      * the per-frame delta of the shim counters -- plus whether a finger was down. A tap that
@@ -419,6 +418,7 @@ int main(int argc, char *argv[]) {
   boot_load_modules();
   boot_run_init_arrays();
   boot_jni_and_input();
+  rd_mods_boot(RD_GAME_HOME);   /* before Unity opens the archives and registers icalls */
   install_bionic_tls(main_tls);
   boot_jni_onload();
   boot_resolve_natives();
