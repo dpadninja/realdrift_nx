@@ -12,6 +12,7 @@
 #include "libc_shim.h"
 #include "unity_input_hook.h"   /* nx_input_icall_table */
 #include "rd_smoke.h"          /* rd_smoke_icall_table */
+#include "egl.h"
 
 
 // ---------------------------------------------------------------------------

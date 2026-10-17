@@ -203,6 +203,45 @@ void *dlsym_fake(void *handle, const char *symbol);
 // pthread extras
 int pthread_rwlock_rdlock_fake(void **rw);
 int pthread_rwlock_wrlock_fake(void **rw);
+/* ---- pthread (shim_pthread.c) ----------------------------------------------------------
+ * bionic allocates pthread_mutex_t / pthread_cond_t inline and zero-initialises them; each is
+ * backed lazily by a heap-allocated newlib object whose pointer is stored in the caller's slot
+ * (the `**` arguments). Return values follow POSIX (0 or an error number). */
+int pthread_mutex_init_fake(pthread_mutex_t **uid, const int *attr);
+int pthread_mutex_destroy_fake(pthread_mutex_t **uid);
+int pthread_mutex_lock_fake(pthread_mutex_t **uid);
+int pthread_mutex_trylock_fake(pthread_mutex_t **uid);
+int pthread_mutex_unlock_fake(pthread_mutex_t **uid);
+int pthread_mutex_timedlock_fake(pthread_mutex_t **uid, const struct timespec *abs);
+int pthread_cond_init_fake(pthread_cond_t **cnd, const int *attr);
+int pthread_cond_broadcast_fake(pthread_cond_t **cnd);
+int pthread_cond_signal_fake(pthread_cond_t **cnd);
+int pthread_cond_destroy_fake(pthread_cond_t **cnd);
+/* Waits are capped (COND_WAIT_CAP_MS) and the deadline is re-derived on CLOCK_MONOTONIC, so a
+ * missed wake or a clock mismatch costs one re-poll instead of a hang. */
+int pthread_cond_wait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx);
+int pthread_cond_timedwait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx, const struct timespec *t);
+int pthread_once_fake(volatile int *once, void (*init)(void));
+/* Attributes live in the caller's opaque bionic pthread_attr_t (we keep stack size and
+ * detach state; scheduling attributes are ignored). */
+int pthread_mutexattr_init_fake(int *a);
+int pthread_mutexattr_settype_fake(int *a, int t);
+int pthread_attr_init_fake(void *a);
+int pthread_attr_destroy_fake(void *a);
+int pthread_attr_setdetachstate_fake(void *a, int s);
+int pthread_attr_setstacksize_fake(void *a, size_t s);
+/* Starts an engine thread: at least a 2 MB stack, its own bionic TLS block (stack guard), and
+ * registration with the stall watchdog (diag.h). */
+int pthread_create_fake(pthread_t *thread, const void *bionic_attr, void *entry, void *arg);
+int pthread_join_fake(pthread_t thread, void **retval);
+int pthread_setschedparam_fake(pthread_t t, int policy, const void *p);
+int pthread_sigmask_fake(int how, const void *set, void *old);
+/* Thread-local keys over one newlib key holding a per-thread value array (bionic key numbers
+ * are small integers starting at 1; destructors run at thread exit). */
+int pthread_key_create_fake(unsigned *key, void (*dtor)(void *));
+int pthread_key_delete_fake(unsigned key);
+void *pthread_getspecific_fake(unsigned key);
+int pthread_setspecific_fake(unsigned key, const void *value);
 int pthread_rwlock_unlock_fake(void **rw);
 int sem_init_fake(void **s, int pshared, unsigned int value);
 int sem_destroy_fake(void **s);

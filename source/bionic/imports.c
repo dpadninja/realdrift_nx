@@ -14,78 +14,28 @@
 
 #define _GNU_SOURCE
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdarg.h>
 #include <string.h>
-#include <strings.h>
 #include <malloc.h>
-#include <unistd.h>
 #include <ctype.h>
 #include <math.h>
-#include <pthread.h>
-#include <time.h>
 #include <wchar.h>
 #include <errno.h>
 #include <locale.h>
 #include <setjmp.h>
-#include <sys/time.h>
-#include <sys/stat.h>
 #include <dirent.h>
-#include <EGL/egl.h>
-#include <GLES2/gl2.h>
-#include <GLES3/gl3.h>
-#include "nx_pointer.h"
-#include "rd_fps.h"
-#include "rd_platform.h"
-#include <switch.h>
 #include "diag.h"
 
-#include "config.h"
-#include "so_util.h"
 #include "util.h"
 #include "libc_shim.h"
 #include "opensles.h"
 #include "imports.h"
+#include "egl.h"
+#include "android_log.h"
 #include "android_native_unity.h"
 #include "unity_imports.h"
-#include "rd_perfstat.h"
 #include "rd_gcbridge.h"
 
 extern int *__errno(void);              // newlib
-
-// ---------------------------------------------------------------------------
-// liblog
-// ---------------------------------------------------------------------------
-
-static int __android_log_print(int prio, const char *tag, const char *fmt, ...) {
-  (void)prio;
-#if DEBUG_LOG
-  va_list list; static char string[0x1000];
-  va_start(list, fmt); vsnprintf(string, sizeof(string), fmt, list); va_end(list);
-  debugPrintf("%s: %s\n", tag, string);
-#else
-  (void)tag; (void)fmt;
-#endif
-  return 0;
-}
-static int __android_log_write(int prio, const char *tag, const char *text) {
-  (void)prio; debugPrintf("%s: %s\n", tag, text); return 0;
-}
-static int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list va) {
-  (void)prio;
-#if DEBUG_LOG
-  static char string[0x1000]; vsnprintf(string, sizeof(string), fmt, va);
-  debugPrintf("%s: %s\n", tag, string);
-#else
-  (void)tag; (void)fmt; (void)va;
-#endif
-  return 0;
-}
-static void __assert2(const char *file, int line, const char *func, const char *expr) {
-  debugPrintf("assert: %s:%d (%s): %s\n", file, line, func, expr); abort();
-}
 
 // ---------------------------------------------------------------------------
 // stack protector / cxxabi
@@ -99,270 +49,6 @@ static void __cxa_finalize_fake(void *dso) { (void)dso; }
 
 // stdin/stdout/stderr point into the fake __sF block (see libc_shim.c)
 FILE *stderr_fake = (FILE *)&fake_sF[2];
-
-// ---------------------------------------------------------------------------
-// pthread: bionic allocates the opaque types inline and zero-inits them, so we
-// lazily back them with heap-allocated newlib objects stashed through the
-// caller's pointer slot.
-// ---------------------------------------------------------------------------
-
-static int pthread_mutex_init_fake(pthread_mutex_t **uid, const int *attr) {
-  pthread_mutex_t *m = calloc(1, sizeof(pthread_mutex_t));
-  if (!m) return -1;
-  const int recursive = (attr && *attr == 1); // bionic PTHREAD_MUTEX_RECURSIVE == 1
-  int ret;
-  if (recursive) {
-    pthread_mutexattr_t a; pthread_mutexattr_init(&a);
-    pthread_mutexattr_settype(&a, PTHREAD_MUTEX_RECURSIVE);
-    ret = pthread_mutex_init(m, &a); pthread_mutexattr_destroy(&a);
-  } else {
-    ret = pthread_mutex_init(m, NULL);
-  }
-  if (ret != 0) { free(m); return -1; }
-  *uid = m; return 0;
-}
-static int pthread_mutex_destroy_fake(pthread_mutex_t **uid) {
-  if (uid && *uid && (uintptr_t)*uid > 0x8000) { pthread_mutex_destroy(*uid); free(*uid); *uid = NULL; }
-  return 0;
-}
-static int ensure_mutex(pthread_mutex_t **uid) {
-  // A real (already-initialized) handle is a heap pointer; anything small is a
-  // bionic static initializer left in place: 0 = normal, 0x4000 = recursive,
-  // 0x8000 = errorcheck, etc. Back ALL of those with a real newlib mutex.
-  // (Was only handling 0 and 0x4000 -> a 0x8000 errorcheck static was treated
-  // as a valid pointer and locked at address 0x8000: wild deref / hang.)
-  if ((uintptr_t)*uid < 0x10000) {
-    int recursive = ((uintptr_t)*uid == 0x4000);
-    int a = 1;
-    return pthread_mutex_init_fake(uid, recursive ? &a : NULL);
-  }
-  return 0;
-}
-static int pthread_mutex_lock_fake(pthread_mutex_t **uid) {
-  if (ensure_mutex(uid) < 0) return -1;
-  if (pthread_mutex_trylock(*uid) == 0) return 0;        // uncontended: no beacon
-  diag_wait_enter(DIAG_W_MUTEX, *uid);
-  int r = pthread_mutex_lock(*uid);
-  diag_wait_exit();
-  return r;
-}
-static int pthread_mutex_trylock_fake(pthread_mutex_t **uid) { if (ensure_mutex(uid) < 0) return -1; return pthread_mutex_trylock(*uid); }
-static int pthread_mutex_unlock_fake(pthread_mutex_t **uid) { if (ensure_mutex(uid) < 0) return -1; return pthread_mutex_unlock(*uid); }
-static int pthread_mutex_timedlock_fake(pthread_mutex_t **uid, const struct timespec *abs) {
-  (void)abs;
-  if (ensure_mutex(uid) < 0) return -1;
-  for (int i = 0; i < 1000; i++) {
-    if (pthread_mutex_trylock(*uid) == 0) return 0;
-    svcSleepThread(1000000ull);
-  }
-  return ETIMEDOUT;
-}
-
-static int pthread_cond_init_fake(pthread_cond_t **cnd, const int *attr) {
-  (void)attr;
-  pthread_cond_t *c = calloc(1, sizeof(pthread_cond_t));
-  if (!c) return -1;
-  if (pthread_cond_init(c, NULL) < 0) { free(c); return -1; }
-  *cnd = c; return 0;
-}
-static int ensure_cond(pthread_cond_t **cnd) {
-  // like ensure_mutex: any small value is a bionic static cond initializer that
-  // needs a real newlib object (was only treating 0 as needing init, so a
-  // non-zero sentinel was waited/signalled on as a garbage pointer).
-  if ((uintptr_t)*cnd < 0x10000) return pthread_cond_init_fake(cnd, NULL);
-  return 0;
-}
-static int pthread_cond_broadcast_fake(pthread_cond_t **cnd) { if (ensure_cond(cnd) < 0) return -1; return pthread_cond_broadcast(*cnd); }
-static int pthread_cond_signal_fake(pthread_cond_t **cnd) { if (ensure_cond(cnd) < 0) return -1; return pthread_cond_signal(*cnd); }
-static int pthread_cond_destroy_fake(pthread_cond_t **cnd) { if (cnd && (uintptr_t)*cnd >= 0x10000) { pthread_cond_destroy(*cnd); free(*cnd); *cnd = NULL; } return 0; }
-#define COND_WAIT_CAP_MS 16
-static int pthread_cond_wait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx) {
-  if (ensure_cond(cnd) < 0 || ensure_mutex(mtx) < 0) return -1;
-  diag_wait_enter(DIAG_W_COND, *cnd);
-  // Cap the UNTIMED wait too (not just the timed one below). Unity's engine
-  // (job system, GfxDevice sync, PreloadManager) blocks the main thread in a
-  // plain pthread_cond_wait; a raced/lost pthread_cond_signal -- or a
-  // bionic-static-cond object mismatch across signal/wait -- would then hang the
-  // whole engine forever (every worker idle, UnityMain parked in
-  // svcWaitProcessWideKeyAtomic == the observed frame-2 deadlock). Waking every
-  // ~16ms and returning as a spurious wakeup lets the caller re-check its
-  // predicate (POSIX-legal: correct waiters always loop on the predicate), which
-  // breaks a lost-wakeup stall without changing correct behaviour.
-  struct timespec cap;
-  clock_gettime(CLOCK_MONOTONIC, &cap);
-  long add = COND_WAIT_CAP_MS * 1000000L;
-  cap.tv_sec  += (cap.tv_nsec + add) / 1000000000L;
-  cap.tv_nsec  = (cap.tv_nsec + add) % 1000000000L;
-  int r = pthread_cond_timedwait(*cnd, *mtx, &cap);
-  diag_wait_exit();
-  return (r == ETIMEDOUT) ? 0 : r;   // timeout -> report as spurious wakeup
-}
-// Bound every timed cond-wait to at most COND_WAIT_CAP_MS. The .so libs (libc++
-// std::condition_variable, and Swappy's frame pacer) compute an ABSOLUTE deadline
-// against CLOCK_MONOTONIC, but newlib/libnx's pthread_cond_timedwait may measure
-// "now" against a different clock -- a mismatch turns a ~16 ms vsync wait into an
-// effectively infinite one (the Swappy hang: engine wedged in condvarWaitTimeout,
-// frame counter frozen, black screen). Re-deriving the deadline as
-// now(MONOTONIC)+min(requested, CAP) guarantees the wait can't exceed the cap
-// regardless of which clock newlib uses, so the pacer hits its timeout fallback
-// and keeps pacing. Spurious/early wakeups are POSIX-legal (every correct waiter
-// re-checks its predicate), so this is safe in general.
-static int pthread_cond_timedwait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx, const struct timespec *t) {
-  if (ensure_cond(cnd) < 0 || ensure_mutex(mtx) < 0) return -1;
-  struct timespec now, cap;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  long add = COND_WAIT_CAP_MS * 1000000L;
-  cap.tv_sec  = now.tv_sec + (now.tv_nsec + add) / 1000000000L;
-  cap.tv_nsec = (now.tv_nsec + add) % 1000000000L;
-  // honor the caller's deadline if it's sooner than our cap; else clamp to cap
-  const struct timespec *use = &cap;
-  if (t && (t->tv_sec < cap.tv_sec ||
-            (t->tv_sec == cap.tv_sec && t->tv_nsec <= cap.tv_nsec)))
-    use = t;
-  diag_wait_enter(DIAG_W_COND, *cnd);
-  int r = pthread_cond_timedwait(*cnd, *mtx, use);
-  diag_wait_exit();
-  return r;
-}
-
-static int pthread_once_fake(volatile int *once, void (*init)(void)) {
-  if (!once || !init) return -1;
-  if (__sync_lock_test_and_set(once, 1) == 0) (*init)();
-  return 0;
-}
-
-static int pthread_mutexattr_init_fake(int *a) { if (a) *a = 0; return 0; }
-static int pthread_mutexattr_settype_fake(int *a, int t) { if (a) *a = t; return 0; }
-
-// bionic pthread_attr_t is opaque storage we own; stash size/detach there
-#define ATTR_MAGIC 0x41545452 /* 'ATTR' */
-typedef struct { uint32_t magic; uint32_t detach; size_t stacksize; } OurAttr;
-
-static int pthread_attr_init_fake(void *a) { if (a) { OurAttr *o = a; o->magic = ATTR_MAGIC; o->detach = 0; o->stacksize = 0; } return 0; }
-static int pthread_attr_destroy_fake(void *a) { (void)a; return 0; }
-static int pthread_attr_setdetachstate_fake(void *a, int s) { if (a) { OurAttr *o = a; if (o->magic == ATTR_MAGIC) o->detach = (uint32_t)s; } return 0; }
-static int pthread_attr_setstacksize_fake(void *a, size_t s) { if (a) { OurAttr *o = a; if (o->magic == ATTR_MAGIC) o->stacksize = s; } return 0; }
-
-typedef struct { void *(*entry)(void *); void *arg; int is_main; uint8_t tls[BIONIC_TLS_SIZE]; } ThreadStart;
-static volatile int g_first_engine_thread_taken = 0;
-static void *thread_trampoline(void *p) {
-  ThreadStart *ts = (ThreadStart *)p;   /* leaked on purpose: tpidr points into ts->tls */
-  install_bionic_tls(ts->tls);          // this thread's OWN stack-guard block (tpidr_el0+0x28)
-  diag_thread_register(ts->entry, ts->is_main);
-  void *r = ts->entry(ts->arg);
-  diag_thread_unregister();
-  return r;
-}
-static int pthread_create_fake(pthread_t *thread, const void *bionic_attr, void *entry, void *arg) {
-  ThreadStart *ts = malloc(sizeof(*ts));
-  if (!ts) return -1;
-  ts->entry = (void *(*)(void *))entry;
-  ts->arg = arg;
-  ts->is_main = (__sync_lock_test_and_set(&g_first_engine_thread_taken, 1) == 0);
-  size_t stack = 0;
-  if (bionic_attr) {
-    const OurAttr *o = bionic_attr;
-    if (o->magic == ATTR_MAGIC) stack = o->stacksize;
-  }
-  if (stack < (2u << 20)) stack = 2u << 20; // 2 MB floor for the heavy engine threads
-  pthread_attr_t attr; pthread_attr_init(&attr);
-  pthread_attr_setstacksize(&attr, stack);
-  const int r = pthread_create(thread, &attr, thread_trampoline, ts);
-  pthread_attr_destroy(&attr);
-  if (r != 0) { free(ts); return r; }
-  return 0;
-}
-static int pthread_join_fake(pthread_t thread, void **retval) {
-  diag_wait_enter(DIAG_W_JOIN, (const void *)(uintptr_t)thread);
-  int r = pthread_join(thread, retval);
-  diag_wait_exit();
-  return r;
-}
-static int pthread_setschedparam_fake(pthread_t t, int policy, const void *p) { (void)t; (void)policy; (void)p; return 0; }
-static int pthread_sigmask_fake(int how, const void *set, void *old) { (void)how; (void)set; (void)old; return 0; }
-
-// ---------------------------------------------------------------------------
-// pthread TLS keys, multiplexed over a single real newlib key.
-// devkitA64 backs pthread keys with a tiny pool (~16 libnx TLS slots), but
-// Unity's runtime creates dozens during init (46 call sites). The ~17th
-// pthread_key_create returns EAGAIN, and libunity treats that as fatal
-// (asserts the key was created, else BRK). bionic allows 128 keys; emulate
-// that: one real key holds a per-thread value array for up to 128 fake keys.
-// ---------------------------------------------------------------------------
-#define FAKE_KEYS_MAX 128
-static pthread_mutex_t g_key_mutex = PTHREAD_MUTEX_INITIALIZER;
-static struct { int used; void (*dtor)(void *); } g_key_table[FAKE_KEYS_MAX];
-static pthread_key_t g_master_key;
-static int g_master_key_ready;
-typedef struct { void *values[FAKE_KEYS_MAX]; } KeyValues;
-
-static void master_key_dtor(void *p) {
-  KeyValues *kv = p;
-  for (int iter = 0; iter < 4; iter++) {     // POSIX: rerun while dtors set new values
-    int again = 0;
-    for (int i = 0; i < FAKE_KEYS_MAX; i++) {
-      void *v = kv->values[i];
-      if (g_key_table[i].used && g_key_table[i].dtor && v) {
-        kv->values[i] = NULL;
-        g_key_table[i].dtor(v);
-        again = 1;
-      }
-    }
-    if (!again) break;
-  }
-  free(kv);
-}
-
-static int pthread_key_create_fake(unsigned *key, void (*dtor)(void *)) {
-  pthread_mutex_lock(&g_key_mutex);
-  if (!g_master_key_ready) {
-    if (pthread_key_create(&g_master_key, master_key_dtor) != 0) {
-      pthread_mutex_unlock(&g_key_mutex);
-      debugPrintf("pthread_key_create_fake: master key alloc failed\n");
-      return EAGAIN;
-    }
-    g_master_key_ready = 1;
-  }
-  for (unsigned i = 0; i < FAKE_KEYS_MAX; i++) {
-    if (!g_key_table[i].used) {
-      g_key_table[i].used = 1;
-      g_key_table[i].dtor = dtor;
-      *key = i + 1;                 // 1-based: a zeroed key is invalid
-      pthread_mutex_unlock(&g_key_mutex);
-      return 0;
-    }
-  }
-  pthread_mutex_unlock(&g_key_mutex);
-  debugPrintf("pthread_key_create_fake: out of keys\n");
-  return EAGAIN;
-}
-
-static int pthread_key_delete_fake(unsigned key) {
-  if (key == 0 || key > FAKE_KEYS_MAX) return EINVAL;
-  pthread_mutex_lock(&g_key_mutex);
-  g_key_table[key - 1].used = 0;
-  g_key_table[key - 1].dtor = NULL;
-  pthread_mutex_unlock(&g_key_mutex);
-  return 0;
-}
-
-static void *pthread_getspecific_fake(unsigned key) {
-  if (key == 0 || key > FAKE_KEYS_MAX || !g_master_key_ready) return NULL;
-  KeyValues *kv = pthread_getspecific(g_master_key);
-  return kv ? kv->values[key - 1] : NULL;
-}
-
-static int pthread_setspecific_fake(unsigned key, const void *value) {
-  if (key == 0 || key > FAKE_KEYS_MAX || !g_master_key_ready) return EINVAL;
-  KeyValues *kv = pthread_getspecific(g_master_key);
-  if (!kv) {
-    kv = calloc(1, sizeof(*kv));
-    if (!kv) return ENOMEM;
-    pthread_setspecific(g_master_key, kv);
-  }
-  kv->values[key - 1] = (void *)value;
-  return 0;
-}
 
 // ---------------------------------------------------------------------------
 // misc small shims
@@ -451,125 +137,6 @@ static size_t z_strlen(const char *s) { return s ? strlen(s) : 0; }
 
 // engine-facing NDK functions implemented elsewhere ------------------------
 // libandroid: ALooper / ANativeWindow in android_native_unity.h; the sensor queue here.
-extern int   ASensorEventQueue_enableSensor(void *, const void *);
-extern int   ASensorEventQueue_disableSensor(void *, const void *);
-extern int   ASensorEventQueue_setEventRate(void *, const void *, int32_t);
-extern int   ASensorEventQueue_getEvents(void *, void *, size_t);
-
-// ---------------------------------------------------------------------------
-// EGL surface-size fixup
-// ---------------------------------------------------------------------------
-
-// switch-mesa returns 0 for EGL_WIDTH/EGL_HEIGHT on the window surface even
-// though it renders full-screen; the engine trusts that and sets a 0x0 viewport
-// (nothing draws). Hand back the real panel size instead.
-static EGLBoolean egl_QuerySurface_log(EGLDisplay d, EGLSurface s, EGLint attr, EGLint *val) {
-  EGLBoolean r = eglQuerySurface(d, s, attr, val);
-  if (val) {
-    if (attr == 0x3057 /*EGL_WIDTH*/  && *val <= 0) { *val = screen_width;  r = EGL_TRUE; }
-    if (attr == 0x3056 /*EGL_HEIGHT*/ && *val <= 0) { *val = screen_height; r = EGL_TRUE; }
-  }
-  return r;
-}
-
-// SINGLETON window surface. libnx's one NWindow hosts exactly one swapchain, but Unity
-// creates the window surface then re-creates it on gfx-state recreation; a 2nd
-// eglCreateWindowSurface on the same NWindow corrupts the buffer queue and the present
-// faults the vi compositor. So create it once and hand the same EGLSurface back; no-op destroy.
-static EGLSurface g_win_surface = NULL;
-static void      *g_win_native  = NULL;
-extern EGLSurface eglCreateWindowSurface(EGLDisplay, EGLConfig, void *, const EGLint *);
-static EGLSurface egl_CreateWindowSurface_log(EGLDisplay d, EGLConfig cfg, void *win, const EGLint *al) {
-  if (g_win_surface && g_win_native == win) return g_win_surface;
-  EGLSurface sfc = eglCreateWindowSurface(d, cfg, win, al);
-  if (sfc && sfc != (EGLSurface)0) { g_win_surface = sfc; g_win_native = win; }
-  nx_window_reassert();   /* mesa may reset the nwindow crop/transform when it builds its swapchain */
-  return sfc;
-}
-extern EGLBoolean eglDestroySurface(EGLDisplay, EGLSurface);
-static EGLBoolean egl_DestroySurface_keep(EGLDisplay d, EGLSurface s) {
-  if (s && s == g_win_surface) return EGL_TRUE;   /* keep the one swapchain alive */
-  return eglDestroySurface(d, s);
-}
-
-
-/* config.txt debug_fps_counter: frame rate of the presented frames, top-left. The text is
- * laid out again only when rd_fps publishes a new value (twice a second). */
-static void fps_overlay_draw(void) {
-  static rd_fps fps = RD_FPS_INIT;
-  static rd_rect glyphs[RD_OVERLAY_MAX_RECTS], panel;
-  static int nglyphs = -1;
-  if (rd_fps_frame(&fps, rd_now_ns(), RD_FPS_WINDOW_NS) || nglyphs < 0) {
-    char text[32];
-    rd_fps_format(&fps, text, sizeof text);
-    const float px = 3.0f * (float)screen_height / 720.0f;   /* 3 px at 720p, 4.5 at 1080p */
-    const float pad = px, margin = 2.0f * px;
-    panel = (rd_rect){ margin, margin, rd_fps_text_width(text, px) + 2.0f * pad,
-                       RD_FPS_GLYPH_H * px + 2.0f * pad };
-    nglyphs = rd_fps_layout(text, margin + pad, margin + pad, px, glyphs,
-                            (int)(sizeof glyphs / sizeof glyphs[0]));
-  }
-  if (!rd_overlay_begin(screen_width, screen_height)) return;
-  rd_overlay_rects(&panel, 1, 0.0f, 0.0f, 0.0f, 0.6f);
-  rd_overlay_rects(glyphs, nglyphs, 1.0f, 1.0f, 0.2f, 1.0f);
-  rd_overlay_end();
-}
-
-static EGLBoolean egl_SwapBuffers_log(EGLDisplay d, EGLSurface s) {
-  /* Re-assert the nwindow transform for the first few frames while mesa settles its swapchain. */
-  static unsigned frame = 0;
-  if (frame < 5) { frame++; nx_window_reassert(); }
-  if (config.debug_fps_counter) fps_overlay_draw();
-  nxp_draw();   /* on-screen cursor overlay; saves/restores all GL state */
-  const uint64_t t0 = rd_now_ns();
-  const EGLBoolean r = eglSwapBuffers(d, s);
-  __atomic_add_fetch(&nx_stat_swap_ns, rd_now_ns() - t0, __ATOMIC_RELAXED);
-  return r;
-}
-
-/* GL calls that can block until the GPU is done with a buffer (uploads, maps, syncs). The
- * time spent in them goes to nx_stat_glwait_ns -> "gl=" in the [perf] line: large values on
- * slow frames mean the CPU waits for the GPU there (e.g. re-uploading the smoke's particle
- * mesh into a buffer the GPU still reads). Unity gets them through eglGetProcAddress. */
-#define GL_TIMED(call) do {                                                      \
-    const uint64_t _t0 = rd_now_ns();                                            \
-    call;                                                                        \
-    __atomic_add_fetch(&nx_stat_glwait_ns, rd_now_ns() - _t0, __ATOMIC_RELAXED); \
-  } while (0)
-
-static void (*real_glBufferSubData)(GLenum, GLintptr, GLsizeiptr, const void *);
-static void *(*real_glMapBufferRange)(GLenum, GLintptr, GLsizeiptr, GLbitfield);
-static GLboolean (*real_glUnmapBuffer)(GLenum);
-static GLenum (*real_glClientWaitSync)(GLsync, GLbitfield, GLuint64);
-
-static void timed_glBufferData(GLenum t, GLsizeiptr n, const void *d, GLenum u) {
-  GL_TIMED(glBufferData(t, n, d, u));
-}
-static void timed_glBufferSubData(GLenum t, GLintptr o, GLsizeiptr n, const void *d) {
-  GL_TIMED(real_glBufferSubData(t, o, n, d));
-}
-static void *timed_glMapBufferRange(GLenum t, GLintptr o, GLsizeiptr n, GLbitfield a) {
-  void *r; GL_TIMED(r = real_glMapBufferRange(t, o, n, a)); return r;
-}
-static GLboolean timed_glUnmapBuffer(GLenum t) {
-  GLboolean r; GL_TIMED(r = real_glUnmapBuffer(t)); return r;
-}
-static GLenum timed_glClientWaitSync(GLsync s, GLbitfield f, GLuint64 timeout) {
-  GLenum r; GL_TIMED(r = real_glClientWaitSync(s, f, timeout)); return r;
-}
-static void timed_glFinish(void) { GL_TIMED(glFinish()); }
-
-void *egl_GetProcAddress_timed(const char *name) {
-  void *real = (void *)eglGetProcAddress(name);
-  if (!real || !name) return real;
-#define TIMED(fn) if (!strcmp(name, #fn)) { real_##fn = real; return (void *)&timed_##fn; }
-  TIMED(glBufferSubData) TIMED(glMapBufferRange) TIMED(glUnmapBuffer) TIMED(glClientWaitSync)
-#undef TIMED
-  if (!strcmp(name, "glBufferData")) return (void *)&timed_glBufferData;
-  if (!strcmp(name, "glFinish"))     return (void *)&timed_glFinish;
-  return real;
-}
-
 // --- NDK/libc imports newer Unity versions need (kept: harmless, tested by coverage) ---
 // Frame pacing: newer Unity uses the NDK AChoreographer (Android Frame Pacing / Swappy)
 // for vsync callbacks. We drive frames from our own loop, so report the choreographer
@@ -596,7 +163,6 @@ static long  z_process_vm_readv(int pid, const void *lv, unsigned long lc,
 static char  *z_gnu_strerror_r(int e, char *buf, size_t n){
   if (buf && n) { strncpy(buf, strerror(e), n); buf[n-1] = 0; return buf; }
   return strerror(e); }
-extern int ALooper_removeFd(ALooper *l, int fd);   // android_native_unity.c
 
 // ---------------------------------------------------------------------------
 // import table
