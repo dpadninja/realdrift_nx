@@ -1,4 +1,4 @@
-/* sources: source/rd_modimage.c */
+/* sources: source/loader/rd_modimage.c */
 #include <string.h>
 #include "check.h"
 #include "rd_modimage.h"

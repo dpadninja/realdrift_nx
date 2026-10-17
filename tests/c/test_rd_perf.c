@@ -1,4 +1,4 @@
-/* sources: source/rd_perf.c */
+/* sources: source/platform/rd_perf.c */
 #include "check.h"
 #include "rd_perf.h"
 

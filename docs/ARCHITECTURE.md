@@ -84,4 +84,86 @@ through the documented entry points of the upper layer's headers.
 
 ## File map
 
-Filled in by the layout move; see the directory listing of each layer and each file's header comment.
+One line per module; each file's header comment has the details.
+
+### loader
+
+| File | Purpose |
+|---|---|
+| `main.c` | entry point: memory layout, loading the libraries, the Unity lifecycle, the main loop |
+| `so_util.{c,h}` | load an arm64 ELF shared object into the reserved region, relocate it, find symbols |
+| `rd_modimage.{c,h}` | a loaded module as an `rd_image` for the pattern search |
+| `rd_codeaddr.{c,h}` | is a stack word a plausible return address into a loaded module (backtraces) |
+| `util.{c,h}` | `debugPrintf`, the buffered `debug.log` |
+| `rd_log.{c,h}` | which log lines `debug_log=0` keeps and which must reach the SD card at once |
+| `error.{c,h}` | fatal error screen |
+| `nx_crash_handler.{c,h}` | CPU exception handler: registers and backtrace into the log |
+| `diag.{c,h}` | thread registry and stall watchdog: dumps every thread when frames stop |
+
+### bionic
+
+| File | Purpose |
+|---|---|
+| `imports.{c,h}` | the main import table (libc, libm, pthread, EGL/GLES, NDK) and import resolution |
+| `rd_imports.c` | imports of this game build the inherited tables did not have |
+| `libc_shim.{c,h}` | bionic ABI on top of newlib: struct conversions, file system, mmap, stdio, stubs |
+| `fakefd.{c,h}` | in-process pipes for the engine's pipe()-based thread signalling |
+| `rd_iov.{c,h}` | `writev` on top of `write` |
+| `rd_synth.{c,h}` | stdio access to the synthetic `/proc` and `/sys` files |
+
+### android
+
+| File | Purpose |
+|---|---|
+| `jni_fake.{c,h}` | the fake `JNIEnv` / `JavaVM` and the generic Java object model |
+| `jni_unimpl.h` | generated stubs that log any JNI function slot nobody implemented |
+| `unity_jni.{c,h}` | real behaviour for the Java classes Unity needs (Context, AssetManager, prefs, ...) |
+| `android_native_unity.{c,h}` | NDK: `ANativeWindow` over the Switch window, `ALooper`, sensors, input |
+| `opensles.{c,h}` | the OpenSL ES subset FMOD uses, mixed into one SDL2 audio device |
+| `rd_zip.{c,h}` | read single entries of `base.apk` (stored or deflated) for the AssetManager |
+| `rd_meta.{c,h}` | `ApplicationInfo.metaData` values from the manifest |
+| `rd_features.{c,h}` | `PackageManager.hasSystemFeature()` answers |
+| `rd_apkpath.{c,h}` | what `Context.getPackageCodePath()` returns |
+
+### engine
+
+| File | Purpose |
+|---|---|
+| `rd_il2cpp.{c,h}` | the il2cpp runtime API, resolved once, plus helpers (classes, fields, arrays, strings) |
+| `rd_icall.{c,h}` | replace or wrap engine icalls by name at registration |
+| `rd_sig.{c,h}` | masked AArch64 instruction-pattern search |
+| `rd_patchsites.{c,h}` | the patterns that locate every engine patch site and GC variable |
+| `rd_patches.{c,h}` | apply the libunity patches; the background clock thread (CPU boost, log flush) |
+| `rd_a64.{c,h}` | AArch64 instruction encode/decode helpers |
+| `rd_gcbridge.{c,h}` | Boehm GC stop-the-world without POSIX signals |
+| `unity_imports.{c,h}` | imports specific to the Unity/IL2CPP engine |
+| `unity_glue.c` | the fake UnityPlayer / Context / Surface objects the engine is driven with |
+| `unity_input_hook.{c,h}` | `UnityEngine.Input` icalls fed from the Switch touch screen and cursor |
+| `unity_entrypoints.h` | signatures of the `UnityPlayer` natives |
+
+### platform
+
+| File | Purpose |
+|---|---|
+| `rd_platform.h` | timing constants, main-loop cadences, buffer sizes, `rd_now_ns()`, the frame clock |
+| `rd_device.h` | the Android device the port pretends to be (SDK level, ABI, cores, RAM) |
+| `nx_pointer.{c,h}` | pad, touch screen, USB mouse, gyro and the on-screen cursor |
+| `nx_fonts.{c,h}` | the console's shared fonts as Android system fonts for Unity's fallback |
+| `rd_overlay.{c,h}`, `rd_overlay_gl.c` | 2D drawing on top of the finished frame (cursor, FPS counter) |
+| `rd_fps.{c,h}` | the debug FPS counter: counting and the built-in pixel font |
+| `rd_gpuwait.{c,h}` | time mesa waits for the display and the GPU; real clock rates in the log |
+| `rd_perf.{c,h}` | render resolution choice and CPU boost while loading |
+
+### game
+
+| File | Purpose |
+|---|---|
+| `rd_game.h` | identity of the supported game build and its file names |
+| `rd_game_symbols.h` | C# classes, methods, fields and icalls the hooks use, by name |
+| `rd_settings.{c,h}`, `config.{c,h}` | `config.txt`: the settings table, parsing, writing, defaults |
+| `rd_drive.{c,h}`, `rd_drive_hook.c` | controller driving: button mapping (pure) and the car-controller hook |
+| `rd_race.{c,h}`, `rd_race_hook.c` | race HUD: hide touch controls, pause button |
+| `rd_smoke.{c,h}`, `rd_smoke_hook.c` | lighter tyre smoke through the particle Emit icall |
+| `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
+
+`main.c` is the composition root: it may include headers of every layer to wire them together.

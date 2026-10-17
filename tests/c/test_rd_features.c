@@ -1,4 +1,4 @@
-/* sources: source/rd_features.c */
+/* sources: source/android/rd_features.c */
 #include "check.h"
 #include "rd_features.h"
 

@@ -1,4 +1,4 @@
-/* sources: source/rd_codeaddr.c */
+/* sources: source/loader/rd_codeaddr.c */
 #include <elf.h>
 #include "check.h"
 #include "rd_codeaddr.h"

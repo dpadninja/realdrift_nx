@@ -1,4 +1,4 @@
-/* sources: source/rd_settings.c source/rd_perf.c */
+/* sources: source/game/rd_settings.c source/platform/rd_perf.c */
 #include <string.h>
 #include "check.h"
 #include "rd_settings.h"

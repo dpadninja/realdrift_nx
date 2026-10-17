@@ -1,4 +1,4 @@
-/* sources: source/rd_smoke.c */
+/* sources: source/game/rd_smoke.c */
 #include "check.h"
 #include "rd_smoke.h"
 

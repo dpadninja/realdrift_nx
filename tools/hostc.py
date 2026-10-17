@@ -19,12 +19,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CC = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
+# One -I per layer directory of source/ (headers are included by file name), plus tests/c.
+LAYER_DIRS = sorted(d for d in (ROOT / "source").iterdir() if d.is_dir())
 CFLAGS = [
     "-std=gnu11",
     "-Wall",
     "-Wextra",
     "-Werror",
-    f"-I{ROOT / 'source'}",
+    *(f"-I{d}" for d in LAYER_DIRS),
     f"-I{ROOT / 'tests/c'}",
 ]
 SANITIZE = ["-fsanitize=address,undefined"]

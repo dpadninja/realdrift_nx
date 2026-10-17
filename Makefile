@@ -44,8 +44,10 @@ APP_VERSION := 0.1.0
 APP_ICON    := $(TOPDIR)/icon.jpg
 export APP_TITLE APP_AUTHOR APP_VERSION APP_ICON
 BUILD    := build
-SOURCES  := source
-INCLUDES := source
+# Layers (docs/ARCHITECTURE.md); headers are included by file name from any of them.
+LAYERS   := loader bionic android engine platform game
+SOURCES  := $(addprefix source/,$(LAYERS))
+INCLUDES := $(SOURCES)
 
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
@@ -59,7 +61,7 @@ CFLAGS  += -DLOAD_ADDRESS=0xC0000000
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
 ASFLAGS  := -g $(ARCH)
 LDFLAGS   = -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-# mesa's display/GPU waits, timed in source/rd_gpuwait.c
+# mesa's display/GPU waits, timed in source/platform/rd_gpuwait.c
 LDFLAGS  += -Wl,--wrap=nwindowDequeueBuffer -Wl,--wrap=nvFenceWait -Wl,--wrap=nwindowSetSwapInterval
 
 # mesa GLES3 + EGL + nouveau (force the GLES path); SDL2 for window/HID/audio; zlib.

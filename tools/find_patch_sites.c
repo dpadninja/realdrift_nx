@@ -1,4 +1,4 @@
-/* sources: source/rd_patchsites.c source/rd_sig.c source/rd_a64.c */
+/* sources: source/engine/rd_patchsites.c source/engine/rd_sig.c source/engine/rd_a64.c */
 /* find_patch_sites -- run the loader's pattern finders (source/rd_patchsites.c) on .so files.
  *
  *   make tools        (or: python -m tools.hostc tools/find_patch_sites.c build-host/find_patch_sites)

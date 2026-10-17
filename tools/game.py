@@ -1,4 +1,4 @@
-"""The supported game build and its files, read from source/rd_game.h.
+"""The supported game build and its files, read from source/game/rd_game.h.
 
 rd_game.h is the one place the loader defines them; tools and tests import these values
 instead of repeating them.
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GAME_H = ROOT / "source/rd_game.h"
+GAME_H = ROOT / "source/game/rd_game.h"
 
 # Analysis artefacts per release (gitignored; extracted from the user's own APKs).
 ANALYSIS = ROOT / "analysis"

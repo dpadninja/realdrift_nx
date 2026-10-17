@@ -1,4 +1,4 @@
-/* sources: source/rd_apkpath.c */
+/* sources: source/android/rd_apkpath.c */
 #include <string.h>
 #include "check.h"
 #include "rd_apkpath.h"

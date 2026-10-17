@@ -1,4 +1,4 @@
-/* sources: source/config.c source/rd_settings.c */
+/* sources: source/game/config.c source/game/rd_settings.c */
 /* Writes config.txt with every key at its default value (used by tests/test_config_example.py
  * to keep config.example.txt in sync with write_config()). */
 #include "config.h"

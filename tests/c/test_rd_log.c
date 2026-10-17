@@ -1,4 +1,4 @@
-/* sources: source/rd_log.c */
+/* sources: source/loader/rd_log.c */
 #include "check.h"
 #include "rd_log.h"
 

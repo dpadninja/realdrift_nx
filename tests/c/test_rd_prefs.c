@@ -1,4 +1,4 @@
-/* sources: source/rd_prefs.c */
+/* sources: source/game/rd_prefs.c */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

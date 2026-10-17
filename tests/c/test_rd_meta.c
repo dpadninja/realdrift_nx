@@ -1,4 +1,4 @@
-/* sources: source/rd_meta.c */
+/* sources: source/android/rd_meta.c */
 #include <string.h>
 #include "check.h"
 #include "config.h"

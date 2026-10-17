@@ -1,4 +1,4 @@
-/* sources: source/rd_sig.c */
+/* sources: source/engine/rd_sig.c */
 #include "check.h"
 #include "rd_sig.h"
 

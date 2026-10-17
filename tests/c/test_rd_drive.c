@@ -1,4 +1,4 @@
-/* sources: source/rd_drive.c */
+/* sources: source/game/rd_drive.c */
 #include <string.h>
 #include "check.h"
 #include "rd_drive.h"

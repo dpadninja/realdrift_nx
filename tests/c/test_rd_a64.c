@@ -1,4 +1,4 @@
-/* sources: source/rd_a64.c */
+/* sources: source/engine/rd_a64.c */
 #include <stdint.h>
 #include "check.h"
 #include "rd_a64.h"

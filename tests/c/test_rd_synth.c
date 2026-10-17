@@ -1,4 +1,4 @@
-/* sources: source/rd_synth.c */
+/* sources: source/bionic/rd_synth.c */
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>

@@ -1,4 +1,4 @@
-/* sources: source/rd_overlay.c */
+/* sources: source/platform/rd_overlay.c */
 #include "check.h"
 #include "rd_overlay.h"
 

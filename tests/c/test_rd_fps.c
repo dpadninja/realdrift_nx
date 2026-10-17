@@ -1,4 +1,4 @@
-/* sources: source/rd_fps.c */
+/* sources: source/platform/rd_fps.c */
 #include <string.h>
 #include "check.h"
 #include "rd_fps.h"

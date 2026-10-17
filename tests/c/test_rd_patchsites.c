@@ -1,4 +1,4 @@
-/* sources: source/rd_patchsites.c source/rd_sig.c source/rd_a64.c */
+/* sources: source/engine/rd_patchsites.c source/engine/rd_sig.c source/engine/rd_a64.c */
 #include <string.h>
 #include "check.h"
 #include "rd_patchsites.h"

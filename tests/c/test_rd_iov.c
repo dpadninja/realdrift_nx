@@ -1,4 +1,4 @@
-/* sources: source/rd_iov.c */
+/* sources: source/bionic/rd_iov.c */
 #include <string.h>
 #include "check.h"
 #include "rd_iov.h"

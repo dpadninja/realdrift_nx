@@ -1,4 +1,4 @@
-/* sources: source/rd_race.c */
+/* sources: source/game/rd_race.c */
 #include "check.h"
 #include "rd_race.h"
 
