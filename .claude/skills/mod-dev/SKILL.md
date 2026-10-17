@@ -1,6 +1,6 @@
 ---
 name: mod-dev
-description: Writing, fixing or reviewing a Real Drift mod (mods/<id>/ with mod.ini, patch.ini, files/, src/*.c -> mod.so). Use for any mod work instead of reading the port's sources.
+description: Writing, fixing or reviewing a Real Drift mod (mods/<id>/ with mod.ini, patch.ini, assets.ini, src/*.c -> mod.so). Use for any mod work instead of reading the port's sources.
 ---
 
 # Writing a realdrift_nx mod
@@ -26,12 +26,13 @@ uv run python tools/stage_sd.py --mods-only mods/<id> --out sd/switch/realdrift_
 ## Rules
 
 - Data first: a field the game reads every frame -> `patch.ini`, no code.
+- Art and texts -> `assets.ini` (`mod_assets list` prints ready lines); never commit `files/`
+  built from the game.
 - Engine function -> `icall_override` (only in `rd_mod_entry`); Unity message (Update, ...) ->
   `method_swap`; any other C# method -> `inline_hook(method_code(...))`.
 - Class lookups only from `on_game_ready` on; keep pointers in statics.
 - Hooked C# methods: C signature + trailing `MethodInfo*`; call `orig` to keep the game's work.
 - Check every return value; log failures with `api->log` (one line, not per frame).
-- `files/` built from the user's archives is never committed or shipped (`.gitignore`).
 - C style of the port (`c-style` skill), MIT header in every file.
 - Unsure whether something reaches the console? `mod_check`, then ask the user to test and
   send `debug.log` (`[mods]` and `[mod:<id>]` lines).

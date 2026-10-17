@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 import zipfile
 from dataclasses import dataclass, field
@@ -35,16 +34,24 @@ from elftools.common.exceptions import ELFError
 from elftools.elf.elffile import ELFFile
 from elftools.elf.relocation import RelocationSection
 from elftools.elf.sections import SymbolTableSection
+from PIL import Image
 
-from tools import hostc
 from tools.game import ROOT, target_release, user_archives
 from tools.il2cpp_find import TypeDef, find_types
 from tools.il2cpp_find import load as load_dump
 from tools.import_coverage import table_symbols
+from tools.mod_assets import (
+    ASSETS_INI,
+    EDITABLE,
+    Asset,
+    parse_assets_ini,
+    plan_build,
+    scan,
+    texture_size,
+)
+from tools.mod_ini import PatchLine, read_mod
 from tools.unity_ref import library_icalls
 
-CHECKER_SRC = ROOT / "tools" / "mod_ini_check.c"
-CHECKER = ROOT / "build-host" / "mod_ini_check"
 ENTRY = "rd_mod_entry"
 # Relocations so_util.c applies (R_AARCH64_*).
 LOADER_RELOCS = {
@@ -75,56 +82,12 @@ class Report:
         self.warnings.append(msg)
 
 
-@dataclass(frozen=True)
-class PatchLine:
-    """One patch.ini value as the port reads it."""
-
-    line: int
-    assembly: str
-    cls: str  # "Ns.Class" or "Class", nested as "Outer/Inner"
-    field: str
-    value: str
-
-
-def checker() -> Path:
-    """The mod_ini_check binary, rebuilt when its sources are newer.
-
-    Raises:
-        RuntimeError: it does not build.
-    """
-    sources = [CHECKER_SRC, *hostc.linked_sources(CHECKER_SRC)]
-    if not CHECKER.exists() or any(s.stat().st_mtime > CHECKER.stat().st_mtime for s in sources):
-        run = hostc.build(CHECKER_SRC, CHECKER)
-        if run.returncode != 0:
-            raise RuntimeError(f"cannot build {CHECKER_SRC.name}:\n{run.stderr}")
-    return CHECKER
-
-
-def parse_checker_output(text: str) -> tuple[dict[str, str], list[PatchLine], list[str]]:
-    """The info keys, patch lines and errors printed by mod_ini_check."""
-    info: dict[str, str] = {}
-    patches: list[PatchLine] = []
-    errors: list[str] = []
-    for line in text.splitlines():
-        kind, _, rest = line.partition(" ")
-        if kind == "info":
-            key, _, value = rest.partition("=")
-            info[key] = value
-        elif kind == "patch":
-            num, asm, cls, fld, value = (rest.split(" ", 4) + [""] * 5)[:5]
-            patches.append(PatchLine(int(num), asm, cls, fld, value))
-        elif kind == "error":
-            errors.append(rest)
-    return info, patches, errors
-
-
 def check_ini(mod: Path, rep: Report) -> tuple[dict[str, str], list[PatchLine]]:
     """mod.ini and patch.ini through the port's parser."""
-    run = subprocess.run([str(checker()), str(mod)], capture_output=True, text=True, check=False)
-    info, patches, errors = parse_checker_output(run.stdout)
-    for e in errors:
+    ini = read_mod(mod)
+    for e in ini.errors:
         rep.error(e)
-    return info, patches
+    return ini.info, ini.patches
 
 
 def field_type(types: list[TypeDef], t: TypeDef, name: str) -> str | None:
@@ -230,7 +193,43 @@ def check_files(mod: Path, rep: Report) -> None:
                 rep.warn(f"files/{sub}/{f} is not in {path.name}: it will be ADDED, not replaced")
 
 
-def check_mod(mod: Path, types: list[TypeDef] | None, game_icalls: set[str] | None) -> Report:
+def check_assets(mod: Path, rep: Report, assets: list[Asset] | None) -> None:
+    """assets.ini: names resolve to one editable object, files exist, PNGs have the size."""
+    wanted, errors = parse_assets_ini(mod)
+    for e in errors:
+        rep.error(e)
+    if not wanted:
+        return
+    rep.notes.append(f"{len(wanted)} assets")
+    if assets is None:
+        rep.warn("no base.apk / OBB in original/: assets.ini names not checked")
+        return
+    plan = plan_build([mod.name], {mod.name: wanted}, assets)
+    for e in plan.errors:
+        rep.error(e.removeprefix(f"{mod.name}: "))
+    for reps in plan.members.values():
+        for r in reps:
+            size = texture_size(r.asset)
+            if size and Image.open(r.wanted.file).size != size:
+                got = "x".join(map(str, Image.open(r.wanted.file).size))
+                rep.error(
+                    f"{ASSETS_INI}:{r.wanted.line}: {r.wanted.file.name} is {got}, "
+                    f"{r.wanted.name} is {size[0]}x{size[1]}"
+                )
+            raw = mod / "files" / r.asset.archive / r.asset.member
+            if raw.is_file():
+                rep.warn(
+                    f"files/{r.asset.archive}/{r.asset.member} is replaced by the build of "
+                    f"{ASSETS_INI}; remove it"
+                )
+
+
+def check_mod(
+    mod: Path,
+    types: list[TypeDef] | None,
+    game_icalls: set[str] | None,
+    assets: list[Asset] | None = None,
+) -> Report:
     """All checks of one mod folder."""
     rep = Report()
     if not (mod / "mod.ini").is_file():
@@ -243,6 +242,7 @@ def check_mod(mod: Path, types: list[TypeDef] | None, game_icalls: set[str] | No
     if (mod / "mod.so").is_file():
         check_so(mod / "mod.so", rep, game_icalls)
     check_files(mod, rep)
+    check_assets(mod, rep, assets)
     return rep
 
 
@@ -260,16 +260,27 @@ def load_context() -> tuple[list[TypeDef] | None, set[str] | None]:
     return types, icalls
 
 
+def load_assets(mods: list[Path]) -> list[Asset] | None:
+    """The game's editable objects when a mod has assets.ini and the archives exist."""
+    archives = user_archives()
+    if not any((m / ASSETS_INI).is_file() for m in mods):
+        return []
+    if not any(p.is_file() for p in archives.values()):
+        return None
+    return list(scan(archives, EDITABLE))
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command line: checks each mod folder given."""
     ap = argparse.ArgumentParser(description="Check realdrift_nx mod folders.")
     ap.add_argument("mods", nargs="+", type=Path, help="mod folders (mods/<id>)")
     args = ap.parse_args(argv)
     types, icalls = load_context()
+    assets = load_assets(args.mods)
     failed = 0
     for mod in args.mods:
         try:
-            rep = check_mod(mod, types, icalls)
+            rep = check_mod(mod, types, icalls, assets)
         except RuntimeError as e:
             print(f"mod_check: {e}", file=sys.stderr)
             return 1

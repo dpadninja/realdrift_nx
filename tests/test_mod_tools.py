@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from tools import hostc, mod_build, mod_check, mod_new, stage_sd
+from tools import hostc, mod_build, mod_check, mod_ini, mod_new, stage_sd
 from tools.game import ROOT, target_release, user_archives
 from tools.il2cpp_find import parse_dump
 
@@ -160,11 +160,11 @@ def test_parse_checker_output():
     """The checker's output lines become info, patch lines (values may contain spaces) and
     errors.
     """
-    info, patches, errors = mod_check.parse_checker_output(
+    info, patches, errors = mod_ini.parse_checker_output(
         "info id=a\npatch 3 Assembly-CSharp Ns.Cls f a b\nerror bad thing\n"
     )
     assert info == {"id": "a"} and errors == ["bad thing"]
-    assert patches == [mod_check.PatchLine(3, "Assembly-CSharp", "Ns.Cls", "f", "a b")]
+    assert patches == [mod_ini.PatchLine(3, "Assembly-CSharp", "Ns.Cls", "f", "a b")]
 
 
 def test_no_mod_ini():
@@ -267,3 +267,63 @@ def test_stage_mods_only(tmp_path, capsys):
     with pytest.raises(SystemExit):
         stage_sd.main(["--out", str(out)])
     assert stage_sd.main(["--mods-only", str(tmp_path), "--out", str(out)]) == 1
+
+
+# ---- assets.ini in mod_check and stage_sd -------------------------------------------------
+
+
+def test_check_assets(tmp_path):
+    """assets.ini is checked like the build would: names against the game's objects, files,
+    and a texture PNG of the wrong size; without the archives only a warning.
+    """
+    from PIL import Image
+
+    from tools.mod_assets import Asset
+
+    mod = write_mod(tmp_path, "a", "id = a\napi = 1\n")
+    (mod / "art").mkdir()
+    Image.new("RGBA", (4, 4)).save(mod / "art" / "logo.png")
+    (mod / "assets.ini").write_text("Logo = art/logo.png\nNope = art/logo.png\nbad\n")
+    assets = [Asset("obb", "assets/bin/Data/aaa", 1, "Texture2D", "Logo", "4x2 RGB24")]
+    rep = mod_check.Report()
+    mod_check.check_assets(mod, rep, assets)
+    text = "\n".join(rep.errors)
+    assert 'not "Name = file"' in text and "0 editable objects named 'Nope'" in text
+    assert "logo.png is 4x4, Logo is 4x2" in text
+    rep = mod_check.Report()
+    mod_check.check_assets(mod, rep, None)
+    assert "names not checked" in rep.warnings[0]
+
+
+def test_stage_builds_assets_and_skips_art(tmp_path, monkeypatch):
+    """Staging a mod with assets.ini runs the asset build on the staged copy and leaves art/
+    and assets.ini on the PC.
+    """
+    import tools.mod_assets
+
+    calls = []
+    monkeypatch.setattr(tools.mod_assets, "build", lambda mods, out: calls.append(out) or ([], []))
+    out = tmp_path / "sd"
+    assert stage_sd.copy_mods([EXAMPLES / "retexture"], out) == ["retexture"]
+    assert calls == [out / "mods"]
+    staged = out / "mods" / "retexture"
+    assert (staged / "mod.ini").is_file()
+    assert not (staged / "art").exists() and not (staged / "assets.ini").exists()
+
+
+def test_stage_without_the_tools(tmp_path, monkeypatch):
+    """The standalone stage_sd.py (no repository tools) says how to build asset mods instead
+    of failing with a traceback.
+    """
+    import builtins
+
+    real_import = builtins.__import__
+
+    def no_tools(name, *a, **kw):
+        if name == "tools.mod_assets":
+            raise ImportError("no module")
+        return real_import(name, *a, **kw)
+
+    monkeypatch.setattr(builtins, "__import__", no_tools)
+    with pytest.raises(ValueError, match="need the realdrift_nx tools"):
+        stage_sd.build_assets([EXAMPLES / "retexture"], tmp_path)

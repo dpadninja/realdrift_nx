@@ -9,7 +9,8 @@ creates ./switch/realdrift_nx/ (copy the `switch` folder to the root of the SD c
     libmain.so libunity.so libil2cpp.so  (lib/arm64-v8a/ from the APK)
     base.apk                           (the APK itself: the game data is read from it)
     main.<versionCode>.<package>.obb
-    mods/<id>/                         (with --mods: each mod folder, without its src/)
+    mods/<id>/                         (with --mods: each mod folder without src/ and art/;
+                                        assets.ini replacements built from your own archives)
 
 The APK and OBB must be the game version the loader supports; anything else is refused.
 Needs Python 3.8+ and nothing else.
@@ -188,7 +189,8 @@ def stage(
 
 
 MOD_INI = "mod.ini"
-MOD_SKIP = ("src",)  # source code stays on the PC
+ASSETS_INI = "assets.ini"
+MOD_SKIP = ("src", "art", ASSETS_INI)  # sources stay on the PC; assets are built instead
 
 
 def copy_mods(mods: list[Path], out: Path) -> list[str]:
@@ -209,7 +211,30 @@ def copy_mods(mods: list[Path], out: Path) -> list[str]:
             shutil.rmtree(dest)
         shutil.copytree(mod, dest, ignore=shutil.ignore_patterns(*MOD_SKIP))
         ids.append(mod.name)
+    build_assets(mods, out / "mods")
     return ids
+
+
+def build_assets(mods: list[Path], mods_out: Path) -> None:
+    """Builds the files of mods with an assets.ini into the staged copies (tools/mod_assets.py).
+
+    Raises:
+        ValueError: the build fails, or the realdrift_nx tools are not available.
+    """
+    if not any((m / ASSETS_INI).is_file() for m in mods):
+        return
+    try:
+        from tools.mod_assets import build  # needs UnityPy: only for mods with assets.ini
+    except ImportError as e:
+        raise ValueError(
+            f"mods with {ASSETS_INI} need the realdrift_nx tools: run "
+            f"`uv run python tools/stage_sd.py ...` in the repository ({e})"
+        ) from e
+    written, warnings = build(mods, mods_out)
+    for w in warnings:
+        print(f"warning: {w}", file=sys.stderr)
+    for f in written:
+        print(f"built {f}")
 
 
 def main(argv: list[str] | None = None) -> int:

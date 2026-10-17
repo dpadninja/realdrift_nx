@@ -1,19 +1,23 @@
-"""Find, export and replace the game's textures and text assets for asset mods.
+"""Asset mods by name: find the game's textures and texts, and build the files replacing them.
 
-The game's assets live in base.apk and the OBB as Unity serialized files (one archive member
-each). A mod replaces a whole member: this tool loads the member from your own archive with
-UnityPy, swaps one object's content, and writes the modified member into the mod's
-files/apk or files/obb folder, where the port serves it in place of the original
-(source/bionic/rd_vfile.h). Only the mod's replaced members are written -- never ship the
-game's own files.
+A mod lists its replacements by object name in assets.ini:
+
+    MainMenu_Options = art/options.png        # Texture2D: a PNG of the same size
+    SomeConfig       = text/config.txt        # TextAsset: any bytes
+    Logo@e3dd51a5... = art/logo.png           # name@member GUID when the name is not unique
+
+`build` turns the assets.ini of several mods into the Unity files the port serves
+(mods/<id>/files/<apk|obb>/<member>, source/bionic/rd_vfile.h): each member is loaded once
+from YOUR base.apk / OBB, every replacement of every mod in it is applied, the result is read
+back, and the file goes to the highest-priority mod that touches the member. Mods load in the
+port's order (priority, then id); when two change the same object the first wins and the
+other gets a warning. stage_sd.py --mods runs it; the built files go to the SD copy only.
 
     uv run python -m tools.mod_assets list --name 'MainMenu_' --type Texture2D
     uv run python -m tools.mod_assets export MainMenu_Options options.png
-    uv run python -m tools.mod_assets replace MainMenu_Options my.png --mod mods/retexture
+    uv run python -m tools.mod_assets build mods/retexture --out sd/switch/realdrift_nx/mods
 
-A name must match exactly one object; add --member (from `list`) when several do.
-Textures keep their size and format; the replacement is read back and compared before the
-file is written. Members split by Unity (*.splitN) cannot be replaced.
+`list` prints lines ready for assets.ini. Members split by Unity (*.splitN) cannot be changed.
 
 MIT (see LICENSE).
 """
@@ -136,39 +140,6 @@ def export(archives: dict[str, Path], a: Asset, out: Path) -> None:
         raise ValueError(f"{a.type} cannot be exported (Texture2D and TextAsset can)")
 
 
-def replace(archives: dict[str, Path], a: Asset, src: Path, mod: Path) -> Path:
-    """Puts `src` into asset a and writes the modified member under mod/files/<archive>/.
-
-    Returns:
-        The written file.
-
-    Raises:
-        ValueError: wrong size, unsupported type or split member, or the read-back differs.
-    """
-    if SPLIT.search(a.member):
-        raise ValueError(f"{a.member} is split by Unity; split members cannot be replaced")
-    env, obj, d = load_object(archives, a)
-    img: Image.Image | None = None
-    if obj.type.name == "Texture2D":
-        img = Image.open(src).convert("RGBA")
-        if img.size != (d.m_Width, d.m_Height):
-            size = f"{img.size[0]}x{img.size[1]}"
-            raise ValueError(f"{src.name} is {size}, the texture is {d.m_Width}x{d.m_Height}")
-        d.image = img
-        d.save()
-    elif obj.type.name == "TextAsset":
-        d.m_Script = src.read_bytes().decode("utf-8", "surrogateescape")
-        d.save()
-    else:
-        raise ValueError(f"{a.type} cannot be replaced (Texture2D and TextAsset can)")
-    data = env.file.save()
-    check_roundtrip(data, a, img)
-    out = mod / "files" / a.archive / a.member
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(data)
-    return out
-
-
 def check_roundtrip(data: bytes, a: Asset, img: Image.Image | None) -> None:
     """Reloads the written member and checks the object is there with the new content.
 
@@ -186,8 +157,209 @@ def check_roundtrip(data: bytes, a: Asset, img: Image.Image | None) -> None:
             raise ValueError("the texture reads back different (format not encodable by UnityPy)")
 
 
+ASSETS_INI = "assets.ini"
+ASSET_LINE = re.compile(r"^(?P<name>[^=@]+?)(?:@(?P<member>[^=\s]+))?\s*=\s*(?P<file>.+?)\s*$")
+
+
+@dataclass(frozen=True)
+class Wanted:
+    """One assets.ini line: put `file` into the object called `name`."""
+
+    mod: str  # mod id (folder name)
+    line: int
+    name: str
+    member: str | None  # GUID or member path when given as name@member
+    file: Path
+
+
+@dataclass(frozen=True)
+class Replacement:
+    """A Wanted line resolved to one object of the game."""
+
+    wanted: Wanted
+    asset: Asset
+
+
+@dataclass
+class Plan:
+    """What build writes: replacements per member, the mod that owns each member's file."""
+
+    members: dict[tuple[str, str], list[Replacement]]  # (archive, member) -> replacements
+    owner: dict[tuple[str, str], str]  # (archive, member) -> mod id
+    errors: list[str]
+    warnings: list[str]
+
+
+def parse_assets_ini(mod: Path) -> tuple[list[Wanted], list[str]]:
+    """The lines of mod/assets.ini (none if absent) and the errors of the bad ones."""
+    path = mod / ASSETS_INI
+    if not path.is_file():
+        return [], []
+    wanted: list[Wanted] = []
+    errors: list[str] = []
+    for num, raw in enumerate(path.read_text().splitlines(), 1):
+        text = raw.split("#", 1)[0].strip()
+        if not text or text.startswith(";"):
+            continue
+        m = ASSET_LINE.match(text)
+        if not m:
+            errors.append(f'{ASSETS_INI}:{num}: not "Name = file"')
+            continue
+        wanted.append(Wanted(mod.name, num, m["name"].strip(), m["member"], mod / m["file"]))
+    return wanted, errors
+
+
+def texture_size(a: Asset) -> tuple[int, int] | None:
+    """Width and height from a texture's `list` detail ("230x96 RGB24")."""
+    m = re.match(r"(\d+)x(\d+) ", a.detail + " ")
+    return (int(m[1]), int(m[2])) if m and a.type == "Texture2D" else None
+
+
+def plan_build(order: list[str], wanted: dict[str, list[Wanted]], assets: list[Asset]) -> Plan:
+    """Resolves every mod's lines (mods in load order) and groups them by archive member.
+
+    A name must resolve to exactly one editable object; an object claimed by an earlier mod
+    stays with it. The first mod to touch a member owns the member's file.
+    """
+    plan = Plan({}, {}, [], [])
+    taken: dict[tuple[str, str, int], str] = {}
+    for mod in order:
+        for w in wanted.get(mod, []):
+            where = f"{mod}: {ASSETS_INI}:{w.line}"
+            found = select(iter(assets), w.name, w.member)
+            if len(found) != 1:
+                cands = ", ".join(f"{a.name}@{a.member.removeprefix(DATA_PREFIX)}" for a in found)
+                plan.errors.append(
+                    f"{where}: {len(found)} editable objects named {w.name!r}"
+                    + (f" ({cands}): add @<member>" if found else "")
+                )
+                continue
+            a = found[0]
+            if SPLIT.search(a.member):
+                plan.errors.append(f"{where}: {w.name} is in {a.member}, split by Unity")
+                continue
+            if not w.file.is_file():
+                plan.errors.append(f"{where}: {w.file} does not exist")
+                continue
+            key = (a.archive, a.member, a.path_id)
+            if key in taken:
+                plan.warnings.append(
+                    f"{where}: {w.name} is also replaced by {taken[key]}, which wins"
+                )
+                continue
+            taken[key] = mod
+            m = (a.archive, a.member)
+            plan.members.setdefault(m, []).append(Replacement(w, a))
+            plan.owner.setdefault(m, mod)
+    return plan
+
+
+def apply_member(
+    archives: dict[str, Path], member: tuple[str, str], reps: list[Replacement]
+) -> bytes:
+    """The member with all its replacements applied and read back.
+
+    Raises:
+        ValueError: a PNG has the wrong size, or a replacement does not read back.
+    """
+    archive, name = member
+    with zipfile.ZipFile(archives[archive]) as z:
+        env: Any = UnityPy.load(z.read(name))  # UnityPy's types do not know .file.save()
+    objs = {o.path_id: o for o in env.objects}
+    images: dict[int, Image.Image | None] = {}
+    for r in reps:
+        obj = objs[r.asset.path_id]
+        d = obj.read()
+        if obj.type.name == "Texture2D":
+            img = Image.open(r.wanted.file).convert("RGBA")
+            if img.size != (d.m_Width, d.m_Height):
+                size = f"{img.size[0]}x{img.size[1]}"
+                raise ValueError(
+                    f"{r.wanted.mod}: {r.wanted.file.name} is {size}, "
+                    f"{r.wanted.name} is {d.m_Width}x{d.m_Height}"
+                )
+            d.image = img
+            images[r.asset.path_id] = img
+        else:
+            d.m_Script = r.wanted.file.read_bytes().decode("utf-8", "surrogateescape")
+            images[r.asset.path_id] = None
+        d.save()
+    data: bytes = env.file.save()
+    for r in reps:
+        check_roundtrip(data, r.asset, images[r.asset.path_id])
+    return data
+
+
+def mod_order(mods: list[Path]) -> list[str]:
+    """Mod ids in the port's load order: priority descending, then id (source/mods/rd_modhost.c)."""
+    from tools.mod_ini import read_mod  # here: the C parser is only needed to build
+
+    prio = {m.name: read_mod(m).priority for m in mods}
+    return sorted(prio, key=lambda i: (-prio[i], i))
+
+
+def build(
+    mods: list[Path], out: Path, archives: dict[str, Path] | None = None
+) -> tuple[list[Path], list[str]]:
+    """Builds the replaced members of `mods` (folders) under out/<owner id>/files/.
+
+    Returns:
+        The written files and the warnings.
+
+    Raises:
+        ValueError: any error (all of them, one per line).
+    """
+    archives = archives or user_archives()
+    wanted: dict[str, list[Wanted]] = {}
+    errors: list[str] = []
+    for m in mods:
+        lines, errs = parse_assets_ini(m)
+        wanted[m.name] = lines
+        errors += [f"{m.name}: {e}" for e in errs]
+    if not any(wanted.values()):
+        return [], []
+    plan = plan_build(mod_order(mods), wanted, list(scan(archives, EDITABLE)))
+    errors += plan.errors
+    by_id = {m.name: m for m in mods}
+    for (archive, member), owner in plan.owner.items():
+        for m in mods:
+            if (m / "files" / archive / member).is_file():
+                errors.append(
+                    f"{m.name}: files/{archive}/{member} is also built from assets.ini "
+                    f"({owner}); remove one"
+                )
+    if errors:
+        raise ValueError("\n".join(errors))
+    written = []
+    for key, reps in plan.members.items():
+        dest = out / by_id[plan.owner[key]].name / "files" / key[0] / key[1]
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(apply_member(archives, key, reps))
+        written.append(dest)
+    return written, plan.warnings
+
+
+def list_assets(
+    archives: dict[str, Path], rx: re.Pattern[str], kind: str | None, archive: str | None
+) -> int:
+    """Prints matching objects; editable ones as assets.ini lines (name@member when needed)."""
+    wanted = {k: v for k, v in archives.items() if not archive or k == archive}
+    assets = [a for a in scan(wanted, (kind,) if kind else TYPES) if rx.search(a.name)]
+    count: dict[str, int] = {}
+    for a in scan(archives, EDITABLE):
+        count[a.name] = count.get(a.name, 0) + 1
+    for a in assets:
+        guid = a.member.removeprefix(DATA_PREFIX)
+        if a.type in EDITABLE:
+            name = a.name if count.get(a.name) == 1 else f"{a.name}@{guid}"
+            print(f"{name} = <file>    # {a.line()}")
+        else:
+            print(f"# {a.line()}   (not editable)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Command line: list / export / replace."""
+    """Command line: list / export / build."""
     ap = argparse.ArgumentParser(description="Game assets for asset mods (UnityPy).")
     sub = ap.add_subparsers(dest="cmd", required=True)
     ls = sub.add_parser("list", help="named objects, one line each")
@@ -198,23 +370,26 @@ def main(argv: list[str] | None = None) -> int:
     ex.add_argument("name")
     ex.add_argument("out", type=Path)
     ex.add_argument("--member", help="archive member (GUID) when the name is not unique")
-    rp = sub.add_parser("replace", help="write a mod file with this object replaced")
-    rp.add_argument("name")
-    rp.add_argument("file", type=Path, help="PNG for a texture, any file for a TextAsset")
-    rp.add_argument("--mod", type=Path, required=True, help="the mod folder")
-    rp.add_argument("--member", help="archive member (GUID) when the name is not unique")
+    bd = sub.add_parser("build", help="assets.ini of mods -> their files/ under --out")
+    bd.add_argument("mods", nargs="+", type=Path, help="mod folders")
+    bd.add_argument("--out", type=Path, required=True, help="where the mods are staged")
     args = ap.parse_args(argv)
     archives = user_archives()
     if not any(p.is_file() for p in archives.values()):
         print("mod_assets: no base.apk / OBB in original/", file=sys.stderr)
         return 1
     if args.cmd == "list":
-        rx = re.compile(args.name)
-        types = (args.type,) if args.type else TYPES
-        wanted = {k: v for k, v in archives.items() if not args.archive or k == args.archive}
-        for a in scan(wanted, types):
-            if rx.search(a.name):
-                print(a.line())
+        return list_assets(archives, re.compile(args.name), args.type, args.archive)
+    if args.cmd == "build":
+        try:
+            written, warnings = build(args.mods, args.out, archives)
+        except (ValueError, OSError) as e:
+            print(f"mod_assets: {e}", file=sys.stderr)
+            return 1
+        for w in warnings:
+            print(f"warning: {w}", file=sys.stderr)
+        for f in written:
+            print(f)
         return 0
     found = select(scan(archives, EDITABLE), args.name, args.member)
     if len(found) != 1:
@@ -224,11 +399,8 @@ def main(argv: list[str] | None = None) -> int:
             print(a.line(), file=sys.stderr)
         return 1
     try:
-        if args.cmd == "export":
-            export(archives, found[0], args.out)
-            print(args.out)
-        else:
-            print(replace(archives, found[0], args.file, args.mod))
+        export(archives, found[0], args.out)
+        print(args.out)
     except (ValueError, OSError) as e:
         print(f"mod_assets: {e}", file=sys.stderr)
         return 1

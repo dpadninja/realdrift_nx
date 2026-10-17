@@ -12,8 +12,9 @@ MIT (see LICENSE).
 mods/<id>/
   mod.ini      required: id, api, and the mod's own keys
   patch.ini    optional: values for fields of the game's objects
-  files/apk/   optional: files replacing base.apk members (same paths)
-  files/obb/   optional: files replacing OBB members (same paths)
+  assets.ini   optional: game textures / texts replaced by the mod's files, by name
+  art/         the files assets.ini names (stays on the PC, like src/)
+  files/       advanced: whole archive files (files/apk/<member>, files/obb/<member>)
   mod.so       optional: native code, built from src/*.c
   src/         the mod's C sources (stays on the PC)
 ```
@@ -70,20 +71,27 @@ limiterRPM = 9500
 
 ## Replacing assets
 
-`files/apk/<member>` and `files/obb/<member>` replace (or add) archive members. The port shows
-Unity a view of the archive with them put in; the archives themselves are not changed.
+`assets.ini` names what to replace; the mod ships only its own files:
 
-```sh
-uv run python -m tools.mod_assets list --name 'MainMenu_' --type Texture2D
-uv run python -m tools.mod_assets export MainMenu_Options options.png
-uv run python -m tools.mod_assets replace MainMenu_Options my.png --mod mods/mymod
+```ini
+MainMenu_Options = art/options.png     # Texture2D: a PNG of the same size
+SomeConfig       = text/config.txt     # TextAsset: any bytes
+Logo@e3dd51a5... = art/logo.png        # name@member when the name is not unique
 ```
 
-`replace` writes the whole member file with one object changed (textures keep size and
-format; text assets take any bytes) and checks it reads back. Members split by Unity
-(`*.splitN`) cannot be replaced. A member file contains the game's own data besides your
-change: **build it from your own game files and never publish it**; publish the mod with its
-art and the `mod_assets` command instead (see `mods/examples/retexture/mod.ini`).
+```sh
+uv run python -m tools.mod_assets list --name 'MainMenu_' --type Texture2D   # ready lines
+uv run python -m tools.mod_assets export MainMenu_Options options.png         # the original
+```
+
+`stage_sd.py --mods` builds the Unity files from your own base.apk / OBB into the SD copy
+(`mods/<id>/files/...`); nothing derived from the game is kept in the mod. Replacements of all
+staged mods in one Unity file are merged into one file; only the same object in two mods is a
+conflict (the higher priority wins, the other is warned). Split members (`*.splitN`) cannot
+be changed. `mod_check` checks names, files and texture sizes.
+
+`files/` holds whole archive members for what assets.ini cannot express; such a file
+contains the game's data, so build it from your own files and never publish it.
 
 ## Code (mod.so)
 
@@ -125,7 +133,7 @@ stubs): hook the function they jump to.
 |---|---|
 | `hello` | the template: `ini`, `log`, `on_scene`, `on_frame`, `draw_text` |
 | `balance` | a data-only mod: `patch.ini` raises the rev limiter |
-| `retexture` | an asset mod: the Options button with new art (made with `mod_assets`) |
+| `retexture` | an asset mod: `assets.ini` gives the Options button new art |
 | `fov` | `inline_hook` on `UnityEngine.Camera.set_fieldOfView`, scaled by a mod.ini key |
 
 ## Limits
@@ -137,5 +145,5 @@ stubs): hook the function they jump to.
   what can be caught before the console.
 - `inline_hook` patches code while the game runs; hook in `on_game_ready` (the main thread,
   before the method is busy). Up to 256 hooks in all.
-- Two mods cannot replace the same archive file or the same icall (the higher priority wins).
+- Two mods cannot replace the same object, raw file or icall (the higher priority wins).
 - Up to 32 mods, 512 replaced files, 256 patch values, 64 icall overrides, 32 text lines a frame.
