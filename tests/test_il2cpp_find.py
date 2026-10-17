@@ -129,13 +129,79 @@ def test_type_queries(types):
 
 
 def test_split_member():
-    """Type.Member, Type::Member and Il2CppDumper's Type$$Member all split the same way."""
-    assert split_member("Wheel.CalcSkidSmoke") == ("Wheel", "CalcSkidSmoke")
-    assert split_member("UnityEngine.ParticleSystem::Emit") == (
-        "UnityEngine.ParticleSystem",
-        "Emit",
-    )
-    assert split_member("Wheel$$CalcSkidSmoke") == ("Wheel", "CalcSkidSmoke")
+    """A Type::Member or Type$$Member query splits once; a dotted one at every dot, longest type
+    first, because namespaces and explicit interface members both contain dots.
+    """
+    assert split_member("UnityEngine.Foo::Emit") == [("UnityEngine.Foo", "Emit")]
+    assert split_member("Wheel$$CalcSkidSmoke") == [("Wheel", "CalcSkidSmoke")]
+    assert split_member("A.B.C") == [("A.B", "C"), ("A", "B.C")]
+    assert split_member("NoDot") == []
+
+
+EXTRA = """\
+// Namespace: System.Linq
+public static class Enumerable // TypeDefIndex: 7
+{
+\t// Methods
+
+\t// RVA: -1 Offset: -1
+\tpublic static IEnumerable<TResult> Select<TSource, TResult>(IEnumerable<TSource> s) { }
+\t/* GenericInstMethod :
+\t|
+\t|-RVA: 0x100 Offset: 0x100 VA: 0x100
+\t|-Enumerable.Select<object, object>
+\t*/
+
+\t// RVA: 0x200 Offset: 0x200 VA: 0x200
+\tprivate bool System.Collections.IEnumerator.MoveNext() { }
+}
+"""
+
+
+def test_generic_and_explicit_interface_methods():
+    """A generic method with several parameters keeps its own name (not "TResult>") and is
+    found without its parameters; an explicit interface member is found by its full name or its
+    last part. Both were missed by the first version of the parser.
+    """
+    types = parse_dump(EXTRA)
+    assert [m.name for m in types[0].methods] == [
+        "Select<TSource, TResult>",
+        "System.Collections.IEnumerator.MoveNext",
+    ]
+    ((_, select),) = find_methods(types, "System.Linq.Enumerable.Select")
+    assert select.code == [0x100]
+    assert len(find_methods(types, "Enumerable.System.Collections.IEnumerator.MoveNext")) == 1
+    ((_, move),) = find_methods(types, "Enumerable.MoveNext")
+    assert move.code == [0x200]
+
+
+def test_check_counts_agree_on_a_good_parse():
+    """The self-check compares parsed types, fields, methods and names with raw-text counts and
+    with script.json; all agree on the fixture.
+    """
+    types = parse_dump(DUMP)
+    rows = il2cpp_find.check(DUMP, types, {0x95961C, 0x959514, 0x959600, 0x15B80C4})
+    assert all(r.ok for r in rows), rows
+    assert {r.what: r.parsed for r in rows}["methods"] == 5
+
+
+def test_check_reports_a_lost_method():
+    """A method line the parser cannot read shows as a mismatch instead of silently vanishing
+    from every query.
+    """
+    broken = DUMP.replace("\tprivate void CalcSkidSmoke() { }", "\tprivate void CalcSkidSmoke() =>")
+    rows = il2cpp_find.check(broken, parse_dump(broken), set())
+    bad = {r.what for r in rows if not r.ok}
+    assert "methods" in bad and "code addresses in script.json" in bad
+
+
+def test_main_check(release, capsys):
+    """The check command prints one row per count and exits 1 when something disagrees (here the
+    fixture script.json lacks most methods).
+    """
+    assert il2cpp_find.main(["--release", "9.9.9", "check"]) == 1
+    out = capsys.readouterr().out
+    assert "ok       types" in out and "MISMATCH code addresses" in out
 
 
 def test_grep_types_fields_methods(types):

@@ -8,6 +8,7 @@ raises without opening the 10 MB file:
     uv run python -m tools.il2cpp_find method Wheel.CalcSkidSmoke
     uv run python -m tools.il2cpp_find grep 'Smoke|Skid'  # names matching a regex
     uv run python -m tools.il2cpp_find addr 0x95961c      # the method containing an address
+    uv run python -m tools.il2cpp_find check              # parser self-check against the dump
 
 --release picks the dump (default: the release the loader targets); make one with
 tools/il2cpp_dump.py. Each result names its line in dump.cs.
@@ -18,6 +19,7 @@ MIT (see LICENSE).
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from collections.abc import Iterator
@@ -37,8 +39,12 @@ GENERIC_RVA = re.compile(r"^\t\|-RVA: (?P<rva>0x[0-9A-Fa-f]+)")
 GENERIC_NAME = re.compile(r"^\t\|-(?P<name>[^R].*)$")
 GENERIC_PARAMS = re.compile(r"<[^<>]*(?:<[^<>]*>[^<>]*)*>")
 FIELD = re.compile(r"^\t(?P<decl>[^(/\[][^(]*?);(?: // (?P<off>0x[0-9A-Fa-f]+))?$")
+# Generic parameters of a method name, one level of nesting: <TSource, Func<T, bool>>.
+GENERIC_ARGS = r"<[^()<>]*(?:<[^()<>]*>[^()<>]*)*>"
 # A method: "{ }" after a body-less dump, ";" for abstract and interface methods.
-METHOD = re.compile(r"^\t(?P<decl>[^/\[|].*?\b(?P<name>[\w.<>$`|]+)\(.*\))(?: \{ \}|;)$")
+METHOD = re.compile(
+    rf"^\t(?P<decl>[^/\[|].*?\b(?P<name>[\w.$`|]+(?:{GENERIC_ARGS})?)\(.*\))(?: \{{ \}}|;)$"
+)
 
 
 @dataclass
@@ -51,6 +57,21 @@ class Method:
     line: int
     # Shared code of generic instantiations: (rva, instantiation names).
     instances: list[tuple[int, list[str]]] = field(default_factory=list)
+
+    def matches(self, query: str) -> bool:
+        """Whether `query` names this method.
+
+        Generic parameters are optional ("Select" finds "Select<TSource, TResult>"), and an
+        explicit interface implementation ("System.Collections.IEnumerator.MoveNext") is found
+        by its full name or by its last part ("MoveNext").
+        """
+        bare = GENERIC_PARAMS.sub("", self.name)
+        return query in (self.name, bare) or any(n.endswith("." + query) for n in (self.name, bare))
+
+    @property
+    def code(self) -> list[int]:
+        """Where the code is: the method's RVA, or else its generic instances' RVAs."""
+        return [self.rva] if self.rva is not None else [rva for rva, _ in self.instances]
 
 
 @dataclass
@@ -131,14 +152,19 @@ def parse_dump(text: str) -> list[TypeDef]:
     return types
 
 
-def split_member(query: str) -> tuple[str, str]:
-    """Splits "Wheel.CalcSkidSmoke" (or Wheel::X, Wheel$$X) into type and member."""
+def split_member(query: str) -> list[tuple[str, str]]:
+    """The ways to split a query into (type, member).
+
+    "Wheel::X" and "Wheel$$X" split once. A dotted query splits at every dot, because both the
+    namespace and an explicit interface member contain dots:
+    "List.System.Collections.IEnumerable.GetEnumerator" is type "List" with that member.
+    """
     for sep in ("$$", "::"):
         if sep in query:
             t, _, m = query.partition(sep)
-            return t, m
-    t, _, m = query.rpartition(".")
-    return t, m
+            return [(t, m)]
+    parts = query.split(".")
+    return [(".".join(parts[:i]), ".".join(parts[i:])) for i in range(len(parts) - 1, 0, -1)]
 
 
 def find_types(types: list[TypeDef], query: str) -> list[TypeDef]:
@@ -147,9 +173,14 @@ def find_types(types: list[TypeDef], query: str) -> list[TypeDef]:
 
 
 def find_methods(types: list[TypeDef], query: str) -> list[tuple[TypeDef, Method]]:
-    """Methods named by "Type.Method" (every overload)."""
-    tname, mname = split_member(query)
-    return [(t, m) for t in find_types(types, tname) for m in t.methods if m.name == mname]
+    """Methods named by "Type.Method" (every overload), in dump order."""
+    found: dict[int, tuple[TypeDef, Method]] = {}
+    for tname, mname in split_member(query):
+        for t in find_types(types, tname):
+            for m in t.methods:
+                if m.matches(mname):
+                    found.setdefault(m.line, (t, m))
+    return [found[k] for k in sorted(found)]
 
 
 def grep(types: list[TypeDef], pattern: str) -> Iterator[str]:
@@ -205,6 +236,52 @@ def format_method(t: TypeDef, m: Method) -> Iterator[str]:
         yield f"  RVA {irva:#x}  generic: {fmt_names(names)}"
 
 
+# Raw-text counts the parser must reproduce (check): type headers, method RVA comments and
+# field-like lines ("...;" or "...; // 0xOFF" without parentheses) inside types.
+RAW_TYPES = re.compile(r"// TypeDefIndex: \d+$", re.MULTILINE)
+RAW_METHODS = re.compile(r"^\t// RVA: ", re.MULTILINE)
+RAW_FIELDS = re.compile(r"^\t(?![/\[|])[^(\n]*;(?: // 0x[0-9A-Fa-f]+)?$", re.MULTILINE)
+IDENT_NAME = re.compile(r"^[A-Za-z_.][\w.$`|]*(?:<.*>)?$")
+
+
+@dataclass(frozen=True)
+class CheckRow:
+    """One self-check: what the parser found against what the raw text says."""
+
+    what: str
+    parsed: int
+    expected: int
+
+    @property
+    def ok(self) -> bool:
+        """Whether the two counts agree."""
+        return self.parsed == self.expected
+
+
+def check(text: str, types: list[TypeDef], script_methods: set[int]) -> list[CheckRow]:
+    """Compares the parse of `text` with counts taken from the raw dump.cs and script.json.
+
+    Run it after changing the parser or on another game's dump: a mismatch means some types,
+    fields or methods are silently missing from every query.
+
+    Args:
+        text: dump.cs.
+        types: parse_dump(text).
+        script_methods: the method addresses of script.json (what il2cpp_disasm names calls by).
+    """
+    methods = [m for t in types for m in t.methods]
+    with_code = {rva for m in methods for rva in m.code}
+    return [
+        CheckRow("types", len(types), len(RAW_TYPES.findall(text))),
+        CheckRow("fields", sum(len(t.fields) for t in types), len(RAW_FIELDS.findall(text))),
+        CheckRow("methods", len(methods), len(RAW_METHODS.findall(text))),
+        CheckRow(
+            "method names", sum(bool(IDENT_NAME.match(m.name)) for m in methods), len(methods)
+        ),
+        CheckRow("code addresses in script.json", len(with_code & script_methods), len(with_code)),
+    ]
+
+
 def load(dump_dir: Path) -> list[TypeDef]:
     """The parsed dump.cs of a dump folder.
 
@@ -217,6 +294,16 @@ def load(dump_dir: Path) -> list[TypeDef]:
     return parse_dump(path.read_text(errors="replace"))
 
 
+def run_check(dump_dir: Path, types: list[TypeDef]) -> int:
+    """Prints the self-check table; 1 if any row disagrees."""
+    script = json.loads((dump_dir / "script.json").read_text())
+    addrs = {m["Address"] for m in script["ScriptMethod"]}
+    rows = check((dump_dir / "dump.cs").read_text(errors="replace"), types, addrs)
+    for r in rows:
+        print(f"{'ok' if r.ok else 'MISMATCH':8} {r.what:32} {r.parsed:7} / {r.expected}")
+    return 0 if all(r.ok for r in rows) else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command line: class / method / grep / addr queries."""
     ap = argparse.ArgumentParser(description="Query an Il2CppDumper dump (dump.cs, script.json).")
@@ -226,6 +313,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("method", help="Type.Method: RVA and declaration").add_argument("name")
     sub.add_parser("grep", help="names matching a regex").add_argument("pattern")
     sub.add_parser("addr", help="the method at libil2cpp RVAs").add_argument("rva", nargs="+")
+    sub.add_parser("check", help="compare the parse with counts from the raw dump")
     args = ap.parse_args(argv)
     rel = RELEASES[args.release] if args.release else target_release()
     try:
@@ -235,6 +323,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(a, sym.lookup(int(a, 16)) or "?")
             return 0
         types = load(rel.dump)
+        if args.cmd == "check":
+            return run_check(rel.dump, types)
     except OSError as e:
         print(f"il2cpp_find: {e}", file=sys.stderr)
         return 1

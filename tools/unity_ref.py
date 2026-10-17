@@ -33,8 +33,9 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from tools import elfimage
 from tools.game import ANALYSIS, GAME, RELEASES, Release, target_release
-from tools.jni_natives import load_elf
+from tools.il2cpp_find import CheckRow
 
 REPO_URL = "https://github.com/Unity-Technologies/UnityCsReference"
 REF_DIR = ANALYSIS / "ref" / "UnityCsReference"
@@ -238,7 +239,7 @@ def icalls_of(members: Iterable[Member], type_query: str) -> list[Member]:
 
 def library_icalls(lib: Path) -> set[str]:
     """Icall names ("Ns.Class::Method", signature dropped) among the strings of a library."""
-    segments, _ = load_elf(lib)
+    segments = elfimage.load(lib, relocs=False, symbols=False).segments
     rx = re.compile(rb"[A-Z][\w.]*(?:/\w+)*::\w+")
     out: set[str] = set()
     for s in segments:
@@ -303,14 +304,55 @@ def libraries(rel: Release) -> tuple[set[str], set[str]] | None:
     return library_icalls(il2cpp), library_icalls(unity)
 
 
+def unbalanced_files(root: Path) -> list[Path]:
+    """Player sources whose braces do not balance after blanking (the scanner gets lost there).
+
+    Comments, strings and preprocessor lines are blanked first, as for scanning.
+    """
+    out = []
+    for path in sorted(root.rglob("*.cs")):
+        if "Editor" in path.relative_to(root).parts:
+            continue
+        clean = blank_noise(path.read_text(errors="replace"))
+        if clean.count("{") != clean.count("}"):
+            out.append(path.relative_to(root))
+    return out
+
+
+def check(
+    members: list[Member], game: set[str], unbalanced: int
+) -> tuple[list[CheckRow], list[str]]:
+    """The scanner against the game: every UnityEngine icall libil2cpp names should be found.
+
+    Returns:
+        The rows, and the icalls not found as an extern -- each marked "stub" when the
+        reference has the member but not as an extern (UnityEngine.AndroidJNI: only the
+        non-Android stub is published), or "missing" when it has no such member at all.
+    """
+    cands = {c for m in members if m.extern for c in m.icall_candidates()}
+    wanted = sorted(g for g in game if g.startswith("UnityEngine."))
+    unmatched = [g for g in wanted if g not in cands]
+    notes, missing = [], 0
+    for g in unmatched:
+        stub = bool(find(members, g))
+        missing += not stub
+        notes.append(f"{'stub' if stub else 'missing':8} {g}")
+    rows = [
+        CheckRow("files with unbalanced braces", unbalanced, 0),
+        CheckRow("game icalls found (or stub)", len(wanted) - missing, len(wanted)),
+    ]
+    return rows, notes
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Command line: fetch / find / icalls."""
+    """Command line: fetch / find / icalls / check."""
     ap = argparse.ArgumentParser(description="Unity C# reference source for the game's version.")
     ap.add_argument("--release", choices=sorted(RELEASES), help="libraries for the icall check")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("fetch", help=f"clone {REPO_URL} at {GAME.unity_version}")
     sub.add_parser("find", help="Type.Member or an icall name").add_argument("name")
     sub.add_parser("icalls", help="a type's icalls and their status").add_argument("type")
+    sub.add_parser("check", help="scanner self-check against the game's icalls")
     args = ap.parse_args(argv)
     try:
         if args.cmd == "fetch":
@@ -323,6 +365,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"unity_ref: {e}", file=sys.stderr)
         return 1
     game, engine = libs if libs else (None, None)
+    if args.cmd == "check":
+        return run_check(members, game)
     found = find(members, args.name) if args.cmd == "find" else icalls_of(members, args.type)
     if not found:
         what = args.name if args.cmd == "find" else args.type
@@ -336,6 +380,23 @@ def main(argv: list[str] | None = None) -> int:
             for line in describe_icalls(m, game, engine):
                 print(f"    {line}")
     return 0
+
+
+def run_check(members: list[Member], game: set[str] | None) -> int:
+    """Prints the self-check; 1 if a file or an icall is lost."""
+    if game is None:
+        print("unity_ref: check needs the game's libil2cpp.so", file=sys.stderr)
+        return 1
+    rows, notes = check(members, game, len(unbalanced_files(REF_DIR)))
+    for r in rows:
+        print(f"{'ok' if r.ok else 'MISMATCH':8} {r.what:32} {r.parsed:7} / {r.expected}")
+    stubs = sum(n.startswith("stub") for n in notes)
+    if stubs:
+        print(f"         ({stubs} icalls only as non-extern stubs in the reference)")
+    for n in notes:
+        if n.startswith("missing"):
+            print(f"  {n}")
+    return 0 if all(r.ok for r in rows) else 1
 
 
 if __name__ == "__main__":

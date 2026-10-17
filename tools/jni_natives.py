@@ -13,19 +13,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from elftools.elf.elffile import ELFFile
-from elftools.elf.relocation import RelocationSection
+from tools.elfimage import Segment, load, read_cstr
 
-R_AARCH64_RELATIVE = 1027
-MAX_CSTR = 256
-
-
-@dataclass(frozen=True)
-class Segment:
-    """A PT_LOAD segment: its virtual address and file bytes."""
-
-    vaddr: int
-    data: bytes
+__all__ = ["NativeMethod", "Segment", "find_native_methods", "load_elf", "read_cstr"]
 
 
 @dataclass(frozen=True)
@@ -36,21 +26,6 @@ class NativeMethod:
     name: str
     signature: str
     fn: int
-
-
-def read_cstr(segments: list[Segment], vaddr: int) -> str | None:
-    """The ASCII C string at `vaddr`, or None if it is not one (or longer than MAX_CSTR)."""
-    for s in segments:
-        if s.vaddr <= vaddr < s.vaddr + len(s.data):
-            off = vaddr - s.vaddr
-            end = s.data.find(b"\0", off)
-            if end < 0 or end - off > MAX_CSTR:
-                return None
-            try:
-                return s.data[off:end].decode("ascii")
-            except UnicodeDecodeError:
-                return None
-    return None
 
 
 def find_native_methods(segments: list[Segment], relocs: dict[int, int]) -> list[NativeMethod]:
@@ -79,18 +54,8 @@ def find_native_methods(segments: list[Segment], relocs: dict[int, int]) -> list
 
 def load_elf(path: Path) -> tuple[list[Segment], dict[int, int]]:
     """Loadable segments and R_AARCH64_RELATIVE relocations (offset -> addend) of `path`."""
-    with path.open("rb") as f:
-        elf = ELFFile(f)
-        segments = [
-            Segment(s["p_vaddr"], s.data()) for s in elf.iter_segments() if s["p_type"] == "PT_LOAD"
-        ]
-        relocs: dict[int, int] = {}
-        for sec in elf.iter_sections():
-            if isinstance(sec, RelocationSection):
-                for r in sec.iter_relocations():
-                    if r["r_info_type"] == R_AARCH64_RELATIVE:
-                        relocs[r["r_offset"]] = r["r_addend"]
-    return segments, relocs
+    img = load(path, symbols=False)
+    return img.segments, img.relocs
 
 
 def main(argv: list[str] | None = None) -> int:

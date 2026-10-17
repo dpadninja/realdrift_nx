@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 
 from tools import unity_ref
+from tools.elfimage import ElfImage, Segment
 from tools.game import RELEASES, Release, target_release
-from tools.jni_natives import Segment
 from tools.unity_ref import (
     Member,
     blank_noise,
@@ -167,7 +167,7 @@ def test_library_icalls(monkeypatch):
     dropped so both libraries compare equal.
     """
     data = b"\0UnityEngine.Foo/Bar::Baz(System.Int32)\0UnityEngine.Foo::Qux\0not an icall\0"
-    monkeypatch.setattr(unity_ref, "load_elf", lambda p: ([Segment(0, data)], {}))
+    monkeypatch.setattr(unity_ref.elfimage, "load", lambda p, **kw: ElfImage([Segment(0, data)]))
     assert unity_ref.library_icalls(Path("x")) == {
         "UnityEngine.Foo/Bar::Baz",
         "UnityEngine.Foo::Qux",
@@ -264,6 +264,58 @@ def test_real_reference_matches_the_game():
     assert describe_icalls(emit, game, engine) == [
         "game UnityEngine.ParticleSystem::Internal_EmitOld"
     ]
+
+
+def test_check_tells_stubs_from_missing(members):
+    """The self-check counts every game icall found as an extern; one the reference has only
+    as a plain member is a "stub" (UnityEngine.AndroidJNI), one it lacks entirely is "missing"
+    and fails the check.
+    """
+    game = {
+        "UnityEngine.ParticleSystem::Internal_EmitOld",
+        "UnityEngine.ParticleSystemRenderer::Bake",
+        "UnityEngine.Nowhere::Gone",
+        "Other.Namespace::Ignored",
+    }
+    rows, notes = unity_ref.check(members, game, unbalanced=0)
+    assert notes == [
+        "missing  UnityEngine.Nowhere::Gone",
+        "stub     UnityEngine.ParticleSystemRenderer::Bake",
+    ]
+    assert [(r.what, r.parsed, r.expected, r.ok) for r in rows] == [
+        ("files with unbalanced braces", 0, 0, True),
+        ("game icalls found (or stub)", 2, 3, False),
+    ]
+
+
+def test_unbalanced_files(tmp_path):
+    """A source whose braces do not balance after blanking is reported; braces in strings,
+    comments and editor code do not count.
+    """
+    (tmp_path / "Runtime").mkdir()
+    (tmp_path / "Editor").mkdir()
+    (tmp_path / "Runtime" / "ok.cs").write_text('class A { string s = "{"; } // }')
+    (tmp_path / "Runtime" / "bad.cs").write_text("class B { void F() { }")
+    (tmp_path / "Editor" / "e.cs").write_text("{")
+    assert unity_ref.unbalanced_files(tmp_path) == [Path("Runtime/bad.cs")]
+
+
+def test_main_check(tmp_path, monkeypatch, capsys, members):
+    """The check command prints the rows and the missing icalls, and needs the game library."""
+    monkeypatch.setattr(unity_ref, "REF_DIR", tmp_path)
+    monkeypatch.setattr(unity_ref, "load_members", lambda: members)
+    monkeypatch.setattr(unity_ref, "libraries", lambda r: ({"UnityEngine.Nowhere::Gone"}, set()))
+    assert unity_ref.main(["check"]) == 1
+    out = capsys.readouterr().out
+    assert "MISMATCH game icalls" in out and "missing  UnityEngine.Nowhere::Gone" in out
+    monkeypatch.setattr(
+        unity_ref, "libraries", lambda r: ({"UnityEngine.ParticleSystemRenderer::Bake"}, set())
+    )
+    assert unity_ref.main(["check"]) == 0
+    assert "1 icalls only as non-extern stubs" in capsys.readouterr().out
+    monkeypatch.setattr(unity_ref, "libraries", lambda r: None)
+    assert unity_ref.main(["check"]) == 1
+    assert "needs the game's libil2cpp.so" in capsys.readouterr().err
 
 
 def test_member_without_namespace():
