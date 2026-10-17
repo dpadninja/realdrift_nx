@@ -22,19 +22,49 @@ GAME_H = ROOT / "source/game/rd_game.h"
 
 # Analysis artefacts per release (gitignored; extracted from the user's own APKs).
 ANALYSIS = ROOT / "analysis"
+
+
+@dataclass(frozen=True)
+class Release:
+    """A game release we have analysis files for, and where they live."""
+
+    name: str  # versionName, "5.0.8"
+    version_code: int
+    build_id: str  # unity.build-id of its libunity
+    apk: Path  # the full APK
+    lib64: Path  # its lib/arm64-v8a/*.so
+    data: Path  # its assets/ (global-metadata.dat under bin/Data/Managed/Metadata/)
+    dump: Path  # Il2CppDumper output (tools/il2cpp_dump.py)
+
+    @property
+    def metadata(self) -> Path:
+        """The release's global-metadata.dat."""
+        return self.data / METADATA_IN_APK
+
+
+METADATA_IN_APK = "assets/bin/Data/Managed/Metadata/global-metadata.dat"
 RELEASES = {
-    "5.0.7": {
-        "version_code": 74,
-        "build_id": "18435530-159e-4d08-beba-0a1c12258416",
-        "lib64": ANALYSIS / "lib64",
-        "dump": ANALYSIS / "dump507",
-    },
-    "5.0.8": {
-        "version_code": 76,
-        "build_id": "a716b65c-2cb0-47ca-ab2b-f42b256c4e69",
-        "lib64": ANALYSIS / "lib64_508",
-        "dump": None,
-    },
+    r.name: r
+    for r in (
+        Release(
+            "5.0.7",
+            74,
+            "18435530-159e-4d08-beba-0a1c12258416",
+            apk=ANALYSIS / "realdrift-5.0.7-build74.apk",
+            lib64=ANALYSIS / "lib64",
+            data=ANALYSIS / "data507",
+            dump=ANALYSIS / "dump507",
+        ),
+        Release(
+            "5.0.8",
+            76,
+            "a716b65c-2cb0-47ca-ab2b-f42b256c4e69",
+            apk=ROOT / "original/base.apk",
+            lib64=ANALYSIS / "lib64_508",
+            data=ANALYSIS / "data508",
+            dump=ANALYSIS / "dump508",
+        ),
+    )
 }
 # Real Drift Lite: a different package and build, not supported (stage_sd.py refuses it).
 LITE_PACKAGE = "com.realdriftportnew.sipon"
@@ -136,3 +166,11 @@ GAME = load()
 def obb_name(version_code: int, package: str = GAME.package) -> str:
     """main.<versionCode>.<package>.obb -- the name Android (and the loader) use."""
     return f"main.{version_code}.{package}.obb"
+
+
+def target_release() -> Release:
+    """The release the loader targets (the one whose build-id rd_game.h names)."""
+    for r in RELEASES.values():
+        if r.build_id == GAME.build_id:
+            return r
+    raise LookupError(f"no entry in RELEASES for build-id {GAME.build_id}")

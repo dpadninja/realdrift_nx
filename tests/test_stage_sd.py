@@ -22,7 +22,7 @@ from tools.stage_sd import (
 )
 
 BUILD_ID = GAME.build_id
-BUILD_ID_507 = RELEASES["5.0.7"]["build_id"]
+BUILD_ID_507 = RELEASES["5.0.7"].build_id
 OBB = GAME.obb_name  # main.76.com.realdrift.sipon.obb
 
 APK_NAMES = [
@@ -100,8 +100,8 @@ def test_game_identity_comes_from_the_loader_header():
     assert GAME.package == "com.realdrift.sipon" and GAME.version_code == 76
     assert OBB == "main.76.com.realdrift.sipon.obb" == obb_name(76)
     assert GAME.base_apk == "base.apk"
-    assert RELEASES["5.0.8"]["version_code"] == GAME.version_code
-    assert RELEASES["5.0.8"]["build_id"] == GAME.build_id
+    assert RELEASES["5.0.8"].version_code == GAME.version_code
+    assert RELEASES["5.0.8"].build_id == GAME.build_id
 
 
 def test_plan_apk_takes_arm64_libs_only():

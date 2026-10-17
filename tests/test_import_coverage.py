@@ -26,7 +26,7 @@ def test_loader_provides_every_import_of_real_drift_libs(release: str):
     """Every import of the real game libraries is provided by some shim table; an unresolved
     import would crash the first time the engine calls it.
     """
-    libs = [RELEASES[release]["lib64"] / n for n in GAME.libs]
+    libs = [RELEASES[release].lib64 / n for n in GAME.libs]
     if not all(p.exists() for p in libs):
-        pytest.skip(f"extract the {release} arm64 libs to {RELEASES[release]['lib64']} first")
+        pytest.skip(f"extract the {release} arm64 libs to {RELEASES[release].lib64} first")
     assert missing(libs) == {p.name: [] for p in libs}

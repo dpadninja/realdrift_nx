@@ -82,9 +82,9 @@ def test_real_libunity_has_unity_player_natives(release: str):
     """The real libunity registers the UnityPlayer natives main.c resolves by name (initJni,
     nativeRender, nativeDone) with the expected signatures.
     """
-    libunity = RELEASES[release]["lib64"] / "libunity.so"
+    libunity = RELEASES[release].lib64 / "libunity.so"
     if not libunity.exists():
-        pytest.skip(f"extract the {release} arm64 libs to {RELEASES[release]['lib64']} first")
+        pytest.skip(f"extract the {release} arm64 libs to {RELEASES[release].lib64} first")
     methods = {m.name: m.signature for m in find_native_methods(*load_elf(libunity))}
     assert methods["initJni"] == "(Landroid/content/Context;)V"
     assert methods["nativeDone"] == "()V"

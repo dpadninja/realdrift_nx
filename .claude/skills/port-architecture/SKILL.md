@@ -31,10 +31,12 @@ A layer includes only headers from its own layer, lower layers and `platform`.
   `tests/test_patch_sites.py`), applied in `engine/rd_patches.c`. Never a fixed offset.
 - **Replace or wrap an engine icall**: an `rd_icall_override` row (`engine/rd_icall.h`); set
   `orig` to receive the engine's function when wrapping. Only icalls the game's code uses are
-  registered; check with `il2cpp_resolve_icall` before relying on one.
+  registered: check with `uv run python -m tools.unity_ref icalls <Type>` (status `game`)
+  before relying on one (`docs/RESEARCH_TOOLS.md`).
 - **Game hook**: names in `game/rd_game_symbols.h`, offsets and methods resolved through
   `engine/rd_il2cpp.h`, pure decisions in `game/rd_<feature>.c` (host test), the glue in
-  `game/rd_<feature>_hook.c`. Hook per-frame work into the race HUD update (`rd_race_hook.c`)
+  `game/rd_<feature>_hook.c`. Find the class, fields and the method's behaviour first with
+  `tools/il2cpp_find.py` and `tools/il2cpp_disasm.py`. Hook per-frame work into the race HUD update (`rd_race_hook.c`)
   instead of adding new frame callbacks.
 - **Drawing on screen**: `platform/rd_overlay.h` between `rd_overlay_begin` / `rd_overlay_end`
   from the eglSwapBuffers wrapper.

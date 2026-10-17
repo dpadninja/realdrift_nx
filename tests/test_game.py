@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from tools import hostc
-from tools.game import GAME, read_defines
+from tools import game, hostc
+from tools.game import GAME, METADATA_IN_APK, RELEASES, read_defines, target_release
 
 MACROS = [
     "RD_GAME_PACKAGE",
@@ -69,3 +69,15 @@ def test_game_object():
     """
     assert GAME.libs == ("libmain.so", "libunity.so", "libil2cpp.so")
     assert GAME.home == "sdmc:" + GAME.home_dir
+
+
+def test_target_release_is_the_loader_build(monkeypatch):
+    """The research tools default to the release whose build-id rd_game.h names, so they look at
+    the same libraries the loader runs; a table without it is an error, not a silent fallback.
+    """
+    rel = target_release()
+    assert rel.build_id == GAME.build_id and rel.version_code == GAME.version_code
+    assert rel.metadata == rel.data / METADATA_IN_APK
+    monkeypatch.setattr(game, "RELEASES", {"5.0.7": RELEASES["5.0.7"]})
+    with pytest.raises(LookupError, match=GAME.build_id):
+        target_release()

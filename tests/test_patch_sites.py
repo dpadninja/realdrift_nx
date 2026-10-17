@@ -60,7 +60,7 @@ def run(tool: Path, *libs: Path) -> dict[str, int]:
 
 def libdir(release: str) -> Path:
     """The extracted libraries of a release, or a skip with the command to extract them."""
-    d = RELEASES[release]["lib64"]
+    d = RELEASES[release].lib64
     if not (d / "libunity.so").exists():
         pytest.skip(f"extract the {release} arm64 libs to {d.relative_to(hostc.ROOT)} first")
     return d
