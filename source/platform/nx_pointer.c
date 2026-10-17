@@ -1,7 +1,7 @@
 /* nx_pointer.c -- see nx_pointer.h.
  *
- * Everything pointer-related for a Switch port of an Android game, in one file:
- * touchscreen, USB mouse and stick cursor. The cursor is drawn through rd_overlay.
+ * Everything pointer-related for a Switch port of an Android game: touchscreen, USB mouse,
+ * gyro and stick cursor, and the settings file. The cursor is drawn by nx_pointer_draw.c.
  *
  * Origin: badpiggies_nx by ChanseyIsTheBest, https://github.com/ChanseyIsTheBest/badpiggies_nx
  * (commit 7726be3); the same module ships in cloverpit_nx by ChanseyIsTheBest,
@@ -13,38 +13,33 @@
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the LICENSE file for details.
  *
- * Modified for realdrift_nx: the GL drawing moved to rd_overlay_gl.c.
+ * Modified for realdrift_nx: the GL drawing moved to rd_overlay_gl.c, the cursor to
+ * nx_pointer_draw.c.
  */
 #include <switch.h>
-#include <GLES2/gl2.h>
-#include <stdio.h>
-#include <stdarg.h>   /* va_list / va_start / va_end in logf_() */
-#include <stdlib.h>
+#include <stdarg.h>   /* va_list / va_start / va_end in nxp_logf() */
 #include <string.h>
 #include <math.h>
-#include <setjmp.h>  /* png_jmpbuf / setjmp in the libpng error path */
-#include <png.h>
 
 #include "nx_pointer.h"
+#include "nx_pointer_internal.h"
 #include "config.h"
-#include "rd_drive.h"   /* rd_drive_active */
 #include "rd_race.h"    /* rd_race_active */
 #include "rd_platform.h"
-#include "rd_overlay.h"
 
 /* ------------------------------------------------------------------ config */
 
-static NxpConfig s_cfg;
-static int       s_ready = 0;
+NxpConfig nxp_cfg;
+int       nxp_ready = 0;
 
-static void logf_(const char *fmt, ...) {
-  if (!s_cfg.log) return;
+void nxp_logf(const char *fmt, ...) {
+  if (!nxp_cfg.log) return;
   char buf[256];
   va_list ap;
   va_start(ap, fmt);
   vsnprintf(buf, sizeof buf, fmt, ap);
   va_end(ap);
-  s_cfg.log(buf);
+  nxp_cfg.log(buf);
 }
 
 /* ------------------------------------------------------------------- state */
@@ -56,8 +51,8 @@ static int   s_touch_active[16];
 static float s_touch_x[16], s_touch_y[16];
 
 /* cursor */
-static float s_cx, s_cy;
-static int   s_visible   = -1;      /* -1 = not yet decided */
+float nxp_cx, nxp_cy;
+int   nxp_visible   = -1;      /* -1 = not yet decided */
 static int   s_was_docked = -1;
 static int   s_tap_prev  = 0;       /* A or mouse-left held last frame */
 
@@ -118,11 +113,11 @@ static int is_docked(void) {
  * handle table is not thread-safe -- an unlocked open/close from here would race
  * it and corrupt the fd table (which shows up as a Data Abort deep inside
  * newlib, nowhere near this code). */
-static FILE *cfg_fopen(const char *path, const char *mode) {
-  return s_cfg.fopen_fn ? s_cfg.fopen_fn(path, mode) : fopen(path, mode);
+FILE *nxp_fopen(const char *path, const char *mode) {
+  return nxp_cfg.fopen_fn ? nxp_cfg.fopen_fn(path, mode) : fopen(path, mode);
 }
-static int cfg_fclose(FILE *f) {
-  return s_cfg.fclose_fn ? s_cfg.fclose_fn(f) : fclose(f);
+int nxp_fclose(FILE *f) {
+  return nxp_cfg.fclose_fn ? nxp_cfg.fclose_fn(f) : fclose(f);
 }
 
 static void clamp_settings(void) {
@@ -135,16 +130,16 @@ static void clamp_settings(void) {
 }
 
 static void settings_path(char *out, size_t n) {
-  snprintf(out, n, "%s/pointer.cfg", s_cfg.data_dir ? s_cfg.data_dir : ".");
+  snprintf(out, n, "%s/pointer.cfg", nxp_cfg.data_dir ? nxp_cfg.data_dir : ".");
 }
 
 static void settings_load(void) {
-  if (!s_cfg.data_dir) return;
+  if (!nxp_cfg.data_dir) return;
   char path[512];
   settings_path(path, sizeof path);
 
-  FILE *f = cfg_fopen(path, "r");
-  if (!f) { logf_("nxp: no pointer.cfg -- using defaults\n"); return; }
+  FILE *f = nxp_fopen(path, "r");
+  if (!f) { nxp_logf("nxp: no pointer.cfg -- using defaults\n"); return; }
 
   char line[128];
   while (fgets(line, sizeof line, f)) {
@@ -153,28 +148,28 @@ static void settings_load(void) {
     else if (sscanf(line, "mouse=%f", &v) == 1) s_mouse_sens  = v;
     else if (sscanf(line, "gyro=%f",  &v) == 1) s_gyro_sens   = v;
   }
-  cfg_fclose(f);
+  nxp_fclose(f);
   clamp_settings();                      /* the file may have been hand-edited */
-  logf_("nxp: settings loaded  stick=%.1f mouse=%.2f gyro=%.2f\n",
+  nxp_logf("nxp: settings loaded  stick=%.1f mouse=%.2f gyro=%.2f\n",
         s_stick_speed, s_mouse_sens, s_gyro_sens);
 }
 
 void nxp_save_settings(void) {
-  if (!s_ready || !s_cfg.data_dir) return;
+  if (!nxp_ready || !nxp_cfg.data_dir) return;
   char path[512];
   settings_path(path, sizeof path);
 
-  FILE *f = cfg_fopen(path, "w");
-  if (!f) { logf_("nxp: could not write %s\n", path); s_settings_dirty = 0; return; }
+  FILE *f = nxp_fopen(path, "w");
+  if (!f) { nxp_logf("nxp: could not write %s\n", path); s_settings_dirty = 0; return; }
 
   fprintf(f, "# nx_pointer settings -- auto-saved, safe to edit\n");
   fprintf(f, "stick=%.2f\n", s_stick_speed);
   fprintf(f, "mouse=%.2f\n", s_mouse_sens);
   fprintf(f, "gyro=%.2f\n",  s_gyro_sens);
-  cfg_fclose(f);
+  nxp_fclose(f);
 
   s_settings_dirty = 0;
-  logf_("nxp: settings saved  stick=%.1f mouse=%.2f gyro=%.2f\n",
+  nxp_logf("nxp: settings saved  stick=%.1f mouse=%.2f gyro=%.2f\n",
         s_stick_speed, s_mouse_sens, s_gyro_sens);
 }
 
@@ -191,152 +186,22 @@ static void settings_tick(void) {
     nxp_save_settings();
 }
 
-/* --------------------------------------------------- custom cursor (PNG) */
-
-#define CURSOR_MAX_DIM 64
-
-/* Raw file bytes, slurped at init (single-threaded) so the render thread never
- * has to touch the filesystem. Decoded + uploaded lazily in nxp_draw(). */
-static uint8_t *s_png_bytes = NULL;
-static size_t   s_png_len   = 0;
-
-/* decoded */
-static GLuint s_cursor_tex = 0;
-static int    s_cursor_w = 0, s_cursor_h = 0;
-static int    s_png_tried = 0;      /* decode attempted (success or not) */
-
-static void slurp_cursor_png(void) {
-  if (!s_cfg.data_dir) return;
-  char path[512];
-  snprintf(path, sizeof path, "%s/cursor.png", s_cfg.data_dir);
-
-  FILE *f = cfg_fopen(path, "rb");     /* locked path: engine threads are live */
-  if (!f) { logf_("nxp: no cursor.png (using built-in arrow)\n"); return; }
-
-  fseek(f, 0, SEEK_END);
-  long len = ftell(f);
-  fseek(f, 0, SEEK_SET);
-  if (len <= 0 || len > 4 * 1024 * 1024) { cfg_fclose(f); return; }
-
-  s_png_bytes = malloc((size_t)len);
-  if (!s_png_bytes) { cfg_fclose(f); return; }
-  s_png_len = fread(s_png_bytes, 1, (size_t)len, f);
-  cfg_fclose(f);
-
-  if (s_png_len != (size_t)len) { free(s_png_bytes); s_png_bytes = NULL; s_png_len = 0; return; }
-  logf_("nxp: cursor.png loaded (%zu bytes), decoding on first frame\n", s_png_len);
-}
-
-/* libpng reader over the in-memory buffer */
-typedef struct { const uint8_t *p; size_t len, off; } PngSrc;
-
-static void png_read_mem(png_structp png, png_bytep out, png_size_t n) {
-  PngSrc *s = (PngSrc *)png_get_io_ptr(png);
-  if (s->off + n > s->len) { png_error(png, "short read"); return; }
-  memcpy(out, s->p + s->off, n);
-  s->off += n;
-}
-
-/* Decode to RGBA8 and upload. Returns 1 on success. Render thread only. */
-static int cursor_upload_png(void) {
-  if (!s_png_bytes) return 0;
-
-  png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-  if (!png) return 0;
-  png_infop info = png_create_info_struct(png);
-  if (!info) { png_destroy_read_struct(&png, NULL, NULL); return 0; }
-
-  uint8_t   *pixels = NULL;
-  png_bytep *rows   = NULL;
-  if (setjmp(png_jmpbuf(png))) {          /* libpng error path */
-    free(pixels); free(rows);
-    png_destroy_read_struct(&png, &info, NULL);
-    logf_("nxp: cursor.png decode failed -- using built-in arrow\n");
-    return 0;
-  }
-
-  PngSrc src = { s_png_bytes, s_png_len, 0 };
-  png_set_read_fn(png, &src, png_read_mem);
-  png_read_info(png, info);
-
-  const png_uint_32 w = png_get_image_width(png, info);
-  const png_uint_32 h = png_get_image_height(png, info);
-  if (w == 0 || h == 0 || w > CURSOR_MAX_DIM || h > CURSOR_MAX_DIM) {
-    logf_("nxp: cursor.png is %ux%u -- max is %dx%d, using built-in arrow\n",
-          (unsigned)w, (unsigned)h, CURSOR_MAX_DIM, CURSOR_MAX_DIM);
-    png_destroy_read_struct(&png, &info, NULL);
-    return 0;
-  }
-
-  /* normalise anything to 8-bit RGBA so transparency always works */
-  const int ct = png_get_color_type(png, info);
-  const int bd = png_get_bit_depth(png, info);
-  if (bd == 16)                       png_set_strip_16(png);
-  if (ct == PNG_COLOR_TYPE_PALETTE)   png_set_palette_to_rgb(png);
-  if (ct == PNG_COLOR_TYPE_GRAY && bd < 8) png_set_expand_gray_1_2_4_to_8(png);
-  if (png_get_valid(png, info, PNG_INFO_tRNS)) png_set_tRNS_to_alpha(png);
-  if (ct == PNG_COLOR_TYPE_GRAY || ct == PNG_COLOR_TYPE_GRAY_ALPHA)
-    png_set_gray_to_rgb(png);
-  /* ensure an alpha channel exists even for opaque RGB */
-  png_set_filler(png, 0xFF, PNG_FILLER_AFTER);
-  png_read_update_info(png, info);
-
-  const size_t stride = (size_t)w * 4;
-  pixels = malloc(stride * h);
-  rows   = malloc(sizeof(png_bytep) * h);
-  if (!pixels || !rows) { png_error(png, "oom"); }
-  for (png_uint_32 y = 0; y < h; y++) rows[y] = pixels + y * stride;
-  png_read_image(png, rows);
-  png_read_end(png, NULL);
-  png_destroy_read_struct(&png, &info, NULL);
-  free(rows);
-
-  /* Save the texture binding we are about to disturb -- this runs inside the
-   * engine's context, and leaving its texture unbound would corrupt its frame. */
-  GLint prev_active = 0, prev_tex = 0;
-  glGetIntegerv(GL_ACTIVE_TEXTURE, &prev_active);
-  glActiveTexture(GL_TEXTURE0);
-  glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_tex);
-
-  glGenTextures(1, &s_cursor_tex);
-  glBindTexture(GL_TEXTURE_2D, s_cursor_tex);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  GLint prev_align = 4;
-  glGetIntegerv(GL_UNPACK_ALIGNMENT, &prev_align);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)w, (GLsizei)h, 0,
-               GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, prev_align);   /* engine uploads assume 4 */
-  free(pixels);
-
-  glBindTexture(GL_TEXTURE_2D, (GLuint)prev_tex);   /* put the engine's back */
-  glActiveTexture((GLenum)prev_active);
-
-  s_cursor_w = (int)w;
-  s_cursor_h = (int)h;
-  logf_("nxp: custom cursor %dx%d ready (tex=%u)\n", s_cursor_w, s_cursor_h, s_cursor_tex);
-  return 1;
-}
-
 /* ------------------------------------------------------------------- init */
 
 void nxp_init(const NxpConfig *cfg) {
-  if (s_ready) return;
-  memset(&s_cfg, 0, sizeof s_cfg);
-  if (cfg) s_cfg = *cfg;
+  if (nxp_ready) return;
+  memset(&nxp_cfg, 0, sizeof nxp_cfg);
+  if (cfg) nxp_cfg = *cfg;
 
-  if (s_cfg.panel_w <= 0)         s_cfg.panel_w = RD_TOUCH_PANEL_W;
-  if (s_cfg.panel_h <= 0)         s_cfg.panel_h = RD_TOUCH_PANEL_H;
-  if (s_cfg.cursor_id <= 0)       s_cfg.cursor_id = 8;
-  if (s_cfg.max_touch_slots <= 0) s_cfg.max_touch_slots = 8;
-  if (s_cfg.screen_w <= 0)        s_cfg.screen_w = 1920;
-  if (s_cfg.screen_h <= 0)        s_cfg.screen_h = 1080;
+  if (nxp_cfg.panel_w <= 0)         nxp_cfg.panel_w = RD_TOUCH_PANEL_W;
+  if (nxp_cfg.panel_h <= 0)         nxp_cfg.panel_h = RD_TOUCH_PANEL_H;
+  if (nxp_cfg.cursor_id <= 0)       nxp_cfg.cursor_id = 8;
+  if (nxp_cfg.max_touch_slots <= 0) nxp_cfg.max_touch_slots = 8;
+  if (nxp_cfg.screen_w <= 0)        nxp_cfg.screen_w = 1920;
+  if (nxp_cfg.screen_h <= 0)        nxp_cfg.screen_h = 1080;
 
-  s_stick_speed = (s_cfg.stick_speed > 0.0f) ? s_cfg.stick_speed : 14.0f;
-  s_mouse_sens  = (s_cfg.mouse_sens  > 0.0f) ? s_cfg.mouse_sens  : 1.0f;
+  s_stick_speed = (nxp_cfg.stick_speed > 0.0f) ? nxp_cfg.stick_speed : 14.0f;
+  s_mouse_sens  = (nxp_cfg.mouse_sens  > 0.0f) ? nxp_cfg.mouse_sens  : 1.0f;
   s_gyro_sens   = 1.0f;
 
   padConfigureInput(1, HidNpadStyleSet_NpadStandard);
@@ -353,28 +218,28 @@ void nxp_init(const NxpConfig *cfg) {
     for (int i = 0; i < 4; i++) hidStartSixAxisSensor(s_six[i]);
     s_gyro_ready = 1;
   } else {
-    logf_("nxp: gyro unavailable (sensor handles failed)\n");
+    nxp_logf("nxp: gyro unavailable (sensor handles failed)\n");
   }
 
-  s_cx = s_cfg.screen_w * 0.5f;
-  s_cy = s_cfg.screen_h * 0.5f;
+  nxp_cx = nxp_cfg.screen_w * 0.5f;
+  nxp_cy = nxp_cfg.screen_h * 0.5f;
 
   settings_load();                    /* restores stick/mouse/gyro sensitivities */
-  slurp_cursor_png();                 /* read now, decode on the render thread */
+  nxp_slurp_cursor_png();                 /* read now, decode on the render thread */
 
-  s_ready = 1;
-  logf_("nxp: init %dx%d (panel %dx%d), stick=%.1f mouse=%.2f\n",
-        s_cfg.screen_w, s_cfg.screen_h, s_cfg.panel_w, s_cfg.panel_h,
+  nxp_ready = 1;
+  nxp_logf("nxp: init %dx%d (panel %dx%d), stick=%.1f mouse=%.2f\n",
+        nxp_cfg.screen_w, nxp_cfg.screen_h, nxp_cfg.panel_w, nxp_cfg.panel_h,
         s_stick_speed, s_mouse_sens);
 }
 
 /* ---------------------------------------------------------------- helpers */
 
 static void clamp_cursor(void) {
-  if (s_cx < 0) s_cx = 0;
-  if (s_cy < 0) s_cy = 0;
-  if (s_cx > s_cfg.screen_w - 1) s_cx = (float)(s_cfg.screen_w - 1);
-  if (s_cy > s_cfg.screen_h - 1) s_cy = (float)(s_cfg.screen_h - 1);
+  if (nxp_cx < 0) nxp_cx = 0;
+  if (nxp_cy < 0) nxp_cy = 0;
+  if (nxp_cx > nxp_cfg.screen_w - 1) nxp_cx = (float)(nxp_cfg.screen_w - 1);
+  if (nxp_cy > nxp_cfg.screen_h - 1) nxp_cy = (float)(nxp_cfg.screen_h - 1);
 }
 
 static void push(int id, float x, float y, int phase) {
@@ -390,20 +255,20 @@ static void do_touch(void) {
   HidTouchScreenState ts = {0};
   hidGetTouchScreenStates(&ts, 1);
 
-  const int slots = s_cfg.max_touch_slots;
+  const int slots = nxp_cfg.max_touch_slots;
   int now[16] = {0};
   int count = ts.count > slots ? slots : ts.count;
 
-  const float sx = (float)s_cfg.screen_w / (float)s_cfg.panel_w;
-  const float sy = (float)s_cfg.screen_h / (float)s_cfg.panel_h;
+  const float sx = (float)nxp_cfg.screen_w / (float)nxp_cfg.panel_w;
+  const float sy = (float)nxp_cfg.screen_h / (float)nxp_cfg.panel_h;
 
   for (int i = 0; i < count; i++) {
     float x = (float)ts.touches[i].x * sx;
     float y = (float)ts.touches[i].y * sy;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
-    if (x > s_cfg.screen_w - 1) x = (float)(s_cfg.screen_w - 1);
-    if (y > s_cfg.screen_h - 1) y = (float)(s_cfg.screen_h - 1);
+    if (x > nxp_cfg.screen_w - 1) x = (float)(nxp_cfg.screen_w - 1);
+    if (y > nxp_cfg.screen_h - 1) y = (float)(nxp_cfg.screen_h - 1);
     now[i] = 1;
     push(i, x, y, s_touch_active[i] ? NXP_MOVE : NXP_DOWN);
     s_touch_x[i] = x; s_touch_y[i] = y;
@@ -448,15 +313,15 @@ static void do_dpad(u64 held, u64 pressed) {
   if (s_mouse_connected) {
     s_mouse_sens *= f;
     clamp_settings();
-    logf_("nxp: mouse sensitivity = %.2f\n", s_mouse_sens);
+    nxp_logf("nxp: mouse sensitivity = %.2f\n", s_mouse_sens);
   } else if (s_gyro_on) {
     s_gyro_sens *= f;
     clamp_settings();
-    logf_("nxp: gyro sensitivity = %.2f\n", s_gyro_sens);
+    nxp_logf("nxp: gyro sensitivity = %.2f\n", s_gyro_sens);
   } else {
     s_stick_speed *= f;
     clamp_settings();
-    logf_("nxp: stick speed = %.1f px/frame\n", s_stick_speed);
+    nxp_logf("nxp: stick speed = %.1f px/frame\n", s_stick_speed);
   }
 
   settings_touch();                 /* save 3s after the last change */
@@ -514,7 +379,7 @@ static void do_gyro(void) {
 
   if (s_gyro_logged < 5) {
     s_gyro_logged++;
-    logf_("nxp: gyro av=(%.3f, %.3f, %.3f) signs=(%+.0f,%+.0f)\n",
+    nxp_logf("nxp: gyro av=(%.3f, %.3f, %.3f) signs=(%+.0f,%+.0f)\n",
           st.angular_velocity.x, st.angular_velocity.y, st.angular_velocity.z, sx, sy);
   }
 
@@ -524,8 +389,8 @@ static void do_gyro(void) {
 
   /* small deadzone so a resting controller does not creep */
   if (fabsf(dx) > 0.05f || fabsf(dy) > 0.05f) {
-    s_cx += dx;
-    s_cy += dy;
+    nxp_cx += dx;
+    nxp_cy += dy;
     clamp_cursor();
   }
 }
@@ -574,16 +439,16 @@ static int do_mouse(void) {
 
   if (conn != s_mouse_connected) {
     s_mouse_connected = conn;
-    logf_("nxp: mouse %s\n", conn ? "connected" : "disconnected");
+    nxp_logf("nxp: mouse %s\n", conn ? "connected" : "disconnected");
     if (conn && s_gyro_on) {
       s_gyro_on = 0;                 /* a mouse takes priority over motion */
-      logf_("nxp: gyro OFF (mouse connected)\n");
+      nxp_logf("nxp: gyro OFF (mouse connected)\n");
     }
   }
 
   if (s_mouse_seen == 0) {           /* first sight of the mouse: sync, don't jump */
     s_mouse_seen = newest;
-    logf_("nxp: mouse detected (%d samples buffered)\n", n);
+    nxp_logf("nxp: mouse detected (%d samples buffered)\n", n);
     return (buttons & HidMouseButton_Left) ? 1 : 0;
   }
   s_mouse_seen = newest;
@@ -593,7 +458,7 @@ static int do_mouse(void) {
   if ((wheel_x || wheel_y) || s_mouse_logged < 3) {
     if (s_mouse_logged < 40) {
       s_mouse_logged++;
-      logf_("nxp: mouse dx=%d dy=%d wheel_y=%d wheel_x=%d buttons=0x%x\n",
+      nxp_logf("nxp: mouse dx=%d dy=%d wheel_y=%d wheel_x=%d buttons=0x%x\n",
             (int)dx, (int)dy, (int)wheel_y, (int)wheel_x, (unsigned)buttons);
     }
   }
@@ -604,14 +469,14 @@ static int do_mouse(void) {
       s_mouse_sens *= (wheel > 0) ? 1.15f : (1.0f / 1.15f);
     if (s_mouse_sens < SENS_MIN) s_mouse_sens = SENS_MIN;
     if (s_mouse_sens > SENS_MAX) s_mouse_sens = SENS_MAX;
-    logf_("nxp: mouse sensitivity = %.2f\n", s_mouse_sens);
+    nxp_logf("nxp: mouse sensitivity = %.2f\n", s_mouse_sens);
   }
 
   if (dx || dy) {
-    s_cx += (float)dx * s_mouse_sens;
-    s_cy += (float)dy * s_mouse_sens;
+    nxp_cx += (float)dx * s_mouse_sens;
+    nxp_cy += (float)dy * s_mouse_sens;
     clamp_cursor();
-    if (s_visible <= 0) s_visible = 1;     /* moving the mouse brings it up */
+    if (nxp_visible <= 0) nxp_visible = 1;     /* moving the mouse brings it up */
   }
 
   return (buttons & HidMouseButton_Left) ? 1 : 0;
@@ -620,13 +485,13 @@ static int do_mouse(void) {
 /* ----------------------------------------------------------------- update */
 
 void nxp_update(void) {
-  if (!s_ready) return;
+  if (!nxp_ready) return;
   padUpdate(&s_pad);
 
   const int docked = is_docked();
   if (docked != s_was_docked) {
     /* docked has no touchscreen, so make sure there is always a way to point */
-    if (s_visible < 0 || docked) s_visible = docked ? 1 : 0;
+    if (nxp_visible < 0 || docked) nxp_visible = docked ? 1 : 0;
     s_was_docked = docked;
   }
 
@@ -637,18 +502,18 @@ void nxp_update(void) {
    * in a race, '+' does not toggle the cursor if it is bound to pause. */
   const int plus_is_pause = rd_race_active() && (config.pause & HidNpadButton_Plus);
   if ((pressed & HidNpadButton_Plus) && !plus_is_pause) {
-    s_visible = (s_visible > 0) ? 0 : 1;
-    logf_("nxp: cursor %s\n", s_visible ? "ON" : "OFF");
+    nxp_visible = (nxp_visible > 0) ? 0 : 1;
+    nxp_logf("nxp: cursor %s\n", nxp_visible ? "ON" : "OFF");
   }
   if (pressed & HidNpadButton_Minus) {
     if (s_mouse_connected) {
-      logf_("nxp: gyro stays OFF while a mouse is connected\n");
+      nxp_logf("nxp: gyro stays OFF while a mouse is connected\n");
     } else if (!s_gyro_ready) {
-      logf_("nxp: gyro unavailable on this controller\n");
+      nxp_logf("nxp: gyro unavailable on this controller\n");
     } else {
       s_gyro_on = !s_gyro_on;
-      logf_("nxp: gyro %s\n", s_gyro_on ? "ON" : "OFF");
-      if (s_gyro_on && s_visible <= 0) s_visible = 1;   /* pointing needs a cursor */
+      nxp_logf("nxp: gyro %s\n", s_gyro_on ? "ON" : "OFF");
+      if (s_gyro_on && nxp_visible <= 0) nxp_visible = 1;   /* pointing needs a cursor */
     }
   }
 
@@ -660,10 +525,10 @@ void nxp_update(void) {
   const int driving = rd_drive_active();
 
   if (!driving && (pressed & (HidNpadButton_L | HidNpadButton_R))) {
-    s_cx = s_cfg.screen_w * 0.5f;
-    s_cy = s_cfg.screen_h * 0.5f;
-    if (s_visible <= 0) s_visible = 1;    /* show it so you can see where it went */
-    logf_("nxp: cursor recentered\n");
+    nxp_cx = nxp_cfg.screen_w * 0.5f;
+    nxp_cy = nxp_cfg.screen_h * 0.5f;
+    if (nxp_visible <= 0) nxp_visible = 1;    /* show it so you can see where it went */
+    nxp_logf("nxp: cursor recentered\n");
   }
 
   if (!driving) do_dpad(held, pressed);
@@ -676,7 +541,7 @@ void nxp_update(void) {
   const int mouse_tap = do_mouse();
   do_gyro();                               /* no-op if off, or if a mouse is in */
 
-  if (s_visible > 0 && !driving) {
+  if (nxp_visible > 0 && !driving) {
     HidAnalogStickState ls = padGetStickPos(&s_pad, 0);
     if (ls.x || ls.y) {
       /* DRAG BOOST. While a tap is held the cursor is dragging, not pointing, so it needs to
@@ -689,8 +554,8 @@ void nxp_update(void) {
        * in do_touch() at true panel coordinates and is deliberately untouched -- a finger
        * already swipes exactly as it does on a phone. */
       const float sp = s_stick_speed * (s_tap_prev ? NXP_DRAG_BOOST : 1.0f);
-      s_cx += (ls.x / (float)JOYSTICK_MAX) * sp;
-      s_cy -= (ls.y / (float)JOYSTICK_MAX) * sp;   /* stick +y is up */
+      nxp_cx += (ls.x / (float)JOYSTICK_MAX) * sp;
+      nxp_cy -= (ls.y / (float)JOYSTICK_MAX) * sp;   /* stick +y is up */
       clamp_cursor();
     }
 
@@ -703,7 +568,7 @@ void nxp_update(void) {
     else if ( tap &&  s_tap_prev) phase = NXP_MOVE;
     else if (!tap &&  s_tap_prev) phase = NXP_UP;
     s_tap_prev = tap;
-    if (phase) push(s_cfg.cursor_id, s_cx, s_cy, phase);
+    if (phase) push(nxp_cfg.cursor_id, nxp_cx, nxp_cy, phase);
   } else {
     s_tap_prev = 0;
   }
@@ -718,58 +583,15 @@ int nxp_poll(NxpEvent *out, int max) {
 }
 
 /* Raw controller state for rd_drive_hook.c (driving bindings). */
-uint64_t nxp_pad_held(void)    { return s_ready ? padGetButtons(&s_pad) : 0; }
-float    nxp_pad_stick_x(void) { if (!s_ready) return 0.0f;
+uint64_t nxp_pad_held(void)    { return nxp_ready ? padGetButtons(&s_pad) : 0; }
+float    nxp_pad_stick_x(void) { if (!nxp_ready) return 0.0f;
                                  HidAnalogStickState ls = padGetStickPos(&s_pad, 0);
                                  return ls.x / (float)JOYSTICK_MAX; }
 
-int   nxp_cursor_visible(void)          { return s_visible > 0; }
-void  nxp_cursor_pos(float *x, float *y){ if (x) *x = s_cx; if (y) *y = s_cy; }
+int   nxp_cursor_visible(void)          { return nxp_visible > 0; }
+void  nxp_cursor_pos(float *x, float *y){ if (x) *x = nxp_cx; if (y) *y = nxp_cy; }
 float nxp_stick_speed(void)             { return s_stick_speed; }
 float nxp_mouse_sens(void)              { return s_mouse_sens; }
 float nxp_gyro_sens(void)               { return s_gyro_sens; }
 int   nxp_gyro_enabled(void)            { return s_gyro_on && !s_mouse_connected; }
 int   nxp_mouse_connected(void)         { return s_mouse_connected; }
-
-
-/* ======================= GL overlay ====================================== */
-
-/* Built-in arrow: tip at (0,0), y down, drawn as a fan from the tip. */
-static const GLfloat s_arrow[] = {
-   0.0f,  0.0f,   0.0f, 16.0f,   4.0f, 12.0f,   7.0f, 18.0f,
-  10.0f, 16.5f,   7.0f, 10.5f,  12.0f, 10.0f,
-};
-#define ARROW_VERTS 7
-
-void nxp_draw(void) {
-  if (!s_ready || s_visible <= 0) return;
-
-  /* decode + upload cursor.png on first draw (needs a live GL context) */
-  if (!s_png_tried) {
-    s_png_tried = 1;
-    if (s_png_bytes) {
-      if (!cursor_upload_png()) { s_cursor_tex = 0; }
-      free(s_png_bytes); s_png_bytes = NULL; s_png_len = 0;   /* done with the bytes */
-    }
-  }
-
-  if (!rd_overlay_begin(s_cfg.screen_w, s_cfg.screen_h)) return;
-
-  if (s_cursor_tex) {
-    /* ---- custom PNG: textured quad, hotspot at the top-left ---- */
-    const GLfloat w = (GLfloat)s_cursor_w, h = (GLfloat)s_cursor_h;
-    const GLfloat quad[] = { 0,0,  w,0,  0,h,  w,h };
-    const GLfloat uv[]   = { 0,0,  1,0,  0,1,  1,1 };
-    rd_overlay_textured(RD_OVERLAY_STRIP, s_cursor_tex, quad, uv, 4,
-                        s_cx, s_cy, (GLfloat)s_cfg.screen_h / 1080.0f);
-  } else {
-    /* ---- built-in arrow: solid colour, no texture touched at all ---- */
-    const GLfloat sc = 2.4f * ((GLfloat)s_cfg.screen_h / 1080.0f);
-    rd_overlay_solid(RD_OVERLAY_FAN, s_arrow, ARROW_VERTS, s_cx, s_cy, sc * 1.22f,
-                     0.0f, 0.0f, 0.0f, 0.85f);                              /* outline */
-    rd_overlay_solid(RD_OVERLAY_FAN, s_arrow, ARROW_VERTS, s_cx, s_cy, sc,
-                     1.0f, 1.0f, 1.0f, 1.0f);                               /* fill */
-  }
-
-  rd_overlay_end();
-}

@@ -14,8 +14,8 @@
  * Modified for realdrift_nx: the GL drawing moved to rd_overlay (rd_overlay.h).
  *
  * Owns the pad, the touchscreen, a USB mouse and a stick-driven virtual cursor;
- * the cursor is drawn through rd_overlay (rd_overlay.h, rd_overlay_gl.c). Drop
- * nx_pointer.{c,h} and rd_overlay* into
+ * the cursor is drawn by nx_pointer_draw.c through rd_overlay (rd_overlay.h, rd_overlay_gl.c).
+ * Drop nx_pointer*.{c,h} and rd_overlay* into
  * any so-loader style port, call nxp_init() once, nxp_update() per frame,
  * nxp_poll() to drain events, and nxp_draw() right before eglSwapBuffers().
  *
