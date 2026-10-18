@@ -16,7 +16,8 @@ Known issues:
 
 ## Features
 
-- **Controller driving.** Physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls, plus a separate clutch the mobile game lacks; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
+- **Controller driving.** Physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
+- **Separate clutch** (`Y` by default), which the original game does not have: you can now use the clutch separately (e.g. for low-powered cars).
 - **Pause** on a button (`+` by default).
 - **Touch driving controls hidden** during races (optional).
 - **Menus:** use the touchscreen, a USB mouse, or the on-screen cursor (`+` toggles it outside a race, the left stick moves it, `A` taps, `-` toggles gyro pointing).
