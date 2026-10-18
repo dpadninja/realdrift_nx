@@ -6,9 +6,10 @@
 bind_throttle=ZR
 bind_brake=ZL
 bind_handbrake=B
+bind_clutch=Y
 bind_gear_up=UP
 bind_gear_down=DOWN
-bind_camera=Y
+bind_camera=NONE
 bind_steer_left=LEFT
 bind_steer_right=RIGHT
 # left stick deadzone, 0.0 .. 0.9

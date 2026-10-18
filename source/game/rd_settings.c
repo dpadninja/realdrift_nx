@@ -50,6 +50,7 @@ static const setting SETTINGS[] = {
     "# separated by commas; NONE to unbind. The left stick always steers.\n" },
   { "bind_brake",       T_BUTTONS, F(binds.action[RD_ACT_BRAKE]),     "" },
   { "bind_handbrake",   T_BUTTONS, F(binds.action[RD_ACT_HANDBRAKE]), "" },
+  { "bind_clutch",      T_BUTTONS, F(binds.clutch),                   "" },
   { "bind_gear_up",     T_BUTTONS, F(binds.action[RD_ACT_GEAR_UP]),   "" },
   { "bind_gear_down",   T_BUTTONS, F(binds.action[RD_ACT_GEAR_DOWN]), "" },
   { "bind_camera",      T_BUTTONS, F(binds.action[RD_ACT_CAMERA]),    "" },

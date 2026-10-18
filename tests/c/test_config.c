@@ -68,13 +68,13 @@ static void test_bindings_roundtrip_and_custom_values(void) {
 static void test_bad_binding_keeps_default_and_requests_rewrite(void) {
   reset();
   CHECK(write_config(g_path) == 0);
-  FILE *f = fopen(g_path, "a"); fputs("bind_camera=WHAT\r\n", f); fclose(f);
-  /* the valid bind_camera line from write_config came first; the bad one is ignored */
+  FILE *f = fopen(g_path, "a"); fputs("bind_clutch=WHAT\r\n", f); fclose(f);
+  /* the valid bind_clutch line from write_config came first; the bad one is ignored */
   CHECK(read_config(g_path) == 0);
-  CHECK(config.binds.action[RD_ACT_CAMERA] == RD_BTN_Y);
-  write_file("debug_log=0\nbind_camera=WHAT\n");
+  CHECK(config.binds.clutch == RD_BTN_Y);
+  write_file("debug_log=0\nbind_clutch=WHAT\n");
   CHECK(read_config(g_path) == 1);
-  CHECK(config.binds.action[RD_ACT_CAMERA] == RD_BTN_Y);
+  CHECK(config.binds.clutch == RD_BTN_Y);
 }
 
 int main(int argc, char **argv) {

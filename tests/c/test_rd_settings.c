@@ -62,7 +62,9 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "stick_deadzone", "0.3") == idx("stick_deadzone") && s.binds.deadzone == 0.3f);
   CHECK(rd_settings_set(&s, "stick_deadzone", "2") == -1 && s.binds.deadzone == 0.3f);
   CHECK(rd_settings_set(&s, "stick_deadzone", "x") == -1);
-  CHECK(rd_settings_set(&s, "bind_camera", "Q") == -1 && s.binds.action[RD_ACT_CAMERA] == RD_BTN_Y);
+  CHECK(s.binds.action[RD_ACT_CAMERA] == 0 && s.binds.clutch == RD_BTN_Y);   /* defaults */
+  CHECK(rd_settings_set(&s, "bind_camera", "Q") == -1 && s.binds.action[RD_ACT_CAMERA] == 0);
+  CHECK(rd_settings_set(&s, "bind_clutch", "X") == idx("bind_clutch") && s.binds.clutch == RD_BTN_X);
   CHECK(rd_settings_set(&s, "bind_pause", "MINUS") >= 0 && s.pause == RD_BTN_MINUS);
   CHECK(rd_settings_set(&s, "hide_touch_controls", "0") >= 0 && s.hide_touch_controls == 0);
   CHECK(rd_settings_set(&s, "hide_touch_controls", " 1") >= 0 && s.hide_touch_controls == 1);
@@ -86,7 +88,7 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "smoke_amount", "5") == -1 && s.smoke_amount == 50);
   CHECK(rd_settings_set(&s, "smoke_amount", "101") == -1);
   CHECK(rd_settings_set(&s, "smoke_amount", "50%") == -1);
-  CHECK(rd_settings_count() == 17 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_count() == 18 && idx("bind_throttle") == 0);
 }
 
 /* config.txt written with non-default values reads back identically, and a file with missing
@@ -97,6 +99,7 @@ static void test_write_then_read_roundtrip(const char *dir) {
   in.binds.action[RD_ACT_THROTTLE] = RD_BTN_ZR | RD_BTN_A;
   in.binds.steer_right = 0;
   in.binds.deadzone = 0.25f;
+  in.binds.clutch = RD_BTN_L | RD_BTN_X;
   in.pause = RD_BTN_MINUS | RD_BTN_X;
   in.hide_touch_controls = 0;
   in.render_res = RD_RES_720;
@@ -118,7 +121,7 @@ static void test_write_then_read_roundtrip(const char *dir) {
   f = fopen(path, "r");
   CHECK(rd_settings_read(&part, f) == 1);            /* missing / bad keys -> rewrite */
   fclose(f);
-  CHECK(part.debug_log == 0 && part.binds.action[RD_ACT_CAMERA] == RD_BTN_Y);
+  CHECK(part.debug_log == 0 && part.binds.action[RD_ACT_CAMERA] == 0);
 }
 
 int main(int argc, char **argv) {
