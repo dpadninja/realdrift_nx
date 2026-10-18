@@ -122,7 +122,8 @@ The port writes each key when the game reads it:
   is picked (`MenuManager.LoadOriginalValues`), the race when it builds the car
   (`RaceManager.UpdateVehicle`); the port writes them into the model just before. The game
   then applies the player's tuning on top (weight reduction, shift time, suspension height,
-  camber, steering angle, weight distribution, tires, gear ratios), as for a stock car.
+  camber, steering angle, weight distribution, tires, gear ratios), as for a stock car --
+  except the gear ratios and final drive where cars.ini sets `gears` / `final_ratio` (below).
 - **once** -- written when a car is built and on each scene change; the game never rewrites them.
 - **live** -- read while driving; written every second when it differs. Axle values are
   passed to the wheels by the game's `SetWheelsParams` / `SetBrakes` / `SetTiresType`.
@@ -171,12 +172,12 @@ share as `Class.field` (`mod_check` says when). These are written every second a
 
 #### What is not reachable
 
-- **The game's gear screen** has six sliders; with fewer or more gears it is not checked on
-  the console yet. The player's saved tuning of a gear the car no longer has is skipped (the
-  port guards the game's `ApplyGearRatiosTuning`, which would otherwise stop building the car).
-- **Gear ratios in the race**: `RaceManager.UpdateVehicle` applies the player's gear tuning
-  saved per car (`Vehicle.customizations`) on top, where the player tuned a gear; untuned gears
-  keep the ratios of `gears` (not checked on the console yet).
+- **The player's gear tuning**: the game writes the player's saved gear ratios and final drive
+  (`Vehicle.customizations`, `ApplyGearRatiosTuning`) over the car's when it builds it. Where
+  cars.ini sets `gears` (or `final_ratio`) for a car, the port skips that part of the saved
+  tuning -- it belongs to the stock gearbox and does not line up with another one -- so the
+  mod's ratios are what the car drives with. The save is not changed; debug.log lists each
+  skipped value. The game's gear screen (six sliders) is not checked with other gear counts.
 - **The tire model's coefficients** (`Wheel.a1`, `b1`, `c`: arrays), **wheel size** (the
   game's tuning has none; `Wheel.radius` and `width` are read once at start-up) and
   **aerodynamics** (only as `Class.field` of its components).

@@ -326,17 +326,38 @@ static void hook_update_vehicle(void *self, void *mi) {   /* RaceManager.UpdateV
 
 static void (*g_orig_gear_tuning)(void *self, void *dt, int32_t car, int32_t gear, float ratio, void *mi);
 
-/* PersistentData.ApplyGearRatiosTuning, guarded: the player's saved tuning of a gear the car no
- * longer has (after `gears` made it shorter) is skipped instead of throwing out of the game's
- * car building. Gear 0 is the final drive; -1 and 0 are the game's "not tuned". */
+/* 1 if a cars.ini value of `kind` -- or the plain field `field` -- applies to the car whose
+ * Drivetrain is dt. */
+static int car_sets(void *dt, rd_car_kind kind, const char *field) {
+  char name[RD_MODS_NAME_LEN];
+  rd_mods_object_name(dt, name, sizeof name);
+  for (int i = 0; i < g_npatches; i++) {
+    const patch *p = &g_patches[i];
+    if (!p->ok || !p->car[0] || !p->prop || !rd_car_is(p->car, name)) continue;
+    if (p->prop->kind == kind && (!field || !strcmp(p->prop->field, field))) return 1;
+  }
+  return 0;
+}
+
+/* PersistentData.ApplyGearRatiosTuning: the player's saved gear tuning, written over the car's
+ * ratios when the game builds it. Skipped where cars.ini sets the car's gears (or final drive):
+ * the saved tuning belongs to the stock gearbox, and with another number of gears it no longer
+ * lines up (on the console it put the third gear's ratio into first). Also skipped for a gear
+ * the car does not have, which would throw out of the game's car building. Gear 0 is the final
+ * drive; -1 and 0 are the game's "not tuned". The save is not changed. */
 static void hook_gear_tuning(void *self, void *dt, int32_t car, int32_t gear, float ratio, void *mi) {
   void *gears = field_ptr(dt, g_off_gears);
-  const int skip = gear > 0 && ratio != -1 && ratio != 0 && gears &&
-                   (uint32_t)gear + 1 >= g_il2cpp.array_length(gears);
-  if (ratio != -1 && ratio != 0)   /* the player's saved tuning: it overrides the car's ratio */
-    debugPrintf(RD_LOG_TAG_MODS " " CARS_INI ": the player's tuning of %s %d = %g%s\n",
-                gear ? "gear" : "final drive", (int)gear, (double)ratio, skip ? " skipped (no such gear)" : "");
-  if (!skip) g_orig_gear_tuning(self, dt, car, gear, ratio, mi);
+  const char *why = NULL;
+  if (ratio != -1 && ratio != 0) {
+    if (gear == 0 ? car_sets(dt, RD_CAR_FIELD, RD_FLD_FINAL_RATIO) : car_sets(dt, RD_CAR_GEARS, NULL))
+      why = "cars.ini sets it";
+    else if (gear > 0 && gears && (uint32_t)gear + 1 >= g_il2cpp.array_length(gears))
+      why = "no such gear";
+    debugPrintf(RD_LOG_TAG_MODS " " CARS_INI ": the player's tuning of %s %d = %g%s%s\n",
+                gear ? "gear" : "final drive", (int)gear, (double)ratio, why ? ": skipped, " : "",
+                why ? why : "");
+  }
+  if (!why) g_orig_gear_tuning(self, dt, car, gear, ratio, mi);
 }
 
 /* Hooks the method `name` of class `cls` with fn; 1 on success (logged otherwise). */
