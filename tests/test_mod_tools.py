@@ -159,7 +159,7 @@ def test_filtered_section(tmp_path):
         "id = f\napi = 1\n",
         "[Assembly-CSharp:Drivetrain @ Lada VTS*]\nlimiterRPM = 9000\n",
     )
-    _, patches = mod_check.check_ini(mod, mod_check.Report())
+    patches = mod_check.check_ini(mod, mod_check.Report()).patches
     assert [(p.cls, p.filter, p.field) for p in patches] == [
         ("Drivetrain", "Lada VTS*", "limiterRPM")
     ]
@@ -169,12 +169,178 @@ def test_filtered_section(tmp_path):
     assert any("Assembly:Class @ filter" in e for e in rep.errors)
 
 
+CAR_DUMP = (
+    DUMP
+    + """\
+public class CarController : MonoBehaviour // TypeDefIndex: 2
+{
+\t// Fields
+\tpublic bool TCS; // 0x110
+\tpublic float ESPStrength; // 0x130
+\tpublic float throttle; // 0x50
+}
+public class MobileCarController : CarController // TypeDefIndex: 3
+{
+}
+public class Wheel : MonoBehaviour // TypeDefIndex: 4
+{
+\t// Fields
+\tpublic float gripMaterial; // 0x200
+\tpublic string tag; // 0x208
+}
+"""
+)
+
+
+def write_cars(root: Path, folder: str, cars: str) -> Path:
+    """A mod folder with mod.ini and the given cars.ini."""
+    mod = write_mod(root, folder, f"id = {folder}\napi = 1\n")
+    (mod / "cars.ini").write_text(cars)
+    return mod
+
+
+@needs_cc
+def test_cars_against_dump_and_car_names(tmp_path):
+    """cars.ini keys find their one car component (or the named class) in the dump; an unknown
+    car, a field of no component, a field two components share, a Class.field that does not
+    exist and a string field fail. [*] needs no name check.
+    """
+    good = write_cars(
+        tmp_path,
+        "c",
+        "[*]\nTCS = 0\n[Skyline]\nESPStrength = 0.3\nlimiterRPM = 9000\nWheel.gripMaterial = 1.1\n"
+        "Drivetrain.limiterRPM = 8000\n",
+    )
+    rep = mod_check.check_mod(good, parse_dump(CAR_DUMP), None, None, ["Skyline"])
+    assert not rep.errors and "5 car values" in rep.notes
+    bad = write_cars(
+        tmp_path,
+        "d",
+        "[Skylne]\nnope = 1\n[Skyline]\nthrottle = 1\nWheel.nope = 1\nMissing.x = 1\n"
+        "Wheel.tag = 1\n",
+    )
+    text = "\n".join(mod_check.check_mod(bad, parse_dump(CAR_DUMP), None, None, ["Skyline"]).errors)
+    assert "no car [Skylne]" in text and "nope is no field of CarController" in text
+    assert "throttle is in" not in text  # Drivetrain has no throttle in this dump
+    assert "Wheel has no instance field nope" in text and "no class Missing" in text
+    assert "Wheel.tag is string" in text
+
+
+@needs_cc
+def test_cars_ambiguous_and_unchecked(tmp_path, monkeypatch):
+    """A field in two car components must be written Class.field; without a dump or the
+    archives the check warns instead of failing. A key outside a [car] section is refused by
+    the port's parser.
+    """
+    dump = CAR_DUMP.replace("limiterRPM; // 0xC4", "limiterRPM; // 0xC4\n\tpublic float throttle;")
+    mod = write_cars(tmp_path, "a", "[Skyline]\nthrottle = 1\nCarController.throttle = 1\n")
+    errors = mod_check.check_mod(mod, parse_dump(dump), None, None, ["Skyline"]).errors
+    assert errors == [
+        "cars.ini:2: throttle is in CarController, Drivetrain; write it as Class.throttle"
+    ]
+    rep = mod_check.check_mod(mod, None, None, None, None)
+    assert not rep.errors and len(rep.warnings) == 2
+    orphan = write_cars(tmp_path, "o", "TCS = 0\n")
+    assert any(
+        "not under a [car] section" in e for e in mod_check.check_mod(orphan, None, None).errors
+    )
+    monkeypatch.setattr(mod_check, "user_archives", lambda: {"obb": tmp_path / "none"})
+    assert mod_check.load_cars([mod]) is None and mod_check.load_cars([tmp_path / "x"]) == []
+
+
+@needs_cc
+def test_car_keys(tmp_path):
+    """cars.ini's own keys come from the port's table with their units; their values are
+    checked as numbers (drive names by the parser), and the dump is not asked about them.
+    """
+    keys = mod_ini.car_keys()
+    assert keys["power"].unit == "hp, peak" and keys["drive"].unit == "RWD FWD AWD XWD"
+    assert keys["weight"] == mod_ini.CarKey("kg", "base", "Vehicle", "originalWeight")
+    assert {"torque", "turbo", "turbo_bar", "shift_time", "weight", "tcs", "esp"} <= set(keys)
+    mod = write_cars(
+        tmp_path, "k", "[Skyline]\npower = 420\ndrive = AWD\nweight = 1250\nturbo_bar = 1.1\n"
+    )
+    rep = mod_check.check_mod(mod, parse_dump(CAR_DUMP), None, None, ["Skyline"])
+    assert not rep.errors and "4 car values" in rep.notes
+    bad = write_cars(tmp_path, "b", "[Skyline]\npower = lots\nweight = 0\nshift_time = -1\n")
+    errors = mod_check.check_mod(bad, None, None, None, ["Skyline"]).errors
+    assert errors == [
+        "cars.ini:2: power = 'lots' is not a number",
+        "cars.ini:3: weight = 0 must be above 0",
+        "cars.ini:4: shift_time = -1 must be above 0",
+    ]
+    drive = write_cars(tmp_path, "d", "[Skyline]\ndrive = 4WD\n")
+    assert any("RWD FWD AWD XWD" in e for e in mod_check.check_mod(drive, None, None).errors)
+
+
+@needs_cc
+def test_car_keys_exist_in_the_game():
+    """Every class and field a cars.ini key writes exists in the real dump: plain fields with a
+    type the port writes, base values and the special keys' helper fields as floats, the gear
+    ratios as an array.
+    """
+    rel = target_release()
+    if not (rel.dump / "dump.cs").is_file():
+        pytest.skip("needs the il2cpp dump")
+    from tools.il2cpp_find import find_types, load
+
+    types = load(rel.dump)
+
+    def ftype(cls: str, fld: str) -> str | None:
+        return mod_check.field_type(types, find_types(types, cls)[0], fld)
+
+    for key, k in mod_ini.car_keys().items():
+        t = ftype(k.cls, k.field)
+        if k.kind == "field":
+            assert t in mod_check.PATCH_TYPES, key
+        elif k.kind == "base":
+            assert t == "float", key
+        else:
+            assert t in {"float", "float[]", "Drivetrain.Transmissions"}, (key, t)
+    for helper in [
+        "maxPower",
+        "maxTorque",
+        "externalMultiplier",
+        "externalTurboPressure",
+        "actualMaxTurboPressure",
+    ]:
+        assert ftype("Drivetrain", helper) == "float"
+    assert ftype("Drivetrain", "first") == "int"
+    for fld in ["prefabPath", "id", "name"]:
+        assert ftype("Vehicle", fld) == "string"
+    assert ftype("PersistentData", "vehicles") == "Vehicle[]"
+
+
+def test_car_components_from_the_header(tmp_path):
+    """The components come from RD_CAR_COMPONENTS in rd_game_symbols.h, in order; a header
+    without it is an error.
+    """
+    assert mod_check.car_components()[:2] == ["CarController", "Drivetrain"]
+    h = tmp_path / "h.h"
+    h.write_text('/* RD_CAR_COMPONENTS { "No" } */\n')
+    with pytest.raises(RuntimeError):
+        mod_check.car_components(h)
+
+
 @needs_cc
 def test_patches_without_a_dump_warn(tmp_path):
     """Without a dump the patches cannot be checked: a warning, not a failure."""
     mod = write_mod(tmp_path, "p", "id = p\napi = 1\n", "[Assembly-CSharp:X]\na = 1\n")
     rep = mod_check.check_mod(mod, None, None)
     assert not rep.errors and "no dump" in rep.warnings[0]
+
+
+def test_parse_cars():
+    """cars.ini lines from the checker: car, class (empty for a car component), field, value."""
+    out = (
+        "info id=a\ncar\t2\tSkyline\t\tTCS\t0\t\ncar\t3\t*\tWheel\tgripMaterial\t1.1\t\n"
+        "car\t4\tGTR\tDrivetrain\tpowerMultiplier\t600\tpower\n"
+    )
+    assert mod_ini.parse_cars(out) == [
+        mod_ini.CarLine(2, "Skyline", "", "TCS", "0"),
+        mod_ini.CarLine(3, "*", "Wheel", "gripMaterial", "1.1"),
+        mod_ini.CarLine(4, "GTR", "Drivetrain", "powerMultiplier", "600", "power"),
+    ]
 
 
 def test_parse_checker_output():

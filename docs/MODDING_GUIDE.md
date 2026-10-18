@@ -31,12 +31,13 @@ Knowing this makes everything below make sense.
 | File | Changes | Reaches | Needs code |
 |---|---|---|---|
 | `mod.ini` | nothing in the game: the mod's id, API version, load priority, own settings | -- | no |
+| `cars.ini` | **a car's characteristics** by car name: power, drive, turbo, weight, gears, grip, assists | the car(s) named: at once, or (base values) when the car is next built | no |
 | `patch.ini` | **numbers and switches** of the game's components: fields of MonoBehaviour objects | live objects of the named class, re-applied every second | no |
 | `assets.ini` | **images and texts**: Texture2D and TextAsset objects, by name, in the APK or the OBB | every place the game draws that texture or reads that text | no |
 | `files/` | whole archive members, byte for byte (advanced; see 5.4) | anything stored in a Unity file | no |
 | `mod.so` (`src/*.c`) | **behaviour**: replace or wrap methods and engine functions, call the game's methods, draw text | anything the C# code or the engine does | yes (C) |
 
-Pick the first row that fits: a number → patch.ini, a picture or text → assets.ini, anything
+Pick the first row that fits: something about a car → cars.ini, another number → patch.ini, a picture or text → assets.ini, anything
 else (logic, new behaviour, values patch.ini cannot reach) → code.
 
 ## 3. mod.ini
@@ -80,6 +81,81 @@ field. `Assembly-CSharp` is the game's own code; Unity's classes are in other as
   frame, your value is overwritten until the next second. Section 7 shows how to see that.
 - **Timing**: an object created in the middle of a scene runs with the original value for up
   to one second.
+
+### cars.ini: one car, by its name
+
+Characteristics the way a player thinks of them -- which car, which value, in the game's
+units:
+
+```ini
+[Skyline]
+power = 450          # hp at the peak
+drive = AWD
+turbo = 1
+turbo_bar = 1.2
+weight = 1250
+gear_1 = 3.2
+esp_strength = 0.3
+```
+
+- **Section** = a car name, or `[*]` for every car (a car's own section wins over `[*]`). The
+  names (`240Z`, `E30M`, `LadaVTS`, `Skyline`, ...): `uv run python -m tools.mod_assets cars`.
+  `mod_check` refuses a name the game does not have.
+- **Which objects**: the car you drive (the object carrying a `CarController`, named
+  `<car>` or `<car>(Clone)`) and the components under it, such as its four `Wheel`s. The menu
+  models (`<car>_Garage`, `<car>_cover`) are not touched.
+
+#### cars.ini keys
+
+**At once** -- the game reads these while driving; written into the car every second:
+
+| Key | Value | What the port does |
+|---|---|---|
+| `power` / `torque` | hp / Nm at the peak, after the player's engine tuning | scales the whole engine curve (`Drivetrain.powerMultiplier`); give one of the two |
+| `drive` | `RWD`, `FWD`, `AWD`, `XWD` | sets `Drivetrain.transmission` and calls `SetTransmission` (picks the powered wheels) |
+| `turbo` | 0 / 1 | `Drivetrain.turboCharged` |
+| `turbo_bar` | bar | `Drivetrain.maxTurboPressure` and the limit the game derives from it |
+| `rev_limit`, `max_rpm`, `idle_rpm` | rpm | `Drivetrain.limiterRPM`, `maxRPM`, `minRPM` |
+| `gear_1` `gear_2` `gear_3` `gear_4` `gear_5` `gear_6` | ratio | `Drivetrain.gearRatios` (from the next shift) |
+| `final_ratio` | ratio | `Drivetrain.finalDriveRatio` |
+| `brake_torque`, `handbrake_torque` | Nm per wheel | `Wheel.brakeFrictionTorque`, `handbrakeFrictionTorque` |
+| `tcs`, `esp`, `abs` | 0 / 1 | `CarController.TCS`, `ESP`, `ABS` |
+| `tcs_slip`, `esp_strength`, `abs_slip` | the assist's setting | `TCSAllowedSlip`, `ESPStrength`, `ABSAllowedSlip` |
+
+**Base values** -- the car's record (`Vehicle` in `PersistentData.vehicles`) that the game's
+own tuning starts from when it builds the car, so the player's upgrades still apply on top.
+They take effect the next time the car is built: picking it in the garage or starting a race.
+They are not written into the save.
+
+| Key | Value | Vehicle field |
+|---|---|---|
+| `weight` | kg (before weight reduction) | `originalWeight` |
+| `shift_time` | s (before shift-time tuning) | `originalShiftTime` |
+| `susp_height` | as the game stores it | `originalSuspHeight` |
+| `front_camber`, `rear_camber` | as the game stores it | `originalFrontCamber`, `originalRearCamber` |
+| `steering_angle` | degrees | `originalSteeringAngle` |
+| `weight_distr` | as the game stores it | `originalWeightDistr` |
+| `front_grip`, `front_side_grip`, `rear_grip`, `rear_side_grip` | grip factor | `originalFrontForwardGrip`, `originalFrontSidewaysGrip`, `originalRearForwardGrip`, `originalRearSidewaysGrip` |
+
+On the console `debug.log` lists every Vehicle record once (`[mods] cars.ini: vehicle 3:
+prefab "...", id "...", name "..."` -- a section matches the last part of the prefab path, the
+id or the name) and each base value it changed with the old value (`weight of Skyline:
+1380 -> 1250`): use it to learn the units the game stores.
+
+**Anything else** -- any field of the car's components works as a key too: a field of
+`CarController`, `Drivetrain`, `CarDynamics` or `CarSpecs` by its name (`maxPowerRPM`), any
+other component of the car as `Class.field` (`Wheel.gripMaterial`, `Axle.brakeFrictionTorque`),
+and a name two of them share as `Class.field` (`mod_check` says when). These follow
+"Where it stops" above: the field types, values read once at start-up, the game writing a
+value back. Look at the current values with `inspect` (section 7.4) first.
+
+#### What is not reachable
+
+- **Gear ratios from the player's tuning screen** win when the car is built; `gear_N` then
+  overrides them while driving. The tuning screen still shows the player's values.
+- **The specs screen** shows the base power and torque, not the `power` / `torque` you set.
+- **Not covered yet**: wheel size (a Vector3), the torque curve's shape (an AnimationCurve),
+  per-gear numbers above the sixth.
 
 ### Find the class and the field
 

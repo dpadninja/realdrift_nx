@@ -6,6 +6,9 @@ the PC with the game's own files:
 - mod.ini and patch.ini, read by the port's own parser (tools/mod_ini_check.c, built with
   tools/hostc.py) so the rules cannot drift apart;
 - patch.ini classes and fields exist in the dump and have a type patch.ini supports;
+- cars.ini car names are drivable cars of the game (tools/mod_assets.py cars), and each key
+  names exactly one field of a car component (RD_CAR_COMPONENTS in rd_game_symbols.h) or a
+  Class.field, of a supported type;
 - mod.so is an aarch64 shared library exporting rd_mod_entry, with only imports and
   relocations the loader provides, and the engine icall names it contains are registered in
   this game (tools/unity_ref.py status "game");
@@ -36,7 +39,7 @@ from elftools.elf.relocation import RelocationSection
 from elftools.elf.sections import SymbolTableSection
 from PIL import Image
 
-from tools.game import ROOT, target_release, user_archives
+from tools.game import ROOT, strip_comments, target_release, user_archives
 from tools.il2cpp_find import TypeDef, find_types
 from tools.il2cpp_find import load as load_dump
 from tools.import_coverage import table_symbols
@@ -44,12 +47,13 @@ from tools.mod_assets import (
     ASSETS_INI,
     EDITABLE,
     Asset,
+    car_names,
     parse_assets_ini,
     plan_build,
     scan,
     texture_size,
 )
-from tools.mod_ini import PatchLine, read_mod
+from tools.mod_ini import CarLine, ModIni, PatchLine, read_mod
 from tools.unity_ref import library_icalls
 
 ENTRY = "rd_mod_entry"
@@ -62,6 +66,10 @@ LOADER_RELOCS = {
 }
 # Field types patch.ini can write (source/mods/rd_mod_patch.c), as dump.cs spells them.
 PATCH_TYPES = {"bool", "int", "uint", "long", "float", "double"}
+CARS_INI = "cars.ini"
+# 0 is refused by the port (rd_mods_patches.c) or makes no sense
+POSITIVE_KEYS = {"power", "torque", "weight", "final_ratio"} | {f"gear_{n}" for n in range(1, 7)}
+SYMBOLS_H = ROOT / "source/game/rd_game_symbols.h"
 ICALL_IN_STRINGS = re.compile(rb"UnityEngine\.[\w.]*(?:/\w+)*::\w+")
 
 
@@ -82,12 +90,22 @@ class Report:
         self.warnings.append(msg)
 
 
-def check_ini(mod: Path, rep: Report) -> tuple[dict[str, str], list[PatchLine]]:
-    """mod.ini and patch.ini through the port's parser."""
+def check_ini(mod: Path, rep: Report) -> ModIni:
+    """mod.ini, patch.ini and cars.ini through the port's parser."""
     ini = read_mod(mod)
     for e in ini.errors:
         rep.error(e)
-    return ini.info, ini.patches
+    return ini
+
+
+def car_components(header: Path = SYMBOLS_H) -> list[str]:
+    """The classes a cars.ini key may name without "Class." (RD_CAR_COMPONENTS), in order."""
+    m = re.search(
+        r"#\s*define\s+RD_CAR_COMPONENTS\s*\{([^}]*)\}", strip_comments(header.read_text())
+    )
+    if not m:
+        raise RuntimeError(f"no RD_CAR_COMPONENTS in {header}")
+    return re.findall(r'"([^"]+)"', m.group(1))
 
 
 def field_type(types: list[TypeDef], t: TypeDef, name: str) -> str | None:
@@ -126,6 +144,69 @@ def check_patches(patches: list[PatchLine], types: list[TypeDef] | None, rep: Re
                 f"{where}: {p.cls}.{p.field} is {ftype}; patch.ini sets only "
                 f"{', '.join(sorted(PATCH_TYPES))}"
             )
+
+
+def check_cars(
+    cars: list[CarLine], types: list[TypeDef] | None, names: list[str] | None, rep: Report
+) -> None:
+    """cars.ini: car names against the game's cars, keys against the car components' fields."""
+    if not cars:
+        return
+    known = set(names or [])
+    for car in sorted({c.car for c in cars if c.car != "*"}):
+        if names is None:
+            rep.warn(f"no base.apk / OBB to check the car name [{car}] against")
+        elif car not in known:
+            rep.error(f"{CARS_INI}: no car [{car}] (uv run python -m tools.mod_assets cars)")
+    for c in cars:
+        if c.key:  # one of cars.ini's own keys: the port knows where it goes
+            check_car_key(c, f"{CARS_INI}:{c.line}", rep)
+    fields = [c for c in cars if not c.key]
+    if types is None:
+        if fields:
+            rep.warn(f"no dump to check {CARS_INI} against (python -m tools.il2cpp_dump)")
+        return
+    components = car_components()
+    for c in fields:
+        where = f"{CARS_INI}:{c.line}"
+        classes = [c.cls] if c.cls else components
+        typed = []
+        for cls in classes:
+            found = find_types(types, cls)
+            if not found and c.cls:
+                rep.error(f"{where}: no class {cls} in the game")
+            ftype = field_type(types, found[0], c.field) if found else None
+            if ftype is not None:
+                typed.append((cls, ftype))
+        if not typed:
+            if c.cls and find_types(types, c.cls):
+                rep.error(f"{where}: {c.cls} has no instance field {c.field}")
+            elif not c.cls:
+                rep.error(f"{where}: {c.field} is no field of {', '.join(components)}")
+        elif len(typed) > 1:
+            rep.error(
+                f"{where}: {c.field} is in {', '.join(t[0] for t in typed)}; "
+                f"write it as Class.{c.field}"
+            )
+        elif typed[0][1] not in PATCH_TYPES:
+            cls, ftype = typed[0]
+            rep.error(
+                f"{where}: {cls}.{c.field} is {ftype}; {CARS_INI} sets only "
+                f"{', '.join(sorted(PATCH_TYPES))}"
+            )
+
+
+def check_car_key(c: CarLine, where: str, rep: Report) -> None:
+    """The value of one of cars.ini's own keys (drive names are checked by the parser)."""
+    if c.key == "drive":
+        return
+    try:
+        value = float(c.value)
+    except ValueError:
+        rep.error(f"{where}: {c.key} = {c.value!r} is not a number")
+        return
+    if value < 0 or (value == 0 and c.key in POSITIVE_KEYS):
+        rep.error(f"{where}: {c.key} = {c.value} must be above 0")
 
 
 def check_so(path: Path, rep: Report, game_icalls: set[str] | None) -> None:
@@ -229,16 +310,20 @@ def check_mod(
     types: list[TypeDef] | None,
     game_icalls: set[str] | None,
     assets: list[Asset] | None = None,
+    cars: list[str] | None = None,
 ) -> Report:
     """All checks of one mod folder."""
     rep = Report()
     if not (mod / "mod.ini").is_file():
         rep.error("no mod.ini")
         return rep
-    _, patches = check_ini(mod, rep)
-    check_patches(patches, types, rep)
-    if patches:
-        rep.notes.append(f"{len(patches)} patch values")
+    ini = check_ini(mod, rep)
+    check_patches(ini.patches, types, rep)
+    check_cars(ini.cars, types, cars, rep)
+    if ini.patches:
+        rep.notes.append(f"{len(ini.patches)} patch values")
+    if ini.cars:
+        rep.notes.append(f"{len(ini.cars)} car values")
     if (mod / "mod.so").is_file():
         check_so(mod / "mod.so", rep, game_icalls)
     check_files(mod, rep)
@@ -270,6 +355,16 @@ def load_assets(mods: list[Path]) -> list[Asset] | None:
     return list(scan(archives, EDITABLE))
 
 
+def load_cars(mods: list[Path]) -> list[str] | None:
+    """The game's car names when a mod has cars.ini and the archives exist."""
+    archives = user_archives()
+    if not any((m / CARS_INI).is_file() for m in mods):
+        return []
+    if not any(p.is_file() for p in archives.values()):
+        return None
+    return car_names(archives)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Command line: checks each mod folder given."""
     ap = argparse.ArgumentParser(description="Check realdrift_nx mod folders.")
@@ -277,10 +372,11 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     types, icalls = load_context()
     assets = load_assets(args.mods)
+    cars = load_cars(args.mods)
     failed = 0
     for mod in args.mods:
         try:
-            rep = check_mod(mod, types, icalls, assets)
+            rep = check_mod(mod, types, icalls, assets, cars)
         except RuntimeError as e:
             print(f"mod_check: {e}", file=sys.stderr)
             return 1

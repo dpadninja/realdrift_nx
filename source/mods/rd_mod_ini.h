@@ -1,8 +1,9 @@
-/* rd_mod_ini.h -- reading a mod's mod.ini and patch.ini.
+/* rd_mod_ini.h -- reading a mod's mod.ini, patch.ini and cars.ini.
  * Host-testable (tests/c/test_rd_mod_ini.c).
  *
- * INI text: "key = value" lines, "[section]" headers, '#' or ';' starts a comment line, blank
- * lines are ignored, spaces around keys and values are trimmed. mod.ini uses no sections;
+ * INI text: "key = value" lines, "[section]" headers, '#' or ';' starts a comment line, and
+ * " #" (after a space) a comment at the end of a value line or a header; blank lines are
+ * ignored, spaces around keys and values are trimmed. mod.ini uses no sections;
  * patch.ini has one section per class: "[Assembly:Namespace.Class]" (nested classes as
  * "Outer/Inner", the game's classes have no namespace: "[Assembly-CSharp:Drivetrain]"),
  * optionally limited to objects by name: "[Assembly-CSharp:CarController @ Skyline*]".

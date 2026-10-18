@@ -47,9 +47,16 @@ class FakeObj:
         """Wraps data as object path_id of type kind."""
         self.path_id, self.type, self.data = path_id, SimpleNamespace(name=kind), data
 
-    def read(self):
+    def read(self, check_read=True):
         """The object's data."""
         return self.data
+
+
+def behaviour(script, owner):
+    """MonoBehaviour data: its script's class and its GameObject's name (both read lazily)."""
+    ref = SimpleNamespace(read=lambda: SimpleNamespace(m_ClassName=script))
+    go = SimpleNamespace(read=lambda: SimpleNamespace(m_Name=owner))
+    return SimpleNamespace(m_Script=ref, m_GameObject=go)
 
 
 class FakeEnv:
@@ -86,6 +93,14 @@ def game(tmp_path, monkeypatch):
             FakeObj(2, "Texture2D", FakeTexture("B")),
         ],
         b"DUP": [FakeObj(1, "Texture2D", FakeTexture("A"))],
+        b"CARS": [
+            FakeObj(1, "MonoBehaviour", behaviour("MobileCarController", "Skyline")),
+            FakeObj(2, "MonoBehaviour", behaviour("Drivetrain", "Skyline")),
+            FakeObj(3, "MonoBehaviour", behaviour("Drivetrain", "Skyline_Garage")),
+            FakeObj(4, "MonoBehaviour", behaviour("MobileCarController", "E30M")),
+            FakeObj(5, "MonoBehaviour", SimpleNamespace()),  # unreadable: skipped
+            FakeObj(6, "Texture2D", FakeTexture("NotABehaviour")),
+        ],
     }
 
     def load(data):
@@ -109,6 +124,7 @@ def game(tmp_path, monkeypatch):
         z.writestr("assets/bin/Data/junk", b"junk")
         z.writestr("assets/bin/Data/ddd", b"TWO")
         z.writestr("assets/bin/Data/eee", b"DUP")
+        z.writestr("assets/bin/Data/fff", b"CARS")
         z.writestr("other/x", b"TEX")
     archives = {"obb": obb, "apk": tmp_path / "missing.apk"}
     monkeypatch.setattr(mod_assets, "user_archives", lambda: archives)
@@ -323,6 +339,31 @@ def test_main(game, tmp_path, capsys, monkeypatch):
     (mod / "assets.ini").write_text("Nope = l.png\n")
     assert mod_assets.main(["build", str(mod), "--out", str(tmp_path / "sd")]) == 1
     assert "0 editable objects named 'Nope'" in capsys.readouterr().err
+
+
+def test_holders_and_car_names(game, capsys):
+    """Objects are found by the class of a script on them; the car names are the objects with
+    the drivable-car script only (not the garage models that carry Drivetrain too).
+    """
+    held = mod_assets.holders(game, "Drivetrain")
+    assert [(h.name, h.member) for h in held] == [
+        ("Skyline", "assets/bin/Data/fff"),
+        ("Skyline_Garage", "assets/bin/Data/fff"),
+    ]
+    assert mod_assets.car_names(game) == ["E30M", "Skyline"]
+    assert mod_assets.main(["cars"]) == 0
+    assert capsys.readouterr().out.split() == ["E30M", "Skyline"]
+    assert mod_assets.main(["objects", "--component", "Drivetrain"]) == 0
+    assert "Skyline_Garage    # obb fff" in capsys.readouterr().out
+
+
+def test_real_car_names():
+    """On the real OBB the drivable cars are found (22 in 5.0.8), garage models excluded."""
+    if not user_archives()["obb"].is_file():
+        pytest.skip("needs original/<obb>")
+    names = mod_assets.car_names(user_archives())
+    assert {"Skyline", "E30M", "LadaVTS", "240Z"} <= set(names) and len(names) >= 20
+    assert not any(n.endswith(("_Garage", "_cover", "_Cover")) for n in names)
 
 
 def test_main_without_archives(monkeypatch, tmp_path, capsys):

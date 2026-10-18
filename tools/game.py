@@ -73,7 +73,7 @@ LITE_BUILD_ID = "f450d0cc-c473-4332-a598-31d85e35eaf0"
 _TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|\w+\s*\(\s*\w+\s*\)|\w+')
 
 
-def _strip_comments(text: str) -> str:
+def strip_comments(text: str) -> str:
     """C source without /* */ and // comments."""
     text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
     return re.sub(r"//[^\n]*", "", text)
@@ -81,7 +81,7 @@ def _strip_comments(text: str) -> str:
 
 def read_defines(path: Path = GAME_H) -> dict[str, str | int]:
     """Object-like #defines of `path`, evaluated (strings joined, ints parsed)."""
-    lines = _strip_comments(path.read_text()).replace("\\\n", " ").splitlines()
+    lines = strip_comments(path.read_text()).replace("\\\n", " ").splitlines()
     raw: dict[str, str] = {}
     for line in lines:
         m = re.match(r"\s*#\s*define\s+(\w+)(\(\w*\))?\s*(.*)", line)

@@ -11,7 +11,7 @@ import re
 
 import pytest
 
-from tools import mod_new
+from tools import hostc, mod_ini, mod_new
 from tools.game import ROOT
 
 BUDGET = {
@@ -50,4 +50,15 @@ def test_doc_names_every_api_member():
     assert {"log", "inline_hook", "version", "dir"} <= members
     doc = (ROOT / "docs/MODDING.md").read_text()
     missing = sorted(m for m in members if f"`{m}`" not in doc)
+    assert not missing, missing
+
+
+@pytest.mark.skipif(hostc.CC is None, reason="no host C compiler")
+def test_guide_lists_every_car_key():
+    """Each key of the port's cars.ini table (rd_car_props) is in the guide's key tables, so a
+    new key cannot stay undocumented.
+    """
+    guide = (ROOT / "docs/MODDING_GUIDE.md").read_text()
+    tables = guide[guide.index("#### cars.ini keys") : guide.index("#### What is not reachable")]
+    missing = [k for k in mod_ini.car_keys() if f"`{k}`" not in tables]
     assert not missing, missing

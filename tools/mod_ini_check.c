@@ -1,18 +1,25 @@
-/* sources: source/mods/rd_mod_ini.c */
+/* sources: source/mods/rd_mod_ini.c source/mods/rd_mod_cars.c */
 /* mod_ini_check -- reads a mod folder's mod.ini and patch.ini with the port's own parser
  * (rd_mod_ini.c) and prints what the port would read, so tools/mod_check.py applies exactly
  * the rules the console applies. Built on the fly by tools/hostc.py.
  *
  *   mod_ini_check <mod folder>
+ *   mod_ini_check --keys
  *
  * Output, one line each:  info <key>=<value> | error <message>
  *   | patch<TAB>line<TAB>assembly<TAB>class<TAB>filter<TAB>field<TAB>value (tabs: names and
  *     values may contain spaces; filter is empty for every object)
+ *   | car<TAB>line<TAB>car<TAB>class (empty: a car component)<TAB>field<TAB>value<TAB>key
+ *     (key: the cars.ini key of rd_car_props, empty for a field)
+ *   | carkey<TAB>key<TAB>unit<TAB>kind<TAB>class<TAB>field
+ *     (with --keys: the table of cars.ini keys, for tools and docs; kind "field", "base" or
+ *     "special")
  * Exit 0 if mod.ini is valid (patch.ini problems are reported but do not fail).
  * MIT (see LICENSE). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "rd_mod_cars.h"
 #include "rd_mod_ini.h"
 
 #define MAX_TEXT (64 * 1024)
@@ -43,7 +50,16 @@ static const char *folder_of(const char *dir) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 2) { fprintf(stderr, "usage: mod_ini_check <mod folder>\n"); return 2; }
+  if (argc == 2 && !strcmp(argv[1], "--keys")) {
+    int n;
+    const rd_car_prop *props = rd_car_props(&n);
+    for (int i = 0; i < n; i++)
+      printf("carkey\t%s\t%s\t%s\t%s\t%s\n", props[i].key, props[i].unit,
+             props[i].kind == RD_CAR_FIELD ? "field" : props[i].kind == RD_CAR_BASE ? "base" : "special",
+             props[i].cls, props[i].field);
+    return 0;
+  }
+  if (argc != 2) { fprintf(stderr, "usage: mod_ini_check <mod folder> | --keys\n"); return 2; }
   char path[1024];
   snprintf(path, sizeof path, "%s/mod.ini", argv[1]);
   if (slurp(path)) { printf("error mod.ini: missing or larger than %d bytes\n", MAX_TEXT); return 1; }
@@ -75,6 +91,17 @@ int main(int argc, char **argv) {
                  t.cls, t.filter, e->key, e->value);
       }
     }
+  }
+  snprintf(path, sizeof path, "%s/cars.ini", argv[1]);
+  if (slurp(path) == 0) {
+    static rd_car_value cars[RD_INI_MAX_ENTRIES];
+    bad = rd_ini_parse(g_text, &g_ini);
+    const int n = bad ? -1 : rd_cars_read(&g_ini, cars, RD_INI_MAX_ENTRIES, err, sizeof err);
+    if (bad) printf("error cars.ini line %d is not \"key = value\"\n", bad);
+    else if (n < 0) printf("error %s\n", err);
+    for (int i = 0; i < n; i++)
+      printf("car\t%d\t%s\t%s\t%s\t%s\t%s\n", cars[i].line, cars[i].car, cars[i].cls,
+             cars[i].field, cars[i].value, cars[i].prop ? cars[i].prop->key : "");
   }
   return 0;
 }

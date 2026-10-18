@@ -40,7 +40,7 @@ through the documented entry points of the upper layer's headers.
    (`bionic/imports.c`, `engine/unity_imports.c`, `bionic/rd_imports.c`); locate and apply
    engine patches by instruction pattern (`engine/rd_patches.c`, `engine/rd_patchsites.c`).
 5. Run the libraries' init arrays, build the fake JNI world (`android/jni_fake.c`,
-   `android/unity_jni.c`); load the mods (`mods/rd_mods.c`: their archive files, patch.ini,
+   `android/unity_jni.c`); load the mods (`mods/rd_mods.c`: their archive files, patch.ini, cars.ini,
    mod.so and icall overrides must be in place before Unity starts); call `JNI_OnLoad` of
    libunity and libil2cpp.
 6. Recover the `UnityPlayer` natives by name from libunity's `RegisterNatives` table and drive
@@ -214,5 +214,7 @@ points: they may include headers of every layer to wire implementations to the e
 | `rd_mods_internal.h` | state shared by the two files above (internal) |
 | `rd_mod_ini.{c,h}` | mod.ini / patch.ini parsing and the mod.ini key table |
 | `rd_mod_patch.{c,h}` | patch.ini values parsed for their field type and written |
+| `rd_mod_cars.{c,h}` | cars.ini: its key table (`rd_car_props`) and parsing, pure |
+| `rd_mods_patches.c` | patch.ini and cars.ini values written into live objects (a car = the object carrying a `CarController`) and into the cars' `Vehicle` records |
 | `rd_modhost.{c,h}` | load order, file/icall claims, the per-frame text queue |
 | `../../sdk/rd_mod.h`, `../../sdk/mod.mk` | the public mod API and the mod build rules |

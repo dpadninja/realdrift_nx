@@ -13,7 +13,8 @@ MIT (see LICENSE).
 ```
 mods/<id>/
   mod.ini      required: id, api, and the mod's own keys
-  patch.ini    optional: values for fields of the game's objects
+  cars.ini     optional: car characteristics by car name
+  patch.ini    optional: values for fields of any of the game's objects
   assets.ini   optional: game textures / texts replaced by the mod's files, by name
   art/         the files assets.ini names (stays on the PC, like src/)
   files/       advanced: whole archive files (files/apk/<member>, files/obb/<member>)
@@ -38,7 +39,7 @@ mods (kept with `debug_log = 0` too):
 
 ## mod.ini
 
-`key = value` lines, `#` comments. Keys the port reads (any other key is the mod's own, read
+`key = value` lines, `#` comments (on their own line, or after a value: `x = 1  # note`). Keys the port reads (any other key is the mod's own, read
 with `api->ini`):
 
 | Key | Required | Meaning |
@@ -52,6 +53,26 @@ with `api->ini`):
 
 Mods load in priority order (highest first, then by id); the first to claim a file or an icall
 keeps it and the other is logged.
+
+## cars.ini
+
+A car's characteristics by its name -- no classes, no patterns:
+
+```ini
+[*]                 # every car (a car's own section wins)
+tcs = 0
+[Skyline]           # names: uv run python -m tools.mod_assets cars
+power = 450         # hp; also torque, drive, turbo, turbo_bar, rev_limit, gear_1.., weight..
+Wheel.gripMaterial = 1.1
+```
+
+- Keys: the table in `docs/MODDING_GUIDE.md` ("cars.ini keys"; `mod_ini_check --keys` prints
+  it). Driving values apply at once; base values (`weight`, `shift_time`, camber, grip...) go
+  into the car's `Vehicle` record and apply when the car is next built, under the player's
+  tuning.
+- Any other key is a field of `CarController`, `Drivetrain`, `CarDynamics` or `CarSpecs`, or
+  `Class.field` of any component of the car or its children.
+- Only the car (the object carrying a `CarController`) and what is under it is changed.
 
 ## patch.ini
 
@@ -140,6 +161,7 @@ stubs): hook the function they jump to.
 | Mod | Shows |
 |---|---|
 | `hello` | the template: `ini`, `log`, `on_scene`, `on_frame`, `draw_text` |
+| `cars` | a data-only mod: `cars.ini` sets assists and rev limiters per car |
 | `balance` | a data-only mod: `patch.ini` raises the rev limiter |
 | `retexture` | an asset mod: `assets.ini` gives the Options button new art |
 | `fov` | `inline_hook` on `UnityEngine.Camera.set_fieldOfView`, scaled by a mod.ini key |
@@ -155,4 +177,4 @@ stubs): hook the function they jump to.
 - `inline_hook` patches code while the game runs; hook in `on_game_ready` (the main thread,
   before the method is busy). Up to 256 hooks in all.
 - Two mods cannot replace the same object, raw file or icall (the higher priority wins).
-- Up to 32 mods, 512 replaced files, 256 patch values, 64 icall overrides, 32 text lines a frame.
+- Up to 32 mods, 512 replaced files, 256 patch and car values, 64 icall overrides, 32 text lines a frame.

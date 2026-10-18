@@ -46,6 +46,16 @@ void rd_mods_text(float x, float y, float size, uint32_t rgba, const char *text)
 #define RD_MODS_NAME_LEN 128
 int rd_mods_object_name(void *obj, char *buf, size_t n);
 
+/* A managed string (may be NULL) as ASCII into buf, others as '?'; its length (rd_mods.c). */
+int rd_mods_ascii(void *str, char *buf, size_t n);
+
+/* patch.ini and cars.ini (rd_mods_patches.c), main thread. _load adds the values of mod `id`
+ * (either ini may be NULL; id must outlive the patches) and returns how many; _resolve looks
+ * the classes and fields up once the game is ready; _apply writes them into live objects. */
+int  rd_mods_patches_load(const char *id, const rd_ini *patches, const rd_ini *cars);
+void rd_mods_patches_resolve(void);
+void rd_mods_patches_apply(void);
+
 /* Live objects of klass (rd_mods.c): up to max into out; count, or a negative RD_MOD_E*. */
 int rd_mods_find_objects(void *klass, void **out, int max);
 

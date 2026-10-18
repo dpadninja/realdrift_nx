@@ -84,11 +84,22 @@ static void test_patch_target(void) {
   CHECK(rd_patch_target_parse("Asm @ x:Cls", &t) == -1);  /* the filter comes last */
 }
 
+/* A comment may follow a value or a header after a space ("power = 450  # hp"); a '#' inside
+ * a value (no space before it) stays part of it. */
+static void test_end_comments(void) {
+  static rd_ini ini;
+  CHECK(rd_ini_parse("[Skyline]   # the car\npower = 450   # hp\ncolor = a#b\nx = 1\t# t\n", &ini) == 0);
+  CHECK(ini.n == 3 && !strcmp(ini.e[0].section, "Skyline"));
+  CHECK(!strcmp(ini.e[0].value, "450") && !strcmp(ini.e[1].value, "a#b"));
+  CHECK(!strcmp(ini.e[2].value, "1"));
+}
+
 int main(void) {
   RUN(test_parse);
   RUN(test_errors);
   RUN(test_mod_info);
   RUN(test_key_table);
   RUN(test_patch_target);
+  RUN(test_end_comments);
   return g_failures != 0;
 }

@@ -49,6 +49,16 @@ def checker() -> Path:
     return CHECKER
 
 
+def parse_cars(text: str) -> list[CarLine]:
+    """The cars.ini values printed by mod_ini_check."""
+    out = []
+    for line in text.splitlines():
+        if line.startswith("car\t"):
+            num, car, cls, fld, value, key = (line.split("\t")[1:] + [""] * 6)[:6]
+            out.append(CarLine(int(num), car, cls, fld, value, key))
+    return out
+
+
 def parse_checker_output(text: str) -> tuple[dict[str, str], list[PatchLine], list[str]]:
     """The info keys, patch lines and errors printed by mod_ini_check."""
     info: dict[str, str] = {}
@@ -69,12 +79,25 @@ def parse_checker_output(text: str) -> tuple[dict[str, str], list[PatchLine], li
 
 
 @dataclass(frozen=True)
+class CarLine:
+    """One cars.ini value as the port reads it."""
+
+    line: int
+    car: str  # a car name, or "*" for every car
+    cls: str  # "" = the field of a car component (RD_CAR_COMPONENTS)
+    field: str
+    value: str
+    key: str = ""  # one of cars.ini's own keys (car_keys), "" for a field
+
+
+@dataclass(frozen=True)
 class ModIni:
     """What the port reads from a mod folder's ini files."""
 
     info: dict[str, str]  # id, name, version, api, enabled, priority
     patches: list[PatchLine] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    cars: list[CarLine] = field(default_factory=list)
 
     @property
     def priority(self) -> int:
@@ -85,12 +108,33 @@ class ModIni:
             return 0
 
 
+@dataclass(frozen=True)
+class CarKey:
+    """One of cars.ini's own keys (a row of rd_car_props in source/mods/rd_mod_cars.c)."""
+
+    unit: str
+    kind: str  # "field" (a car component's field), "base" (Vehicle record) or "special"
+    cls: str
+    field: str
+
+
+def car_keys() -> dict[str, CarKey]:
+    """cars.ini's own keys, in table order, from the port's table.
+
+    Raises:
+        RuntimeError: the parser program does not build.
+    """
+    run = subprocess.run([str(checker()), "--keys"], capture_output=True, text=True, check=True)
+    rows = [line.split("\t") for line in run.stdout.splitlines() if line.startswith("carkey\t")]
+    return {r[1]: CarKey(*r[2:6]) for r in rows if len(r) == 6}
+
+
 def read_mod(mod: Path) -> ModIni:
-    """mod.ini and patch.ini of a mod folder through the port's parser.
+    """mod.ini, patch.ini and cars.ini of a mod folder through the port's parser.
 
     Raises:
         RuntimeError: the parser program does not build.
     """
     run = subprocess.run([str(checker()), str(mod)], capture_output=True, text=True, check=False)
     info, patches, errors = parse_checker_output(run.stdout)
-    return ModIni(info, patches, errors)
+    return ModIni(info, patches, errors, parse_cars(run.stdout))

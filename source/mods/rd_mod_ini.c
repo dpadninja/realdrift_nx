@@ -45,6 +45,8 @@ int rd_ini_parse(const char *text, rd_ini *ini) {
     }
     const char *eq = memchr(s, '=', (size_t)(end - s));
     if (!eq || ini->n == RD_INI_MAX_ENTRIES) return line;
+    for (const char *c = eq + 1; c < end; c++)   /* " # ..." after a value is a comment */
+      if (*c == '#' && isspace((unsigned char)c[-1])) { end = c; break; }
     rd_ini_entry *e = &ini->e[ini->n];
     if (copy_trim(e->key, sizeof e->key, s, eq) || !e->key[0] ||
         copy_trim(e->value, sizeof e->value, eq + 1, end))

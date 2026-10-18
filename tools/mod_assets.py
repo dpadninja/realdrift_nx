@@ -27,12 +27,17 @@ stage_sd.py --mods runs it; the built files go to the SD copy only.
     uv run python -m tools.mod_assets export MainMenu_Options options.png
     uv run python -m tools.mod_assets build mods/retexture --out sd/switch/realdrift_nx/mods
 
-`list` prints lines ready for assets.ini.
+`list` prints lines ready for assets.ini. Game objects by the scripts on them (no typetree
+needed: the script reference and the object name are Unity's own types):
+
+    uv run python -m tools.mod_assets cars                         # the car names for cars.ini
+    uv run python -m tools.mod_assets objects --component Drivetrain
 """
 
 from __future__ import annotations
 
 import argparse
+import functools
 import re
 import sys
 import tempfile
@@ -54,6 +59,9 @@ EDITABLE = ("Texture2D", "TextAsset")  # what export and assets.ini handle
 SPLIT = re.compile(r"\.split(\d+)$")
 DATA_FILES = (".resS", ".resource")  # bulk data stored next to a Unity file
 ASSETS_INI = "assets.ini"
+# The script only the drivable cars carry: their object names are the cars.ini sections. The
+# garage and menu models ("<car>_Garage", "<car>_cover") have Drivetrain but not this.
+CAR_SCRIPT = "MobileCarController"
 ASSET_LINE = re.compile(r"^(?P<name>[^=@]+?)(?:@(?P<file>[^=\s]+))?\s*=\s*(?P<path>.+?)\s*$")
 
 
@@ -182,6 +190,62 @@ def scan(archives: dict[str, Path], types: tuple[str, ...] = TYPES) -> Iterator[
         with zipfile.ZipFile(path) as z:
             for uf in unity_files(z, archive):
                 yield from scan_file(uf, b"".join(z.read(p) for p in uf.parts), types)
+
+
+@dataclass(frozen=True)
+class Holder:
+    """A game object carrying a script (MonoBehaviour) of some class."""
+
+    name: str  # the GameObject's name
+    archive: str
+    member: str  # the Unity file
+
+
+def holders_in(uf: UnityFile, joined: bytes, script: str) -> Iterator[Holder]:
+    """The objects of one Unity file that carry a script of class `script`."""
+    try:
+        env = UnityPy.load(joined)
+    except Exception:  # UnityPy raises anything on non-Unity data
+        return
+    for obj in env.objects:
+        if obj.type.name != "MonoBehaviour":
+            continue
+        try:  # the script's own fields need a typetree; the header fields do not
+            d = obj.read(check_read=False)
+            if d.m_Script.read().m_ClassName == script:
+                yield Holder(d.m_GameObject.read().m_Name, uf.archive, uf.name)
+        except Exception:  # an object UnityPy cannot read is skipped
+            continue
+
+
+def holders(archives: dict[str, Path], script: str) -> list[Holder]:
+    """Every object in the archives carrying a script of class `script`, sorted by name."""
+    out: list[Holder] = []
+    for archive, path in archives.items():
+        if not path.is_file():
+            continue
+        with zipfile.ZipFile(path) as z:
+            for uf in unity_files(z, archive):
+                out.extend(holders_in(uf, b"".join(z.read(p) for p in uf.parts), script))
+    return sorted(set(out), key=lambda h: (h.name, h.member))
+
+
+def car_names(archives: dict[str, Path]) -> list[str]:
+    """The names of the drivable cars (the cars.ini sections), sorted.
+
+    Cached per archive file and its modification time: a scan reads every Unity file (10 s).
+    """
+    key = tuple(
+        (a, str(p), p.stat().st_mtime_ns if p.is_file() else 0) for a, p in sorted(archives.items())
+    )
+    return list(_car_names(key))
+
+
+@functools.cache
+def _car_names(key: tuple[tuple[str, str, int], ...]) -> tuple[str, ...]:
+    """car_names for archives given as (archive, path, mtime) -- hashable, so it can be cached."""
+    archives = {a: Path(p) for a, p, _ in key}
+    return tuple(sorted({h.name for h in holders(archives, CAR_SCRIPT)}))
 
 
 def select(assets: Iterator[Asset], name: str, file: str | None) -> list[Asset]:
@@ -441,7 +505,7 @@ def list_assets(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line: list / export / build."""
+    """Command line: list / export / build / cars / objects."""
     ap = argparse.ArgumentParser(description="Game assets for asset mods (UnityPy).")
     sub = ap.add_subparsers(dest="cmd", required=True)
     ls = sub.add_parser("list", help="named objects, one line each")
@@ -455,11 +519,21 @@ def main(argv: list[str] | None = None) -> int:
     bd = sub.add_parser("build", help="assets.ini of mods -> their files/ under --out")
     bd.add_argument("mods", nargs="+", type=Path, help="mod folders")
     bd.add_argument("--out", type=Path, required=True, help="where the mods are staged")
+    sub.add_parser("cars", help="the drivable cars' names (cars.ini sections)")
+    ob = sub.add_parser("objects", help="game objects carrying a script of a class")
+    ob.add_argument("--component", required=True, help="the script's class, e.g. Drivetrain")
     args = ap.parse_args(argv)
     archives = user_archives()
     if not any(p.is_file() for p in archives.values()):
         print("mod_assets: no base.apk / OBB in original/", file=sys.stderr)
         return 1
+    if args.cmd == "cars":
+        print("\n".join(car_names(archives)))
+        return 0
+    if args.cmd == "objects":
+        for h in holders(archives, args.component):
+            print(f"{h.name}    # {h.archive} {h.member.removeprefix(DATA_PREFIX)}")
+        return 0
     if args.cmd == "list":
         return list_assets(archives, re.compile(args.name), args.type, args.archive)
     if args.cmd == "build":
