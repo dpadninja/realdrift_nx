@@ -68,8 +68,9 @@ LOADER_RELOCS = {
 PATCH_TYPES = {"bool", "int", "uint", "long", "float", "double"}
 CARS_INI = "cars.ini"
 # 0 and below are refused by the port (rd_mods_patches.c) or make no sense
-POSITIVE_KEYS = {"power", "weight", "final_ratio"} | {f"gear_{n}" for n in range(1, 7)}
-CURVE_KEY = "torque_curve"  # rpm:Nm pairs, checked by the port's parser (rd_mod_cars.c)
+POSITIVE_KEYS = {"power", "weight", "final_ratio"}
+# lists of numbers, checked by the port's parser (rd_mod_cars.c)
+LIST_KEYS = {"torque_curve", "gears"}
 SYMBOLS_H = ROOT / "source/game/rd_game_symbols.h"
 ICALL_IN_STRINGS = re.compile(rb"UnityEngine\.[\w.]*(?:/\w+)*::\w+")
 
@@ -200,7 +201,7 @@ def check_cars(
 def check_car_key(c: CarLine, where: str, rep: Report) -> None:
     """The value of one of cars.ini's own keys: a number (names and curves: the parser's)."""
     key = car_keys().get(c.key)
-    if key is None or key.names or c.key == CURVE_KEY:
+    if key is None or key.names or c.key in LIST_KEYS:
         return
     try:
         value = float(c.value)

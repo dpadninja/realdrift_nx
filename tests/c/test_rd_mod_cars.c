@@ -48,7 +48,7 @@ static void test_errors(void) {
 static void test_own_keys(void) {
   char err[160];
   CHECK(rd_ini_parse("[GTR]\npower = 600\ndrive = awd\nweight = 1300\nrear_diff = two_way_LSD\n"
-                     "front_spring = 50000\ngear_3 = 1.2\nmaxRPM = 9000\n", &g_ini) == 0);
+                     "front_spring = 50000\ngears = 3.6 2.1 1.5\nmaxRPM = 9000\n", &g_ini) == 0);
   CHECK(rd_cars_read(&g_ini, g_v, 8, err, sizeof err) == 7);
   CHECK(g_v[0].prop->kind == RD_CAR_POWER && g_v[0].prop->when == RD_CAR_ONCE);
   CHECK(!strcmp(g_v[0].cls, "Drivetrain") && !strcmp(g_v[0].field, "powerMultiplier"));
@@ -57,7 +57,7 @@ static void test_own_keys(void) {
   CHECK(g_v[3].prop->kind == RD_CAR_AXLE && g_v[3].prop->axle == RD_AXLE_REAR && !strcmp(g_v[3].cls, "Axle"));
   CHECK(!strcmp(g_v[3].field, "differential") && g_v[3].prop->names);
   CHECK(g_v[4].prop->axle == RD_AXLE_FRONT && g_v[4].prop->when == RD_CAR_LIVE);
-  CHECK(g_v[5].prop->kind == RD_CAR_GEAR && g_v[5].prop->index == 3);
+  CHECK(g_v[5].prop->kind == RD_CAR_GEARS && g_v[5].prop->when == RD_CAR_BUILD);
   CHECK(!g_v[6].prop && !strcmp(g_v[6].field, "maxRPM") && !strcmp(g_v[6].cls, ""));
 }
 
@@ -73,19 +73,20 @@ static void test_value_errors(void) {
   CHECK(rd_cars_read(&g_ini, g_v, 8, err, sizeof err) == -1 && strstr(err, "line 2"));
   CHECK(rd_ini_parse("[GTR]\ntorque_curve = 1000:100\n", &g_ini) == 0);
   CHECK(rd_cars_read(&g_ini, g_v, 8, err, sizeof err) == -1 && strstr(err, "torque_curve"));
+  CHECK(rd_ini_parse("[GTR]\ngears = 3.6 0 1.5\n", &g_ini) == 0);
+  CHECK(rd_cars_read(&g_ini, g_v, 8, err, sizeof err) == -1 && strstr(err, "gears"));
   CHECK(rd_ini_parse("[GTR]\nfront_tires = SPORT_front\n", &g_ini) == 0);
   CHECK(rd_cars_read(&g_ini, g_v, 8, err, sizeof err) == 1);
 }
 
-/* Every key is lower case, unique, has a class, field and unit; gears and axles say which;
+/* Every key is lower case, unique, has a class, field and unit; axle keys say which axle;
  * enum keys have names. The docs and mod_check list them from here. */
 static void test_table(void) {
   int n;
   const rd_car_prop *t = rd_car_props(&n);
-  CHECK(n >= 50);
+  CHECK(n >= 50 && rd_car_prop_find("gears") && !rd_car_prop_find("gear_1"));
   for (int i = 0; i < n; i++) {
     CHECK(t[i].cls[0] && t[i].field[0] && t[i].unit[0]);
-    CHECK((t[i].kind == RD_CAR_GEAR) == (t[i].index > 0));
     CHECK((t[i].kind == RD_CAR_AXLE) == (t[i].axle != 0));
     CHECK(!t[i].names || t[i].kind == RD_CAR_AXLE || t[i].kind == RD_CAR_DRIVE);
     for (const char *c = t[i].key; *c; c++)
@@ -120,6 +121,18 @@ static void test_curve(void) {
   CHECK(rd_car_curve_parse("", rpm, nm, RD_CAR_CURVE_MAX) == -1);
 }
 
+/* Gears: one ratio per forward gear, so their count is the number of gears; each above 0
+ * (0 would be a neutral, not a missing gear), at most RD_CAR_GEARS_MAX. */
+static void test_gears(void) {
+  float g[RD_CAR_GEARS_MAX];
+  CHECK(rd_car_gears_parse("3.6 2.1, 1.5 1.15 0.95", g, RD_CAR_GEARS_MAX) == 5 && g[4] == 0.95f);
+  CHECK(rd_car_gears_parse("4.0", g, RD_CAR_GEARS_MAX) == 1);
+  CHECK(rd_car_gears_parse("3.6 0 1.5", g, RD_CAR_GEARS_MAX) == -1);
+  CHECK(rd_car_gears_parse("3.6 -1", g, RD_CAR_GEARS_MAX) == -1);
+  CHECK(rd_car_gears_parse("3.6 x", g, RD_CAR_GEARS_MAX) == -1 && rd_car_gears_parse("3.6:1", g, RD_CAR_GEARS_MAX) == -1);
+  CHECK(rd_car_gears_parse("1 2 3", g, 2) == -1 && rd_car_gears_parse("", g, RD_CAR_GEARS_MAX) == -1);
+}
+
 /* The power multiplier: the target over the curve's own peak; nothing when the peak is not
  * known (0) or a value is not positive or NaN. */
 static void test_multiplier(void) {
@@ -137,6 +150,7 @@ int main(void) {
   RUN(test_table);
   RUN(test_enum);
   RUN(test_curve);
+  RUN(test_gears);
   RUN(test_multiplier);
   return g_failures != 0;
 }

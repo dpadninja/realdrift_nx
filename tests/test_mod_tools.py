@@ -277,23 +277,27 @@ def test_car_keys(tmp_path):
         tmp_path,
         "k",
         "[Skyline]\npower = 420\ndrive = AWD\nweight = 1250\nfront_camber = -2\n"
-        "rear_diff = two_way_LSD\ntorque_curve = 0:0 5000:240 7500:0\n",
+        "rear_diff = two_way_LSD\ntorque_curve = 0:0 5000:240 7500:0\n"
+        "gears = 3.6 2.1 1.5 1.1 0.9\n",
     )
     rep = mod_check.check_mod(mod, parse_dump(CAR_DUMP), None, None, ["Skyline"])
-    assert not rep.errors and "6 car values" in rep.notes
-    bad = write_cars(tmp_path, "b", "[Skyline]\npower = lots\nweight = 0\ngear_2 = -1\n")
+    assert not rep.errors and "7 car values" in rep.notes
+    bad = write_cars(tmp_path, "b", "[Skyline]\npower = lots\nweight = 0\nfinal_ratio = -1\n")
     errors = mod_check.check_mod(bad, None, None, None, ["Skyline"]).errors
     assert errors == [
         "cars.ini:2: power = 'lots' is not a number",
         "cars.ini:3: weight = 0 must be above 0",
-        "cars.ini:4: gear_2 = -1 must be above 0",
+        "cars.ini:4: final_ratio = -1 must be above 0",
     ]
-    for line, why in [
-        ("drive = 4WD", "RWD FWD AWD XWD"),
-        ("rear_diff = lsd", "two_way_LSD"),
-        ("torque_curve = 1:1", "torque_curve"),
-    ]:
-        mod = write_cars(tmp_path, f"e{len(why)}", f"[Skyline]\n{line}\n")
+    for i, (line, why) in enumerate(
+        [
+            ("drive = 4WD", "RWD FWD AWD XWD"),
+            ("rear_diff = lsd", "two_way_LSD"),
+            ("torque_curve = 1:1", "torque_curve"),
+            ("gears = 3.6 0", "gears needs"),
+        ]
+    ):
+        mod = write_cars(tmp_path, f"e{i}", f"[Skyline]\n{line}\n")
         assert any(why in e for e in mod_check.check_mod(mod, None, None).errors), line
 
 

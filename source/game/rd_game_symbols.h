@@ -82,6 +82,12 @@
 #define RD_FLD_IDLE_RPM           "minRPM"
 #define RD_FLD_GEAR_RATIOS        "gearRatios"          /* float[]: reverse, neutral, 1st (= `first`).. */
 #define RD_FLD_FIRST_GEAR         "first"
+#define RD_ASM_CORLIB             "mscorlib"
+#define RD_NS_SYSTEM              "System"
+#define RD_CLS_SINGLE             "Single"              /* float[] elements */
+#define RD_CLS_PERSISTENT_DATA    "PersistentData"
+#define RD_MTH_APPLY_GEAR_TUNING  "ApplyGearRatiosTuning"  /* (drivetrain, indexC, gear, ratio):
+                                                              gearRatios[gear + 1] = ratio, bounds-checked */
 #define RD_FLD_FINAL_RATIO        "finalDriveRatio"
 #define RD_FLD_SHIFT_TIME         "shiftTime"
 #define RD_FLD_TRANSMISSION       "transmission"        /* enum Transmissions, see RD_DRIVES */

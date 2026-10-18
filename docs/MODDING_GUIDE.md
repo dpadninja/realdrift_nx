@@ -95,7 +95,7 @@ torque_curve = 0:0 2000:190 4500:240 6500:200 7500:0
 weight = 1200
 rear_diff = two_way_LSD
 rear_tire_pressure = 2.0
-gear_1 = 3.6
+gears = 3.6 2.1 1.5 1.15 0.95   # five gears
 ```
 
 - **Section** = a car name, or `[*]` for every car (a car's own section wins over `[*]`). The
@@ -141,7 +141,7 @@ The port writes each key when the game reads it:
 | `drive` | `RWD`, `FWD`, `AWD`, `XWD` | live | `Drivetrain.transmission` + `SetTransmission` |
 | `shift_time` | s | build | `Drivetrain.shiftTime` |
 | `final_ratio` | ratio | build | `Drivetrain.finalDriveRatio` |
-| `gear_1` `gear_2` `gear_3` `gear_4` `gear_5` `gear_6` | ratio | build | `Drivetrain.gearRatios` |
+| `gears` | the ratios of 1st, 2nd, ... (1 to 10, above 0); **their count is the number of gears** | build | `Drivetrain.gearRatios` from `first` on (reverse and neutral kept) |
 | `front_diff`, `rear_diff` | `open`, `viscous`, `locked`, `one_way_LSD`, `two_way_LSD`, `one_point_five_way_LSD` | live | `Axle.differential` |
 | `front_diff_preload`, `rear_diff_preload` | Nm | live | `Axle.preLoad` |
 | `front_diff_power`, `rear_diff_power` | LSD ratio on power | live | `Axle.powerRatio` |
@@ -171,12 +171,12 @@ share as `Class.field` (`mod_check` says when). These are written every second a
 
 #### What is not reachable
 
-- **The number of gears**: the length of the car's `gearRatios` array; the game's gear screen
-  has six.
-- **Gear ratios in the race**: `RaceManager.UpdateVehicle` takes them from the player's gear
-  tuning saved per car (`Vehicle.customizations`), not from the originals; so `gear_N` and
-  `final_ratio` reach the garage and the specs, and the race only through that tuning (not
-  checked on the console yet).
+- **The game's gear screen** has six sliders; with fewer or more gears it is not checked on
+  the console yet. The player's saved tuning of a gear the car no longer has is skipped (the
+  port guards the game's `ApplyGearRatiosTuning`, which would otherwise stop building the car).
+- **Gear ratios in the race**: `RaceManager.UpdateVehicle` applies the player's gear tuning
+  saved per car (`Vehicle.customizations`) on top, where the player tuned a gear; untuned gears
+  keep the ratios of `gears` (not checked on the console yet).
 - **The tire model's coefficients** (`Wheel.a1`, `b1`, `c`: arrays), **wheel size** (the
   game's tuning has none; `Wheel.radius` and `width` are read once at start-up) and
   **aerodynamics** (only as `Class.field` of its components).

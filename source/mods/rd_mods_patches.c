@@ -55,8 +55,8 @@ typedef struct {
   uint32_t         aux2;         /* a third: the turbo limit */
   void            *method;       /* SetTransmission / CalcMaxPowerMaxTorque / the set_mass icall */
   rd_patch_value   v;
-  float            rpm[RD_CAR_CURVE_MAX], nm[RD_CAR_CURVE_MAX];   /* torque_curve */
-  int              nkeys;
+  float            rpm[RD_CAR_CURVE_MAX], nm[RD_CAR_CURVE_MAX];   /* torque_curve; gears: rpm[] */
+  int              nkeys;        /* the curve's keys, or the number of gears */
   int              ok;
   int              logged;       /* the first write was logged with the car's own value */
 } patch;
@@ -83,6 +83,8 @@ static void  *g_keyframe_class;
 static void (*g_set_keys)(void *curve, void *keys);
 static void (*g_smooth)(void *curve, int32_t index, float weight);
 static float (*g_get_mass)(void *body);
+static void  *g_single_class;      /* System.Single: elements of a new gearRatios */
+static uint32_t g_off_gears;       /* Drivetrain.gearRatios, for the gear tuning guard */
 
 /* A new patch of mod `id`, or NULL (logged) when the table is full. */
 static patch *add_patch(const char *id) {
@@ -192,6 +194,8 @@ static void resolve_cars(void) {
   g_set_brakes = method(g_dynamics_class, RD_MTH_SET_BRAKES, 0);
   g_set_tires = method(g_dynamics_class, RD_MTH_SET_TIRES_TYPE, 0);
   g_keyframe_class = rd_il2cpp_class(&g_il2cpp, RD_ASM_UNITY_CORE, RD_NS_UNITY, RD_CLS_KEYFRAME);
+  g_single_class = rd_il2cpp_class(&g_il2cpp, RD_ASM_CORLIB, RD_NS_SYSTEM, RD_CLS_SINGLE);
+  if (!field_of(g_drivetrain_class, RD_FLD_GEAR_RATIOS, 0, &g_off_gears)) g_off_gears = 0;
   if (g_il2cpp.resolve_icall) {
     g_set_keys = g_il2cpp.resolve_icall(RD_ICALL_CURVE_SET_KEYS);
     g_smooth = g_il2cpp.resolve_icall(RD_ICALL_CURVE_SMOOTH);
@@ -245,8 +249,10 @@ static int resolve_car_key(patch *p) {
     return float_value(p, 0) && field_of(p->klass, RD_FLD_TURBO_BAR, RD_IL2CPP_TYPE_R4, &p->offset) &&
            field_of(p->klass, RD_FLD_TURBO_EXTRA, RD_IL2CPP_TYPE_R4, &p->aux) &&
            field_of(p->klass, RD_FLD_TURBO_LIMIT, RD_IL2CPP_TYPE_R4, &p->aux2);
-  case RD_CAR_GEAR:
-    return float_value(p, 1) && field_of(p->klass, RD_FLD_GEAR_RATIOS, 0, &p->offset) &&
+  case RD_CAR_GEARS:
+    p->nkeys = rd_car_gears_parse(p->e.value, p->rpm, RD_CAR_GEARS_MAX);
+    return p->nkeys >= 1 && g_single_class && g_il2cpp.array_new && g_il2cpp.array_length &&
+           field_of(p->klass, RD_FLD_GEAR_RATIOS, 0, &p->offset) &&
            field_of(p->klass, RD_FLD_FIRST_GEAR, RD_IL2CPP_TYPE_I4, &p->aux);
   case RD_CAR_MASS:
     p->method = g_il2cpp.resolve_icall ? g_il2cpp.resolve_icall(RD_ICALL_SET_MASS) : NULL;
@@ -287,10 +293,22 @@ static void hook_update_vehicle(void *self, void *mi) {   /* RaceManager.UpdateV
   g_orig_update_vehicle(self, mi);
 }
 
+static void (*g_orig_gear_tuning)(void *self, void *dt, int32_t car, int32_t gear, float ratio, void *mi);
+
+/* PersistentData.ApplyGearRatiosTuning, guarded: the player's saved tuning of a gear the car no
+ * longer has (after `gears` made it shorter) is skipped instead of throwing out of the game's
+ * car building. Gear 0 is the final drive; -1 and 0 are the game's "not tuned". */
+static void hook_gear_tuning(void *self, void *dt, int32_t car, int32_t gear, float ratio, void *mi) {
+  void *gears = field_ptr(dt, g_off_gears);
+  if (gear > 0 && ratio != -1 && ratio != 0 && gears && (uint32_t)gear + 1 >= g_il2cpp.array_length(gears))
+    return;
+  g_orig_gear_tuning(self, dt, car, gear, ratio, mi);
+}
+
 /* Hooks the method `name` of class `cls` with fn; 1 on success (logged otherwise). */
-static int hook(const char *cls, const char *name, void *fn, void **orig) {
+static int hook(const char *cls, const char *name, int argc, void *fn, void **orig) {
   void *k = rd_il2cpp_class(&g_il2cpp, RD_ASM_GAME, RD_NS_GAME, cls);
-  void *mi = method(k, name, 0);
+  void *mi = method(k, name, argc);
   const int r = mi ? rd_hook_install(*(void **)mi, fn, orig) : -3;
   if (r) debugPrintf(RD_LOG_TAG_MODS " " CARS_INI ": cannot hook %s.%s (%d)\n", cls, name, r);
   return r == 0;
@@ -309,12 +327,19 @@ static void install_hooks(void) {
   field_of(menu, RD_FLD_MANAGER_BODY, 0, &g_off_menu_body);
   field_of(race, RD_FLD_MANAGER_DRIVETRAIN, 0, &g_off_race_dt);
   field_of(race, RD_FLD_MANAGER_DYNAMICS, 0, &g_off_race_cd);
-  const int a = hook(RD_CLS_MENU_MANAGER, RD_MTH_LOAD_ORIGINALS, (void *)hook_load_originals,
+  const int a = hook(RD_CLS_MENU_MANAGER, RD_MTH_LOAD_ORIGINALS, 0, (void *)hook_load_originals,
                      (void **)&g_orig_load_originals);
-  const int b = hook(RD_CLS_RACE_MANAGER, RD_MTH_UPDATE_VEHICLE, (void *)hook_update_vehicle,
+  const int b = hook(RD_CLS_RACE_MANAGER, RD_MTH_UPDATE_VEHICLE, 0, (void *)hook_update_vehicle,
                      (void **)&g_orig_update_vehicle);
   if (a && b) debugPrintf(RD_LOG_TAG_MODS " " CARS_INI ": hooked %s, %s\n", RD_MTH_LOAD_ORIGINALS,
                           RD_MTH_UPDATE_VEHICLE);
+  int gears = 0;
+  for (int i = 0; i < g_npatches; i++)
+    gears |= g_patches[i].ok && g_patches[i].prop && g_patches[i].prop->kind == RD_CAR_GEARS;
+  if (gears && g_off_gears && g_il2cpp.array_length &&
+      hook(RD_CLS_PERSISTENT_DATA, RD_MTH_APPLY_GEAR_TUNING, 4, (void *)hook_gear_tuning,
+           (void **)&g_orig_gear_tuning))
+    debugPrintf(RD_LOG_TAG_MODS " " CARS_INI ": guarded %s\n", RD_MTH_APPLY_GEAR_TUNING);
 }
 
 void rd_mods_patches_resolve(void) {
@@ -450,6 +475,28 @@ static void write_power(patch *p, void *dt, const char *car) {
   calc_max_power(p, dt, m);
 }
 
+/* Replaces the forward gears of Drivetrain dt: a new gearRatios with the entries before `first`
+ * (reverse, neutral) kept and the mod's ratios after them -- the array's length is the number
+ * of gears to the game (ShiftGear, LoadOriginalValues). */
+static void write_gears(patch *p, void *dt, const char *car) {
+  void *old = field_ptr(dt, p->offset);
+  const int32_t first = *(int32_t *)((char *)dt + p->aux);
+  const uint32_t len = old ? g_il2cpp.array_length(old) : 0;
+  if (!old || first < 0 || (uint32_t)first > len) return;
+  const float *was = (const float *)((char *)old + RD_IL2CPP_ARRAY_DATA);
+  if (len == (uint32_t)(first + p->nkeys) && !memcmp(was + first, p->rpm, sizeof(float) * (size_t)p->nkeys))
+    return;   /* already these gears */
+  void *now = g_il2cpp.array_new(g_single_class, (uintptr_t)(first + p->nkeys));
+  if (!now) return;
+  float *ratios = (float *)((char *)now + RD_IL2CPP_ARRAY_DATA);
+  memcpy(ratios, was, sizeof(float) * (size_t)first);
+  memcpy(ratios + first, p->rpm, sizeof(float) * (size_t)p->nkeys);
+  char olds[32];
+  snprintf(olds, sizeof olds, "%u gears", len - (uint32_t)first);
+  log_first(p, car, olds, p->e.value);
+  *(void **)((char *)dt + p->offset) = now;
+}
+
 /* Writes an Axle value into the front and/or rear axle of CarDynamics cd; the AXLES_* to pass
  * on, 0 if nothing changed. */
 static int write_axles(patch *p, void *cd, const char *car) {
@@ -505,15 +552,9 @@ static int write_patch(patch *p, void *obj, const char *car) {
     *at = p->v.v.f32;
     *(float *)(o + p->aux2) = p->v.v.f32 + *(float *)(o + p->aux);
     return 0;
-  case RD_CAR_GEAR: {
-    void *gears = field_ptr(obj, p->offset);
-    const int32_t i = *(int32_t *)(o + p->aux) + p->prop->index - 1;
-    if (gears && g_il2cpp.array_length && i >= 0 && (uint32_t)i < g_il2cpp.array_length(gears)) {
-      log_field(p, car, gears, RD_IL2CPP_ARRAY_DATA + 4 * (uint32_t)i);
-      ((float *)((char *)gears + RD_IL2CPP_ARRAY_DATA))[i] = p->v.v.f32;
-    }
+  case RD_CAR_GEARS:
+    write_gears(p, obj, car);
     return 0;
-  }
   case RD_CAR_MASS: {
     void *body = field_ptr(obj, g_off_body);
     if (!body && obj == g_build_drivetrain) body = g_build_body;

@@ -20,6 +20,7 @@
 #define RD_CAR_ALL        "*"    /* the section for every car */
 #define RD_CAR_PARENTS    12     /* how far up the object tree a component's car is looked for */
 #define RD_CAR_CURVE_MAX  32     /* keys of a torque_curve */
+#define RD_CAR_GEARS_MAX  10     /* forward gears of `gears` */
 
 /* How a cars.ini key reaches the game. */
 typedef enum {
@@ -30,7 +31,8 @@ typedef enum {
   RD_CAR_POWER,      /* stock peak hp: powerMultiplier from the game's CalcMaxPowerMaxTorque */
   RD_CAR_CURVE,      /* Drivetrain.torqueCurve: rpm:Nm keys through AnimationCurve.SetKeys */
   RD_CAR_TURBO_BAR,  /* maxTurboPressure, and the limit Awake derives from it */
-  RD_CAR_GEAR,       /* Drivetrain.gearRatios[first + index - 1] */
+  RD_CAR_GEARS,      /* the forward gears: Drivetrain.gearRatios from `first` on, replaced by
+                        a new array of that many gears (the reverse and neutral kept) */
   RD_CAR_MASS,       /* kg: the car's Rigidbody.mass through its setter */
 } rd_car_kind;
 
@@ -53,7 +55,6 @@ typedef struct {
   const char *cls;            /* the class written to (RD_CAR_AXLE: Axle) */
   const char *field;          /* its field */
   const char *unit;           /* what the value is, for docs and checks */
-  int index;                  /* RD_CAR_GEAR: the gear, 1 = first */
   int axle;                   /* RD_CAR_AXLE: RD_AXLE_FRONT | RD_AXLE_REAR */
   const char *const *names;   /* an enum field: its value names in order, NULL-terminated */
 } rd_car_prop;
@@ -89,6 +90,10 @@ int rd_car_enum(const char *const *names, const char *name);
 /* A torque_curve value "rpm:Nm rpm:Nm ..." into rpm[] / nm[] (at most max pairs). Returns the
  * number of pairs, or -1 unless there are 2 or more, all finite, rpm >= 0 and rising. */
 int rd_car_curve_parse(const char *text, float *rpm, float *nm, int max);
+
+/* A gears value "3.6 2.1 1.5 ..." (ratios of 1st, 2nd, ...) into out (at most max). Returns
+ * the number of gears, or -1 unless there are 1 or more, all finite and above 0. */
+int rd_car_gears_parse(const char *text, float *out, int max);
 
 /* The powerMultiplier giving peak `target` when the curve's own peak (at factor 1) is `peak`;
  * -1 when it cannot be computed (no peak, bad value). */

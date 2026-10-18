@@ -62,7 +62,7 @@ A car's characteristics by its name -- no classes, no patterns:
 [*]                 # every car (a car's own section wins)
 tcs = 0
 [E30M]              # names: uv run python -m tools.mod_assets cars
-power = 197         # hp; also torque_curve, drive, gear_1, rear_diff, weight, ... (the guide)
+power = 197         # hp; also torque_curve, drive, gears, rear_diff, weight, ... (the guide)
 Wheel.gripMaterial = 1.1
 ```
 
