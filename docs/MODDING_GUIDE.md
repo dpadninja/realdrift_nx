@@ -107,7 +107,7 @@ gear_1 = 3.6
 - **The engine curve**: the cars take their torque from a curve, rpm -> Nm
   (`Drivetrain.torqueCurve`). `uv run python -m tools.mod_assets curves E30M` prints the car's
   own curve as a `torque_curve =` line to start from. The curve's shape is `torque_curve`, its
-  height `power` or `torque`. Neither `rev_limit` nor `max_rpm` changes the curve:
+  height `power`. Neither `rev_limit` nor `max_rpm` changes the curve:
   - `rev_limit` (`limiterRPM`) is where the revs stop: at it the game cuts the throttle for
     the car's limiter time (a bouncing limiter) or, with no limiter time, holds the revs there;
   - `max_rpm` (`maxRPM`) is not a cut: the engine's internal friction grows with rpm / maxRPM
@@ -131,7 +131,7 @@ The port writes each key when the game reads it:
 
 | Key | Value | When | The game's value |
 |---|---|---|---|
-| `power` / `torque` | hp / Nm at the curve's peak, stock (the player's engine tuning adds on top); give one | once | `Drivetrain.powerMultiplier`, from `CalcMaxPowerMaxTorque` |
+| `power` | hp at the curve's peak, stock (the player's engine tuning adds on top): scales the whole curve | once | `Drivetrain.powerMultiplier`, from `CalcMaxPowerMaxTorque` |
 | `torque_curve` | 2 to 32 `rpm:Nm` pairs, rpm rising (`curves` prints the car's own) | once | `Drivetrain.torqueCurve` via `AnimationCurve.SetKeys` + `SmoothTangents` |
 | `turbo` | 0 / 1 | live | `Drivetrain.turboCharged` |
 | `turbo_bar` | bar | live | `Drivetrain.maxTurboPressure` (+ the limit `Awake` derives) |

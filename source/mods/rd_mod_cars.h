@@ -28,7 +28,6 @@ typedef enum {
                         `names` -- then the game's SetWheelsParams / SetBrakes / SetTiresType */
   RD_CAR_DRIVE,      /* Drivetrain.transmission by name, then SetTransmission */
   RD_CAR_POWER,      /* stock peak hp: powerMultiplier from the game's CalcMaxPowerMaxTorque */
-  RD_CAR_TORQUE,     /* stock peak Nm: the same through maxTorque */
   RD_CAR_CURVE,      /* Drivetrain.torqueCurve: rpm:Nm keys through AnimationCurve.SetKeys */
   RD_CAR_TURBO_BAR,  /* maxTurboPressure, and the limit Awake derives from it */
   RD_CAR_GEAR,       /* Drivetrain.gearRatios[first + index - 1] */

@@ -73,7 +73,6 @@
                                                            the engine torque factor (FixedUpdate) */
 #define RD_FLD_TUNING_MULTIPLIER  "externalMultiplier"  /* the game's engine tuning */
 #define RD_FLD_MAX_POWER          "maxPower"            /* hp, the curve's peak (an output) */
-#define RD_FLD_MAX_TORQUE         "maxTorque"           /* Nm, the curve's peak (an output) */
 #define RD_FLD_TURBO              "turboCharged"
 #define RD_FLD_TURBO_BAR          "maxTurboPressure"
 #define RD_FLD_TURBO_EXTRA        "externalTurboPressure"

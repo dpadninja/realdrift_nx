@@ -24,7 +24,6 @@ static const char *const SUFFIXES[] = RD_CAR_NAME_SUFFIXES;
 static const rd_car_prop PROPS[] = {
   /* engine */
   { "power",        RD_CAR_POWER,     RD_CAR_ONCE,  DT, RD_FLD_POWER_MULTIPLIER, "hp, stock peak", 0, 0, NULL },
-  { "torque",       RD_CAR_TORQUE,    RD_CAR_ONCE,  DT, RD_FLD_POWER_MULTIPLIER, "Nm, stock peak", 0, 0, NULL },
   { "torque_curve", RD_CAR_CURVE,     RD_CAR_ONCE,  DT, RD_FLD_TORQUE_CURVE,     "rpm:Nm pairs", 0, 0, NULL },
   { "turbo",        RD_CAR_FIELD,     RD_CAR_LIVE,  DT, RD_FLD_TURBO,            "0 / 1", 0, 0, NULL },
   { "turbo_bar",    RD_CAR_TURBO_BAR, RD_CAR_LIVE,  DT, RD_FLD_TURBO_BAR,        "bar", 0, 0, NULL },

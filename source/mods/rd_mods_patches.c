@@ -51,7 +51,7 @@ typedef struct {
   const rd_car_prop *prop;       /* cars.ini: its own key, NULL for a field */
   void            *klass;
   uint32_t         offset;
-  uint32_t         aux;          /* a second field: maxPower / maxTorque, first gear, turbo extra */
+  uint32_t         aux;          /* a second field: maxPower, first gear, turbo extra */
   uint32_t         aux2;         /* a third: the turbo limit */
   void            *method;       /* SetTransmission / CalcMaxPowerMaxTorque / the set_mass icall */
   rd_patch_value   v;
@@ -231,12 +231,10 @@ static int resolve_car_key(patch *p) {
     return p->v.v.i32 >= 0 && p->method && g_il2cpp.runtime_invoke &&
            field_of(p->klass, RD_FLD_TRANSMISSION, 0, &p->offset);
   case RD_CAR_POWER:
-  case RD_CAR_TORQUE:
     p->method = method(p->klass, RD_MTH_CALC_MAX_POWER, 2);
     return float_value(p, 1) && p->method && g_il2cpp.runtime_invoke &&
            field_of(p->klass, RD_FLD_POWER_MULTIPLIER, RD_IL2CPP_TYPE_R4, &p->offset) &&
-           field_of(p->klass, k->kind == RD_CAR_POWER ? RD_FLD_MAX_POWER : RD_FLD_MAX_TORQUE,
-                    RD_IL2CPP_TYPE_R4, &p->aux);
+           field_of(p->klass, RD_FLD_MAX_POWER, RD_IL2CPP_TYPE_R4, &p->aux);
   case RD_CAR_CURVE:
     p->nkeys = rd_car_curve_parse(p->e.value, p->rpm, p->nm, RD_CAR_CURVE_MAX);
     p->method = method(p->klass, RD_MTH_CALC_MAX_POWER, 2);
@@ -438,7 +436,7 @@ static void write_curve(const patch *p, void *dt) {
   if (p->method) calc_max_power(p, dt, *(float *)((char *)dt + p->aux));   /* the specs shown */
 }
 
-/* Writes the power or torque target: the multiplier from the curve's own peak, then the
+/* Writes the power target: the multiplier from the curve's own peak, then the
  * game's maxPower / maxTorque as it would compute them at that multiplier (the specs screen). */
 static void write_power(patch *p, void *dt, const char *car) {
   if (calc_max_power(p, dt, 1)) return;
@@ -497,7 +495,6 @@ static int write_patch(patch *p, void *obj, const char *car) {
     return 0;
   }
   case RD_CAR_POWER:
-  case RD_CAR_TORQUE:
     write_power(p, obj, car);
     return 0;
   case RD_CAR_CURVE:
@@ -562,7 +559,7 @@ static int objects_of(void *klass, void **out, int max) {
   return n;
 }
 
-/* One object: every applying patch of its class, the torque curve before power and torque. */
+/* One object: every applying patch of its class, the torque curve before power. */
 static void patch_object(int first, void *obj, int mask, const char *name, const char *car) {
   const patch *last = NULL;
   int axles = 0;

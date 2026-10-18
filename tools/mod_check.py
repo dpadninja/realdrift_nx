@@ -68,7 +68,7 @@ LOADER_RELOCS = {
 PATCH_TYPES = {"bool", "int", "uint", "long", "float", "double"}
 CARS_INI = "cars.ini"
 # 0 and below are refused by the port (rd_mods_patches.c) or make no sense
-POSITIVE_KEYS = {"power", "torque", "weight", "final_ratio"} | {f"gear_{n}" for n in range(1, 7)}
+POSITIVE_KEYS = {"power", "weight", "final_ratio"} | {f"gear_{n}" for n in range(1, 7)}
 CURVE_KEY = "torque_curve"  # rpm:Nm pairs, checked by the port's parser (rd_mod_cars.c)
 SYMBOLS_H = ROOT / "source/game/rd_game_symbols.h"
 ICALL_IN_STRINGS = re.compile(rb"UnityEngine\.[\w.]*(?:/\w+)*::\w+")
