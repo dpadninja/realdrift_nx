@@ -61,8 +61,14 @@ nested classes are `Outer/Inner`), then `field = value`:
 ```ini
 [Assembly-CSharp:Drivetrain]
 limiterRPM = 9500
+
+[Assembly-CSharp:CarController @ Skyline*]   # only objects named like this
+ESPStrength = 0.3
 ```
 
+- `@ pattern` limits a section to objects whose name matches (`*` any run, `?` one
+  character, case-sensitive). A component's name is its GameObject's (`Skyline(Clone)`);
+  the `inspect` example logs them. Without `@`, every object of the class.
 - Field types: `bool` (0/1/true/false), `int`, `uint`, `long`, `float`, `double`. Enums,
   strings and references are refused.
 - Values go into every live object of the class after each scene change and again once a
@@ -113,7 +119,7 @@ Lifecycle: `rd_mod_entry` runs at boot before Unity starts (register `on_game_re
 `on_scene` after each scene change; `on_frame` every frame. All on the main thread.
 
 Finding things: `find_class`, `find_nested`, `field`, `method`, `method_code`, `invoke`, `new_object`,
-`new_string`, `string_eq`, `find_objects`, `icall`. Logging and settings: `log`, `ini`,
+`new_string`, `string_eq`, `find_objects`, `object_name`, `icall`. Logging and settings: `log`, `ini`,
 `id`, `dir`. Screen: `draw_text` (3x5 font, 720p coordinates). Versioning: `version`, `size`.
 
 ### Which hook

@@ -123,6 +123,10 @@ static int api_inline_hook(void *code, void *fn, void **orig) {
   return r == 0 ? 0 : r == -1 ? RD_MOD_EARG : RD_MOD_EFULL;
 }
 
+static int api_object_name(void *obj, char *buf, int n) {
+  return buf && n > 0 ? rd_mods_object_name(obj, buf, (size_t)n) : 0;
+}
+
 static void api_draw_text(float x, float y, float size, uint32_t rgba, const char *text) {
   if (text) rd_mods_text(x, y, size, rgba, text);
 }
@@ -153,5 +157,6 @@ void rd_mods_api_fill(rd_mod_slot *s) {
     .method_code = api_method_code,
     .inline_hook = api_inline_hook,
     .draw_text = api_draw_text,
+    .object_name = api_object_name,
   };
 }

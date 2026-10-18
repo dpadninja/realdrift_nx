@@ -5,8 +5,9 @@
  *
  *   mod_ini_check <mod folder>
  *
- * Output, one line each:  info <key>=<value> | patch <line> <section> <field> <value>
- *                         | error <message>
+ * Output, one line each:  info <key>=<value> | error <message>
+ *   | patch<TAB>line<TAB>assembly<TAB>class<TAB>filter<TAB>field<TAB>value (tabs: names and
+ *     values may contain spaces; filter is empty for every object)
  * Exit 0 if mod.ini is valid (patch.ini problems are reported but do not fail).
  * MIT (see LICENSE). */
 #include <stdio.h>
@@ -65,11 +66,13 @@ int main(int argc, char **argv) {
     } else {
       for (int i = 0; i < g_ini.n; i++) {
         const rd_ini_entry *e = &g_ini.e[i];
-        char as[RD_INI_SECTION_LEN], ns[RD_INI_SECTION_LEN], cls[RD_INI_SECTION_LEN];
-        if (!e->section[0] || rd_patch_section(e->section, as, sizeof as, ns, sizeof ns, cls, sizeof cls))
-          printf("error patch.ini line %d: \"%s\" is not under an [Assembly:Class] section\n", e->line, e->key);
+        rd_patch_target t;
+        if (!e->section[0] || rd_patch_target_parse(e->section, &t))
+          printf("error patch.ini line %d: \"%s\" is not under an [Assembly:Class @ filter] section\n",
+                 e->line, e->key);
         else
-          printf("patch %d %s %s%s%s %s %s\n", e->line, as, ns, ns[0] ? "." : "", cls, e->key, e->value);
+          printf("patch\t%d\t%s\t%s%s%s\t%s\t%s\t%s\n", e->line, t.assembly, t.ns, t.ns[0] ? "." : "",
+                 t.cls, t.filter, e->key, e->value);
       }
     }
   }

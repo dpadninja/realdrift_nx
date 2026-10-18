@@ -58,6 +58,19 @@ int rd_patch_parse(int type, const char *text, rd_patch_value *out) {
   }
 }
 
+int rd_name_match(const char *pattern, const char *name) {
+  const char *star = NULL, *resume = NULL;   /* last '*' and where its match would continue */
+  while (*name) {
+    if (*pattern == '*') { star = pattern++; resume = name; continue; }
+    if (*pattern == '?' || *pattern == *name) { pattern++; name++; continue; }
+    if (!star) return 0;
+    pattern = star + 1;                      /* let the last '*' eat one more character */
+    name = ++resume;
+  }
+  while (*pattern == '*') pattern++;
+  return *pattern == 0;
+}
+
 void rd_patch_write(void *obj, uint32_t offset, const rd_patch_value *v) {
   char *p = (char *)obj + offset;
   switch (v->type) {

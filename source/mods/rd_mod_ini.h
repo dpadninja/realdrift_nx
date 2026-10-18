@@ -4,7 +4,8 @@
  * INI text: "key = value" lines, "[section]" headers, '#' or ';' starts a comment line, blank
  * lines are ignored, spaces around keys and values are trimmed. mod.ini uses no sections;
  * patch.ini has one section per class: "[Assembly:Namespace.Class]" (nested classes as
- * "Outer/Inner", the game's classes have no namespace: "[Assembly-CSharp:Drivetrain]").
+ * "Outer/Inner", the game's classes have no namespace: "[Assembly-CSharp:Drivetrain]"),
+ * optionally limited to objects by name: "[Assembly-CSharp:CarController @ Skyline*]".
  *
  * mod.ini keys known to the port are the RD_MOD_INI_KEYS table (rd_mod_ini.c): docs/MODDING.md
  * and tools/mod_new.py are checked against it (tests/test_modding_docs.py). Other keys are the
@@ -64,9 +65,17 @@ extern const int RD_MOD_INI_NKEYS;
 int rd_mod_info_read(const rd_ini *ini, const char *folder, rd_mod_info *info, char *err,
                      size_t errn);
 
-/* Splits a patch.ini section "Assembly:Namespace.Class" (class may be "Outer/Inner").
- * Returns 0, or -1 if it has no ':' or an empty part; ns is "" when there is no '.'. */
-int rd_patch_section(const char *section, char *assembly, size_t an, char *ns, size_t nn,
-                     char *cls, size_t cn);
+/* A patch.ini section split up: "Assembly:Namespace.Class @ filter". */
+typedef struct {
+  char assembly[RD_INI_SECTION_LEN];
+  char ns[RD_INI_SECTION_LEN];       /* "" when the class has no namespace */
+  char cls[RD_INI_SECTION_LEN];      /* nested classes as "Outer/Inner" */
+  char filter[RD_INI_SECTION_LEN];   /* object name pattern after '@' ("" = every object) */
+} rd_patch_target;
+
+/* Splits a patch.ini section. The optional " @ pattern" limits the values to objects whose
+ * name matches (rd_name_match, rd_mod_patch.h). Returns 0, or -1 if it has no ':', an empty
+ * part, or an '@' without a pattern. */
+int rd_patch_target_parse(const char *section, rd_patch_target *t);
 
 #endif

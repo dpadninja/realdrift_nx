@@ -21,6 +21,10 @@ int rd_patch_parse(int type, const char *text, rd_patch_value *out);
 /* Writes v into the field at `offset` of obj. */
 void rd_patch_write(void *obj, uint32_t offset, const rd_patch_value *v);
 
+/* 1 if `name` matches `pattern`: '*' is any run of characters (also none), '?' one character,
+ * everything else itself (case-sensitive). The patch.ini "@ filter" of object names. */
+int rd_name_match(const char *pattern, const char *name);
+
 /* Name of a supported type ("float", ...), or "unsupported". */
 const char *rd_patch_type_name(int type);
 

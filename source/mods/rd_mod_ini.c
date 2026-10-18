@@ -127,20 +127,21 @@ static int part(char *out, size_t n, const char *b, const char *e) {
   return copy_trim(out, n, b, e) || !out[0] ? -1 : 0;
 }
 
-int rd_patch_section(const char *section, char *assembly, size_t an, char *ns, size_t nn,
-                     char *cls, size_t cn) {
-  const char *colon = strchr(section, ':');
-  if (!colon || part(assembly, an, section, colon)) return -1;
-  const char *name = colon + 1, *end = name + strlen(name);
+int rd_patch_target_parse(const char *section, rd_patch_target *t) {
+  memset(t, 0, sizeof *t);
+  const char *at = strchr(section, '@');
+  const char *end = at ? at : section + strlen(section);
+  if (at && part(t->filter, sizeof t->filter, at + 1, at + strlen(at))) return -1;
+  const char *colon = memchr(section, ':', (size_t)(end - section));
+  if (!colon || part(t->assembly, sizeof t->assembly, section, colon)) return -1;
+  const char *name = colon + 1;
   /* the namespace ends at the last '.' before any nested-class '/' */
-  const char *slash = strchr(name, '/');
+  const char *slash = memchr(name, '/', (size_t)(end - name));
   const char *dot = NULL;
   for (const char *q = name; q < (slash ? slash : end); q++) if (*q == '.') dot = q;
   if (dot) {
-    if (part(ns, nn, name, dot)) return -1;
+    if (part(t->ns, sizeof t->ns, name, dot)) return -1;
     name = dot + 1;
-  } else {
-    if (nn) ns[0] = 0;
   }
-  return part(cls, cn, name, end);
+  return part(t->cls, sizeof t->cls, name, end);
 }

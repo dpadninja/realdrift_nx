@@ -51,6 +51,19 @@ static void test_write(void) {
   CHECK(obj[24] == 0xAA);
 }
 
+/* Object-name patterns: '*' matches any run (also empty), '?' one character, the rest is
+ * literal and case-sensitive, so "Skyline*" picks the spawned "Skyline(Clone)" and a name
+ * without '*' must match exactly. */
+static void test_name_match(void) {
+  CHECK(rd_name_match("Skyline*", "Skyline(Clone)") && rd_name_match("Skyline*", "Skyline"));
+  CHECK(!rd_name_match("Skyline*", "skyline(Clone)"));          /* case-sensitive */
+  CHECK(rd_name_match("*GTR*", "Car_GTR_v2") && !rd_name_match("*GTR*", "Car_GT"));
+  CHECK(rd_name_match("Lada VTS", "Lada VTS") && !rd_name_match("Lada VTS", "Lada VTS(Clone)"));
+  CHECK(rd_name_match("S?5*", "S15(Clone)") && !rd_name_match("S?5", "S5"));
+  CHECK(rd_name_match("*", "") && rd_name_match("**a", "a") && !rd_name_match("a*b", "acd"));
+  CHECK(rd_name_match("a*b*c", "aXbYbZc") && !rd_name_match("", "x"));
+}
+
 /* Type names for log lines. */
 static void test_type_names(void) {
   CHECK(!strcmp(rd_patch_type_name(RD_IL2CPP_TYPE_R4), "float"));
@@ -62,5 +75,6 @@ int main(void) {
   RUN(test_parse);
   RUN(test_write);
   RUN(test_type_names);
+  RUN(test_name_match);
   return g_failures != 0;
 }

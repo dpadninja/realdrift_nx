@@ -32,6 +32,7 @@ class PatchLine:
     cls: str  # "Ns.Class" or "Class", nested as "Outer/Inner"
     field: str
     value: str
+    filter: str = ""  # object name pattern of "[Asm:Class @ filter]", "" = every object
 
 
 def checker() -> Path:
@@ -54,13 +55,14 @@ def parse_checker_output(text: str) -> tuple[dict[str, str], list[PatchLine], li
     patches: list[PatchLine] = []
     errors: list[str] = []
     for line in text.splitlines():
+        if line.startswith("patch\t"):
+            num, asm, cls, filt, fld, value = (line.split("\t")[1:] + [""] * 6)[:6]
+            patches.append(PatchLine(int(num), asm, cls, fld, value, filt))
+            continue
         kind, _, rest = line.partition(" ")
         if kind == "info":
             key, _, value = rest.partition("=")
             info[key] = value
-        elif kind == "patch":
-            num, asm, cls, fld, value = (rest.split(" ", 4) + [""] * 5)[:5]
-            patches.append(PatchLine(int(num), asm, cls, fld, value))
         elif kind == "error":
             errors.append(rest)
     return info, patches, errors

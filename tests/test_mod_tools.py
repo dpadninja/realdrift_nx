@@ -149,6 +149,27 @@ def test_patches_against_the_dump(tmp_path):
 
 
 @needs_cc
+def test_filtered_section(tmp_path):
+    """A section limited to objects by name ("@ pattern", spaces allowed) is read by the port's
+    parser with its filter and checked against the dump like any other.
+    """
+    mod = write_mod(
+        tmp_path,
+        "f",
+        "id = f\napi = 1\n",
+        "[Assembly-CSharp:Drivetrain @ Lada VTS*]\nlimiterRPM = 9000\n",
+    )
+    _, patches = mod_check.check_ini(mod, mod_check.Report())
+    assert [(p.cls, p.filter, p.field) for p in patches] == [
+        ("Drivetrain", "Lada VTS*", "limiterRPM")
+    ]
+    assert not mod_check.check_mod(mod, parse_dump(DUMP), None).errors
+    bad = write_mod(tmp_path, "g", "id = g\napi = 1\n", "[Assembly-CSharp:Drivetrain @ ]\nx = 1\n")
+    rep = mod_check.check_mod(bad, None, None)
+    assert any("Assembly:Class @ filter" in e for e in rep.errors)
+
+
+@needs_cc
 def test_patches_without_a_dump_warn(tmp_path):
     """Without a dump the patches cannot be checked: a warning, not a failure."""
     mod = write_mod(tmp_path, "p", "id = p\napi = 1\n", "[Assembly-CSharp:X]\na = 1\n")
@@ -157,14 +178,18 @@ def test_patches_without_a_dump_warn(tmp_path):
 
 
 def test_parse_checker_output():
-    """The checker's output lines become info, patch lines (values may contain spaces) and
-    errors.
+    """The checker's output lines become info, patch lines (values and object-name filters may
+    contain spaces, so fields are tab-separated) and errors.
     """
     info, patches, errors = mod_ini.parse_checker_output(
-        "info id=a\npatch 3 Assembly-CSharp Ns.Cls f a b\nerror bad thing\n"
+        "info id=a\npatch\t3\tAssembly-CSharp\tNs.Cls\t\tf\ta b\n"
+        "patch\t4\tAssembly-CSharp\tCarController\tLada VTS*\tESP\t0\nerror bad thing\n"
     )
     assert info == {"id": "a"} and errors == ["bad thing"]
-    assert patches == [mod_ini.PatchLine(3, "Assembly-CSharp", "Ns.Cls", "f", "a b")]
+    assert patches == [
+        mod_ini.PatchLine(3, "Assembly-CSharp", "Ns.Cls", "f", "a b"),
+        mod_ini.PatchLine(4, "Assembly-CSharp", "CarController", "ESP", "0", "Lada VTS*"),
+    ]
 
 
 def test_no_mod_ini():

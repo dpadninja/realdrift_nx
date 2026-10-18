@@ -24,13 +24,17 @@ static void dump(const char *why) {
   void *objs[8];
   int n = klass ? api->find_objects(klass, objs, 8) : 0;
   api->log(api, "%s: %d objects", why, n);
-  for (int o = 0; o < n && o < nobjects; o++)
+  for (int o = 0; o < n && o < nobjects; o++) {
+    char name[96];
+    api->object_name(objs[o], name, sizeof name);
+    api->log(api, "  #%d \"%s\"", o, name);   /* what patch.ini's "@ filter" matches */
     for (int f = 0; f < nfields; f++) {
       const char *p = (const char *)objs[o] + offsets[f];
       if (types[f] == 'f') api->log(api, "  #%d %s = %f", o, names[f], (double)*(const float *)p);
       else if (types[f] == 'b') api->log(api, "  #%d %s = %d", o, names[f], *(const unsigned char *)p);
       else api->log(api, "  #%d %s = %d", o, names[f], *(const int *)p);
     }
+  }
 }
 
 static void on_ready(void *user) {

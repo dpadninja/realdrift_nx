@@ -4,6 +4,7 @@
 #ifndef RD_MODS_INTERNAL_H
 #define RD_MODS_INTERNAL_H
 
+#include <stddef.h>
 #include "rd_icall.h"
 #include "rd_mod.h"
 #include "rd_mod_ini.h"
@@ -39,6 +40,11 @@ extern int g_rd_mods_nicalls;
 
 /* Queues a line of text for the next frames (rd_mods.c, locked). */
 void rd_mods_text(float x, float y, float size, uint32_t rgba, const char *text);
+
+/* The name of an object (a component: its GameObject's name) as ASCII into buf; its length,
+ * 0 if it has none (rd_mods.c). */
+#define RD_MODS_NAME_LEN 128
+int rd_mods_object_name(void *obj, char *buf, size_t n);
 
 /* Live objects of klass (rd_mods.c): up to max into out; count, or a negative RD_MOD_E*. */
 int rd_mods_find_objects(void *klass, void **out, int max);

@@ -3,7 +3,8 @@
  *   sdmc:/switch/realdrift_nx/mods/<id>/
  *     mod.ini     id, name, version, api, enabled, priority, plus the mod's own keys
  *     mod.so      optional native code (this header), built by tools/mod_new.py's Makefile
- *     patch.ini   optional field values set on every live object of a class
+ *     patch.ini   optional field values set on live objects of a class (or only on the
+ *                 objects whose name matches: [Assembly-CSharp:CarController @ Skyline*])
  *     files/apk/  optional files replacing (or added to) base.apk members, same paths
  *     files/obb/  the same for the OBB
  *
@@ -108,6 +109,13 @@ struct rd_mod_api {
    * (scaled to the render size), `size` pixels per font pixel (2-4 reads well), colour
    * 0xRRGGBBAA. Built-in 3x5 font: digits, A-Z, common punctuation. */
   void (*draw_text)(float x, float y, float size, uint32_t rgba, const char *text);
+
+  /* ---- added after the first release: check m->size before use in older ports ---- */
+
+  /* The name of obj -- for a component its GameObject's name ("Skyline(Clone)") -- as ASCII
+   * into buf (n bytes). Returns its length, 0 if none. This is what patch.ini's "@ filter"
+   * matches. */
+  int (*object_name)(void *obj, char *buf, int n);
 };
 
 /* The entry point: return 0 to stay loaded (anything else: the mod is skipped). *user is

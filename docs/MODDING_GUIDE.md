@@ -64,9 +64,11 @@ field. `Assembly-CSharp` is the game's own code; Unity's classes are in other as
 - **Only MonoBehaviour classes** (components) and other `UnityEngine.Object`s. `il2cpp_find
   class X` shows the base class: `class Drivetrain : MonoBehaviour` works; `class CarValue`
   (no base) is a plain C# object and is never found -- change it with code.
-- **Every object of the class** gets the value: every car in the scene (whichever car you
-  drive, and any other car object the scene has), every copy of a menu panel. There is no
-  "only this one" yet -- that needs code (section 6).
+- **Every object of the class** gets the value -- every car in the scene, every copy of a menu
+  panel -- unless the section names objects: `[Assembly-CSharp:CarController @ Skyline*]`
+  writes only into objects whose name matches (`*` any run of characters, `?` one, case
+  matters). A component's name is the name of its GameObject, usually the prefab's name plus
+  `(Clone)` for spawned ones; section 7.4 shows how to see the real names.
 - **Only fields of type** bool, int, uint, long, float, double. Not enums, strings, vectors,
   colours, references or arrays.
 - **Only instance fields** (not `static`), including fields declared in a base class.
@@ -226,10 +228,13 @@ objects = 2
 ```
 ```
 [mod:inspect] <scene name>: <how many> objects
+[mod:inspect]   #0 "<object name>"
 [mod:inspect]   #0 limiterRPM = <value>
 ```
 
-Use it to learn the original values before patching, and to check that a patch arrived.
+Each object is logged with its name (`#0 "Skyline(Clone)"`) -- the name a patch.ini
+`@ filter` matches. Use it to learn the names and the original values before patching, and
+to check that a patch arrived.
 
 ### 7.5 Deeper
 

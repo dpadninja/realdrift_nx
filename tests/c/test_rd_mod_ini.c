@@ -63,19 +63,25 @@ static void test_key_table(void) {
   CHECK(required == 2 && RD_MOD_INI_NKEYS == 6);
 }
 
-/* patch.ini sections split into assembly, namespace and class, with nested classes kept whole
- * and the game's namespace-less classes allowed; malformed sections are refused. */
-static void test_patch_section(void) {
-  char a[64], ns[64], c[64];
-  CHECK(rd_patch_section("Assembly-CSharp:Drivetrain", a, 64, ns, 64, c, 64) == 0);
-  CHECK(!strcmp(a, "Assembly-CSharp") && !strcmp(ns, "") && !strcmp(c, "Drivetrain"));
-  CHECK(rd_patch_section("UnityEngine.CoreModule:UnityEngine.Camera", a, 64, ns, 64, c, 64) == 0);
-  CHECK(!strcmp(a, "UnityEngine.CoreModule") && !strcmp(ns, "UnityEngine") && !strcmp(c, "Camera"));
-  CHECK(rd_patch_section("Asm:Ns.Outer/Inner.X", a, 64, ns, 64, c, 64) == 0);
-  CHECK(!strcmp(ns, "Ns") && !strcmp(c, "Outer/Inner.X"));
-  CHECK(rd_patch_section("NoColon", a, 64, ns, 64, c, 64) == -1);
-  CHECK(rd_patch_section(":Cls", a, 64, ns, 64, c, 64) == -1);
-  CHECK(rd_patch_section("Asm:", a, 64, ns, 64, c, 64) == -1);
+/* patch.ini sections split into assembly, namespace, class and object filter: nested classes
+ * stay whole, the game's namespace-less classes are allowed, a filter may contain spaces and
+ * dots (car names), and malformed sections are refused. */
+static void test_patch_target(void) {
+  rd_patch_target t;
+  CHECK(rd_patch_target_parse("Assembly-CSharp:Drivetrain", &t) == 0);
+  CHECK(!strcmp(t.assembly, "Assembly-CSharp") && !strcmp(t.ns, "") && !strcmp(t.cls, "Drivetrain"));
+  CHECK(!strcmp(t.filter, ""));
+  CHECK(rd_patch_target_parse("UnityEngine.CoreModule:UnityEngine.Camera", &t) == 0);
+  CHECK(!strcmp(t.assembly, "UnityEngine.CoreModule") && !strcmp(t.ns, "UnityEngine") && !strcmp(t.cls, "Camera"));
+  CHECK(rd_patch_target_parse("Asm:Ns.Outer/Inner.X", &t) == 0);
+  CHECK(!strcmp(t.ns, "Ns") && !strcmp(t.cls, "Outer/Inner.X"));
+  CHECK(rd_patch_target_parse("Assembly-CSharp:CarController @ Lada V.T/S*", &t) == 0);
+  CHECK(!strcmp(t.cls, "CarController") && !strcmp(t.ns, "") && !strcmp(t.filter, "Lada V.T/S*"));
+  CHECK(rd_patch_target_parse("NoColon", &t) == -1);
+  CHECK(rd_patch_target_parse(":Cls", &t) == -1);
+  CHECK(rd_patch_target_parse("Asm:", &t) == -1);
+  CHECK(rd_patch_target_parse("Asm:Cls @ ", &t) == -1);   /* '@' needs a pattern */
+  CHECK(rd_patch_target_parse("Asm @ x:Cls", &t) == -1);  /* the filter comes last */
 }
 
 int main(void) {
@@ -83,6 +89,6 @@ int main(void) {
   RUN(test_errors);
   RUN(test_mod_info);
   RUN(test_key_table);
-  RUN(test_patch_section);
+  RUN(test_patch_target);
   return g_failures != 0;
 }

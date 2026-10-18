@@ -47,6 +47,7 @@ static int32_t      g_scene = -1;
 typedef struct {
   int            mod;
   rd_ini_entry   e;            /* section = class, key = field, value */
+  rd_patch_target t;           /* the section split up; t.filter limits it to object names */
   void          *klass;
   uint32_t       offset;
   rd_patch_value v;
@@ -56,13 +57,11 @@ typedef struct {
 static patch *g_patches;
 static int    g_npatches;
 
-/* The class of a patch.ini section (nested classes "Outer/Inner"), or NULL. */
-static void *patch_class(const char *section) {
-  char as[RD_INI_SECTION_LEN], ns[RD_INI_SECTION_LEN], cls[RD_INI_SECTION_LEN];
-  if (rd_patch_section(section, as, sizeof as, ns, sizeof ns, cls, sizeof cls)) return NULL;
-  char *nested = strchr(cls, '/');
+/* The class of a parsed patch.ini section (nested classes "Outer/Inner"), or NULL. */
+static void *patch_class(rd_patch_target *t) {
+  char *nested = strchr(t->cls, '/');
   if (nested) *nested++ = 0;
-  void *k = rd_il2cpp_class(&g_il2cpp, as, ns, cls);
+  void *k = rd_il2cpp_class(&g_il2cpp, t->assembly, t->ns, t->cls);
   while (k && nested) {
     char *next = strchr(nested, '/');
     if (next) *next++ = 0;
@@ -78,7 +77,7 @@ static void resolve_patches(void) {
     patch *p = &g_patches[i];
     const char *id = g_mods[p->mod]->info.id;
     int type = 0;
-    p->klass = patch_class(p->e.section);
+    p->klass = rd_patch_target_parse(p->e.section, &p->t) ? NULL : patch_class(&p->t);
     if (!p->klass) {
       debugPrintf(RD_LOG_TAG_MODS " %s: patch.ini:%d: no class [%s]\n", id, p->e.line, p->e.section);
     } else if (!rd_il2cpp_field_info(&g_il2cpp, p->klass, p->e.key, &p->offset, &type)) {
@@ -94,20 +93,31 @@ static void resolve_patches(void) {
   }
 }
 
-/* Writes every resolved patch into the live objects of its class. */
+/* Writes every resolved patch into the live objects of its class (whose name matches the
+ * patch's "@ filter", if it has one). Patches apply in mod load order, so with two matching
+ * patches of one field the later mod's value is written last. */
 static void apply_patches(void) {
   static void *objs[MAX_OBJECTS];
+  static char names[MAX_OBJECTS][RD_MODS_NAME_LEN];
   for (int i = 0; i < g_npatches; i++) {
     if (!g_patches[i].ok) continue;
-    int done = 0;   /* one object lookup per class: patches of a class follow each other */
+    int done = 0;   /* one object lookup per class */
     for (int j = 0; j < i; j++) done |= g_patches[j].ok && g_patches[j].klass == g_patches[i].klass;
     if (done) continue;
     int n = rd_mods_find_objects(g_patches[i].klass, objs, MAX_OBJECTS);
     if (n > MAX_OBJECTS) n = MAX_OBJECTS;
-    for (int o = 0; o < n; o++)
-      for (int j = i; j < g_npatches; j++)
-        if (g_patches[j].ok && g_patches[j].klass == g_patches[i].klass)
-          rd_patch_write(objs[o], g_patches[j].offset, &g_patches[j].v);
+    int named = 0;  /* object names only when a patch of this class filters by them */
+    for (int j = i; j < g_npatches && !named; j++)
+      named = g_patches[j].ok && g_patches[j].klass == g_patches[i].klass && g_patches[j].t.filter[0];
+    for (int o = 0; o < n; o++) {
+      if (named) rd_mods_object_name(objs[o], names[o], sizeof names[o]);
+      for (int j = i; j < g_npatches; j++) {
+        const patch *p = &g_patches[j];
+        if (!p->ok || p->klass != g_patches[i].klass) continue;
+        if (p->t.filter[0] && !rd_name_match(p->t.filter, names[o])) continue;
+        rd_patch_write(objs[o], p->offset, &p->v);
+      }
+    }
   }
 }
 
@@ -137,6 +147,29 @@ int rd_mods_find_objects(void *klass, void **out, int max) {
   const int n = (int)g_il2cpp.array_length(arr);
   for (int i = 0; i < n && i < max; i++) out[i] = rd_il2cpp_array_at(arr, (uint32_t)i);
   return n;
+}
+
+int rd_mods_object_name(void *obj, char *buf, size_t n) {
+  static void *(*game_object)(void *component);
+  static void *(*get_name)(void *obj);
+  if (!game_object && g_il2cpp.resolve_icall) {
+    game_object = g_il2cpp.resolve_icall(RD_ICALL_GAME_OBJECT);
+    get_name = g_il2cpp.resolve_icall(RD_ICALL_OBJECT_NAME);
+  }
+  if (!n) return 0;
+  buf[0] = 0;
+  if (!obj || !get_name) return 0;
+  /* a component is named after its GameObject; anything else by its own name */
+  void *go = game_object ? game_object(obj) : NULL;
+  void *s = get_name(go ? go : obj);
+  size_t len = 0;
+  if (s && g_il2cpp.string_length && g_il2cpp.string_chars) {
+    const uint16_t *c = g_il2cpp.string_chars(s);
+    const int32_t sl = g_il2cpp.string_length(s);
+    for (; len + 1 < n && (int32_t)len < sl; len++) buf[len] = c[len] < 128 ? (char)c[len] : '?';
+  }
+  buf[len] = 0;
+  return (int)len;
 }
 
 /* ---- text ---- */
