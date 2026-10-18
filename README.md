@@ -16,7 +16,7 @@ Known issues:
 
 ## Features
 
-- **Controller driving.** Physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
+- **Controller driving.** Physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls, plus a separate clutch the mobile game lacks; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
 - **Pause** on a button (`+` by default).
 - **Touch driving controls hidden** during races (optional).
 - **Menus:** use the touchscreen, a USB mouse, or the on-screen cursor (`+` toggles it outside a race, the left stick moves it, `A` taps, `-` toggles gyro pointing).
@@ -73,27 +73,45 @@ switch/realdrift_nx/
 
 `config.txt` is created in the game folder on first launch. See [`config.example.txt`](config.example.txt) for every key, its default and a description.
 
-| Action | Default |
-|---|---|
-| Throttle / Brake | `ZR` / `ZL` |
-| Steering | left stick (or `LEFT` / `RIGHT`) |
-| Handbrake | `B` |
-| Gear up / down | D-pad `UP` / `DOWN` |
-| Camera | `Y` |
-| Pause | `+` |
+### Controls
 
-A binding accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN LEFT RIGHT LSTICK RSTICK`, comma separated, or `NONE`. Other keys:
+Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN LEFT RIGHT LSTICK RSTICK`, comma separated, or `NONE` to unbind. The left stick always steers.
 
-| Key | Values | Meaning |
+| Key | Default | Meaning |
 |---|---|---|
-| `stick_deadzone` | `0.0`–`0.9` | left stick deadzone |
-| `hide_touch_controls` | `0` / `1` | hide the on-screen driving buttons in races |
-| `render_resolution` | `auto` / `720` / `1080` | `auto` = 720p handheld, 1080p docked |
-| `boost_loading` | `0` / `1` | raise the CPU clock while a scene loads |
-| `smoke_size` | `10`–`100` | size of the tyre smoke puffs in percent; `100` (default) = original. Lower it (e.g. `50`) if heavy smoke drops the frame rate |
-| `smoke_amount` | `10`–`100` | percent of the smoke puffs emitted; `100` (default) = original. `50` together with `smoke_size=50` keeps the frame rate steady in heavy smoke |
-| `debug_log` | `0` / `1` | `1` = full `debug.log` for bug reports; `0` (default) = only crashes, stalls and startup |
-| `debug_fps_counter` | `0` / `1` | show frames per second and the slowest frame (ms) in the top-left corner |
+| `bind_throttle` | `ZR` | throttle |
+| `bind_brake` | `ZL` | brake |
+| `bind_handbrake` | `B` | handbrake (the game also disengages the clutch while it is held) |
+| `bind_clutch` | `Y` | clutch, fully pressed while held |
+| `bind_gear_up` | `UP` | shift up |
+| `bind_gear_down` | `DOWN` | shift down |
+| `bind_camera` | `NONE` | switch the camera view |
+| `bind_steer_left` | `LEFT` | steer left (when the left stick is centred) |
+| `bind_steer_right` | `RIGHT` | steer right (when the left stick is centred) |
+| `bind_pause` | `PLUS` | pause / resume the race (also closes the pause menu) |
+| `stick_deadzone` | `0.15` | left stick deadzone, `0.0`–`0.9` |
+
+### Performance
+
+| Key | Values | Default | Meaning |
+|---|---|---|---|
+| `render_resolution` | `auto` / `720` / `1080` | `auto` | `auto` = 720p handheld, 1080p docked |
+| `boost_loading` | `0` / `1` | `1` | raise the CPU clock while a scene loads |
+| `smoke_size` | `10`–`100` | `100` | size of the tyre smoke puffs in percent; `100` = original. Lower it (e.g. `50`) if heavy smoke drops the frame rate |
+| `smoke_amount` | `10`–`100` | `100` | percent of the smoke puffs emitted; `100` = original. `50` together with `smoke_size=50` keeps the frame rate steady in heavy smoke |
+
+### Debugging
+
+| Key | Values | Default | Meaning |
+|---|---|---|---|
+| `debug_log` | `0` / `1` | `0` | `1` = full `debug.log` for bug reports; `0` = only crashes, stalls and startup |
+| `debug_fps_counter` | `0` / `1` | `0` | show frames per second and the slowest frame (ms) in the top-left corner |
+
+### Other
+
+| Key | Values | Default | Meaning |
+|---|---|---|---|
+| `hide_touch_controls` | `0` / `1` | `1` | hide the on-screen driving buttons in races |
 
 When reporting a problem, set `debug_log=1`, reproduce it and attach `sdmc:/switch/realdrift_nx/debug.log`.
 
