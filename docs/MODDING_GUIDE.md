@@ -106,8 +106,13 @@ gear_1 = 3.6
   wheels). So the garage specs show the values too.
 - **The engine curve**: the cars take their torque from a curve, rpm -> Nm
   (`Drivetrain.torqueCurve`). `uv run python -m tools.mod_assets curves E30M` prints the car's
-  own curve as a `torque_curve =` line to start from. `max_rpm` and `rev_limit` only cut the
-  revs; the curve's shape is `torque_curve`, its height `power` or `torque`.
+  own curve as a `torque_curve =` line to start from. The curve's shape is `torque_curve`, its
+  height `power` or `torque`. Neither `rev_limit` nor `max_rpm` changes the curve:
+  - `rev_limit` (`limiterRPM`) is where the revs stop: at it the game cuts the throttle for
+    the car's limiter time (a bouncing limiter) or, with no limiter time, holds the revs there;
+  - `max_rpm` (`maxRPM`) is not a cut: the engine's internal friction grows with rpm / maxRPM
+    (a lower `max_rpm` brakes the engine more at the same revs), and the game looks for the
+    peak power and torque it shows only between `idle_rpm` and `max_rpm`.
 
 #### When a value is written
 
@@ -130,7 +135,9 @@ The port writes each key when the game reads it:
 | `torque_curve` | 2 to 32 `rpm:Nm` pairs, rpm rising (`curves` prints the car's own) | once | `Drivetrain.torqueCurve` via `AnimationCurve.SetKeys` + `SmoothTangents` |
 | `turbo` | 0 / 1 | live | `Drivetrain.turboCharged` |
 | `turbo_bar` | bar | live | `Drivetrain.maxTurboPressure` (+ the limit `Awake` derives) |
-| `rev_limit`, `max_rpm`, `idle_rpm` | rpm | live | `Drivetrain.limiterRPM`, `maxRPM`, `minRPM` |
+| `rev_limit` | rpm: where the revs stop | live | `Drivetrain.limiterRPM` |
+| `max_rpm` | rpm: the scale of engine friction, the end of the range the specs' peak is looked for in | live | `Drivetrain.maxRPM` |
+| `idle_rpm` | rpm | live | `Drivetrain.minRPM` |
 | `drive` | `RWD`, `FWD`, `AWD`, `XWD` | live | `Drivetrain.transmission` + `SetTransmission` |
 | `shift_time` | s | build | `Drivetrain.shiftTime` |
 | `final_ratio` | ratio | build | `Drivetrain.finalDriveRatio` |
