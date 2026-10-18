@@ -288,9 +288,40 @@ static void hook_load_originals(void *self, void *mi) {   /* MenuManager.LoadOri
   g_orig_load_originals(self, mi);
 }
 
+/* Logs the race car's engine and gearbox as the game left them after building it, so one run
+ * on the console shows what cars.ini and the player's tuning produced. */
+static void log_race_car(void *dt) {
+  static const char *const F[] = { RD_FLD_POWER_MULTIPLIER, RD_FLD_TUNING_MULTIPLIER,
+                                   RD_FLD_ACTUAL_MULTIPLIER, RD_FLD_MAX_POWER, RD_FLD_MAX_POWER_RPM,
+                                   RD_FLD_IDLE_RPM, RD_FLD_MAX_RPM, RD_FLD_REV_LIMIT, RD_FLD_FINAL_RATIO };
+  static float (*evaluate)(void *curve, float t);
+  uint32_t off;
+  char line[512], name[RD_MODS_NAME_LEN];
+  int n = 0;
+  if (!dt || !g_drivetrain_class) return;
+  if (!evaluate && g_il2cpp.resolve_icall) evaluate = g_il2cpp.resolve_icall(RD_ICALL_CURVE_EVALUATE);
+  rd_mods_object_name(dt, name, sizeof name);
+  for (size_t i = 0; i < sizeof F / sizeof F[0]; i++)
+    if (field_of(g_drivetrain_class, F[i], RD_IL2CPP_TYPE_R4, &off))
+      n += snprintf(line + n, sizeof line - (size_t)n, " %s=%g", F[i], (double)*(float *)((char *)dt + off));
+  void *gears = field_ptr(dt, g_off_gears);
+  const uint32_t len = gears && g_il2cpp.array_length ? g_il2cpp.array_length(gears) : 0;
+  n += snprintf(line + n, sizeof line - (size_t)n, " gearRatios=");
+  for (uint32_t i = 0; i < len && n < (int)sizeof line - 16; i++)
+    n += snprintf(line + n, sizeof line - (size_t)n, "%s%g", i ? "," : "",
+                  (double)((float *)((char *)gears + RD_IL2CPP_ARRAY_DATA))[i]);
+  void *curve = field_of(g_drivetrain_class, RD_FLD_TORQUE_CURVE, 0, &off) ? field_ptr(dt, off) : NULL;
+  if (curve && evaluate)
+    for (int rpm = 1000; rpm <= 7000 && n < (int)sizeof line - 24; rpm += 2000)
+      n += snprintf(line + n, sizeof line - (size_t)n, " Nm@%d=%g", rpm, (double)evaluate(curve, (float)rpm));
+  debugPrintf(RD_LOG_TAG_MODS " " CARS_INI ": race car %s:%s\n", name, line);
+}
+
 static void hook_update_vehicle(void *self, void *mi) {   /* RaceManager.UpdateVehicle */
-  build_car(field_ptr(self, g_off_race_dt), field_ptr(self, g_off_race_cd), NULL);
+  void *dt = field_ptr(self, g_off_race_dt);
+  build_car(dt, field_ptr(self, g_off_race_cd), NULL);
   g_orig_update_vehicle(self, mi);
+  log_race_car(field_ptr(self, g_off_race_dt));
 }
 
 static void (*g_orig_gear_tuning)(void *self, void *dt, int32_t car, int32_t gear, float ratio, void *mi);
@@ -300,9 +331,12 @@ static void (*g_orig_gear_tuning)(void *self, void *dt, int32_t car, int32_t gea
  * car building. Gear 0 is the final drive; -1 and 0 are the game's "not tuned". */
 static void hook_gear_tuning(void *self, void *dt, int32_t car, int32_t gear, float ratio, void *mi) {
   void *gears = field_ptr(dt, g_off_gears);
-  if (gear > 0 && ratio != -1 && ratio != 0 && gears && (uint32_t)gear + 1 >= g_il2cpp.array_length(gears))
-    return;
-  g_orig_gear_tuning(self, dt, car, gear, ratio, mi);
+  const int skip = gear > 0 && ratio != -1 && ratio != 0 && gears &&
+                   (uint32_t)gear + 1 >= g_il2cpp.array_length(gears);
+  if (ratio != -1 && ratio != 0)   /* the player's saved tuning: it overrides the car's ratio */
+    debugPrintf(RD_LOG_TAG_MODS " " CARS_INI ": the player's tuning of %s %d = %g%s\n",
+                gear ? "gear" : "final drive", (int)gear, (double)ratio, skip ? " skipped (no such gear)" : "");
+  if (!skip) g_orig_gear_tuning(self, dt, car, gear, ratio, mi);
 }
 
 /* Hooks the method `name` of class `cls` with fn; 1 on success (logged otherwise). */
@@ -333,10 +367,8 @@ static void install_hooks(void) {
                      (void **)&g_orig_update_vehicle);
   if (a && b) debugPrintf(RD_LOG_TAG_MODS " " CARS_INI ": hooked %s, %s\n", RD_MTH_LOAD_ORIGINALS,
                           RD_MTH_UPDATE_VEHICLE);
-  int gears = 0;
-  for (int i = 0; i < g_npatches; i++)
-    gears |= g_patches[i].ok && g_patches[i].prop && g_patches[i].prop->kind == RD_CAR_GEARS;
-  if (gears && g_off_gears && g_il2cpp.array_length &&
+  /* the gear tuning guard (for `gears`) also logs the player's tuning applied over cars.ini */
+  if (g_off_gears && g_il2cpp.array_length &&
       hook(RD_CLS_PERSISTENT_DATA, RD_MTH_APPLY_GEAR_TUNING, 4, (void *)hook_gear_tuning,
            (void **)&g_orig_gear_tuning))
     debugPrintf(RD_LOG_TAG_MODS " " CARS_INI ": guarded %s\n", RD_MTH_APPLY_GEAR_TUNING);

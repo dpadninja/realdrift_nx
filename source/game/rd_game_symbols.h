@@ -116,6 +116,8 @@
 #define RD_CLS_KEYFRAME           "Keyframe"            /* UnityEngine, 28 bytes */
 #define RD_ICALL_CURVE_SET_KEYS   "UnityEngine.AnimationCurve::SetKeys"
 #define RD_ICALL_CURVE_SMOOTH     "UnityEngine.AnimationCurve::SmoothTangents"
+#define RD_ICALL_CURVE_EVALUATE   "UnityEngine.AnimationCurve::Evaluate"
+#define RD_FLD_ACTUAL_MULTIPLIER  "actualMultiplier"    /* powerMultiplier x externalMultiplier */
 /* CarDynamics and its axles (CarDynamics.axles -> Axles.frontAxle / rearAxle: Axle); the game
  * copies Axle values into the wheels in SetWheelsParams (Start, FixedUpdate, its tuning). */
 #define RD_CLS_CAR_DYNAMICS       "CarDynamics"
