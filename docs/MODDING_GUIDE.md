@@ -31,7 +31,7 @@ Knowing this makes everything below make sense.
 | File | Changes | Reaches | Needs code |
 |---|---|---|---|
 | `mod.ini` | nothing in the game: the mod's id, API version, load priority, own settings | -- | no |
-| `cars.ini` | **a car's characteristics** by car name: power, drive, turbo, weight, gears, grip, assists | the car(s) named: at once, or (base values) when the car is next built | no |
+| `cars.ini` | **a car's characteristics** by car name: engine curve, power, drive, gears, differential, weight, suspension, tires, brakes, assists | the car named, as the game reads each value | no |
 | `patch.ini` | **numbers and switches** of the game's components: fields of MonoBehaviour objects | live objects of the named class, re-applied every second | no |
 | `assets.ini` | **images and texts**: Texture2D and TextAsset objects, by name, in the APK or the OBB | every place the game draws that texture or reads that text | no |
 | `files/` | whole archive members, byte for byte (advanced; see 5.4) | anything stored in a Unity file | no |
@@ -84,78 +84,95 @@ field. `Assembly-CSharp` is the game's own code; Unity's classes are in other as
 
 ### cars.ini: one car, by its name
 
-Characteristics the way a player thinks of them -- which car, which value, in the game's
-units:
+A car's characteristics the way a player thinks of them -- which car, which value. Every key
+is one of the game's own values (a field, an enum or a method of the car's components), in
+the game's units and names; derived values are computed by the game's own methods.
 
 ```ini
-[Skyline]
-power = 450          # hp at the peak
-drive = AWD
-turbo = 1
-turbo_bar = 1.2
-weight = 1250
-gear_1 = 3.2
-esp_strength = 0.3
+[E30M]
+power = 197          # hp, stock peak
+torque_curve = 0:0 2000:190 4500:240 6500:200 7500:0
+weight = 1200
+rear_diff = two_way_LSD
+rear_tire_pressure = 2.0
+gear_1 = 3.6
 ```
 
 - **Section** = a car name, or `[*]` for every car (a car's own section wins over `[*]`). The
   names (`240Z`, `E30M`, `LadaVTS`, `Skyline`, ...): `uv run python -m tools.mod_assets cars`.
   `mod_check` refuses a name the game does not have.
-- **Which objects**: the car you drive (the object carrying a `CarController`, named
-  `<car>` or `<car>(Clone)`) and the components under it, such as its four `Wheel`s. The menu
-  models (`<car>_Garage`, `<car>_cover`) are not touched.
+- **Which objects**: every model of the car -- the race car `E30M(Clone)`, the garage model
+  `E30M_Garage(Clone)`, the menu model `E30M_cover` -- and the components under it (its
+  wheels). So the garage specs show the values too.
+- **The engine curve**: the cars take their torque from a curve, rpm -> Nm
+  (`Drivetrain.torqueCurve`). `uv run python -m tools.mod_assets curves E30M` prints the car's
+  own curve as a `torque_curve =` line to start from. `max_rpm` and `rev_limit` only cut the
+  revs; the curve's shape is `torque_curve`, its height `power` or `torque`.
+
+#### When a value is written
+
+The port writes each key when the game reads it:
+
+- **build** -- the car's originals. The garage reads them from the car model each time a car
+  is picked (`MenuManager.LoadOriginalValues`), the race when it builds the car
+  (`RaceManager.UpdateVehicle`); the port writes them into the model just before. The game
+  then applies the player's tuning on top (weight reduction, shift time, suspension height,
+  camber, steering angle, weight distribution, tires, gear ratios), as for a stock car.
+- **once** -- written when a car is built and on each scene change; the game never rewrites them.
+- **live** -- read while driving; written every second when it differs. Axle values are
+  passed to the wheels by the game's `SetWheelsParams` / `SetBrakes` / `SetTiresType`.
 
 #### cars.ini keys
 
-**At once** -- the game reads these while driving; written into the car every second:
-
-| Key | Value | What the port does |
-|---|---|---|
-| `power` / `torque` | hp / Nm at the peak, after the player's engine tuning | scales the whole engine curve (`Drivetrain.powerMultiplier`); give one of the two |
-| `drive` | `RWD`, `FWD`, `AWD`, `XWD` | sets `Drivetrain.transmission` and calls `SetTransmission` (picks the powered wheels) |
-| `turbo` | 0 / 1 | `Drivetrain.turboCharged` |
-| `turbo_bar` | bar | `Drivetrain.maxTurboPressure` and the limit the game derives from it |
-| `rev_limit`, `max_rpm`, `idle_rpm` | rpm | `Drivetrain.limiterRPM`, `maxRPM`, `minRPM` |
-| `gear_1` `gear_2` `gear_3` `gear_4` `gear_5` `gear_6` | ratio | `Drivetrain.gearRatios` (from the next shift) |
-| `final_ratio` | ratio | `Drivetrain.finalDriveRatio` |
-| `brake_torque`, `handbrake_torque` | Nm per wheel | `Wheel.brakeFrictionTorque`, `handbrakeFrictionTorque` |
-| `tcs`, `esp`, `abs` | 0 / 1 | `CarController.TCS`, `ESP`, `ABS` |
-| `tcs_slip`, `esp_strength`, `abs_slip` | the assist's setting | `TCSAllowedSlip`, `ESPStrength`, `ABSAllowedSlip` |
-
-**Base values** -- the car's record (`Vehicle` in `PersistentData.vehicles`) that the game's
-own tuning starts from when it builds the car, so the player's upgrades still apply on top.
-They take effect the next time the car is built: picking it in the garage or starting a race.
-They are not written into the save.
-
-| Key | Value | Vehicle field |
-|---|---|---|
-| `weight` | kg (before weight reduction) | `originalWeight` |
-| `shift_time` | s (before shift-time tuning) | `originalShiftTime` |
-| `susp_height` | as the game stores it | `originalSuspHeight` |
-| `front_camber`, `rear_camber` | as the game stores it | `originalFrontCamber`, `originalRearCamber` |
-| `steering_angle` | degrees | `originalSteeringAngle` |
-| `weight_distr` | as the game stores it | `originalWeightDistr` |
-| `front_grip`, `front_side_grip`, `rear_grip`, `rear_side_grip` | grip factor | `originalFrontForwardGrip`, `originalFrontSidewaysGrip`, `originalRearForwardGrip`, `originalRearSidewaysGrip` |
-
-On the console `debug.log` lists every Vehicle record once (`[mods] cars.ini: vehicle 3:
-prefab "...", id "...", name "..."` -- a section matches the last part of the prefab path, the
-id or the name) and each base value it changed with the old value (`weight of Skyline:
-1380 -> 1250`): use it to learn the units the game stores.
+| Key | Value | When | The game's value |
+|---|---|---|---|
+| `power` / `torque` | hp / Nm at the curve's peak, stock (the player's engine tuning adds on top); give one | once | `Drivetrain.powerMultiplier`, from `CalcMaxPowerMaxTorque` |
+| `torque_curve` | 2 to 32 `rpm:Nm` pairs, rpm rising (`curves` prints the car's own) | once | `Drivetrain.torqueCurve` via `AnimationCurve.SetKeys` + `SmoothTangents` |
+| `turbo` | 0 / 1 | live | `Drivetrain.turboCharged` |
+| `turbo_bar` | bar | live | `Drivetrain.maxTurboPressure` (+ the limit `Awake` derives) |
+| `rev_limit`, `max_rpm`, `idle_rpm` | rpm | live | `Drivetrain.limiterRPM`, `maxRPM`, `minRPM` |
+| `drive` | `RWD`, `FWD`, `AWD`, `XWD` | live | `Drivetrain.transmission` + `SetTransmission` |
+| `shift_time` | s | build | `Drivetrain.shiftTime` |
+| `final_ratio` | ratio | build | `Drivetrain.finalDriveRatio` |
+| `gear_1` `gear_2` `gear_3` `gear_4` `gear_5` `gear_6` | ratio | build | `Drivetrain.gearRatios` |
+| `front_diff`, `rear_diff` | `open`, `viscous`, `locked`, `one_way_LSD`, `two_way_LSD`, `one_point_five_way_LSD` | live | `Axle.differential` |
+| `front_diff_preload`, `rear_diff_preload` | Nm | live | `Axle.preLoad` |
+| `front_diff_power`, `rear_diff_power` | LSD ratio on power | live | `Axle.powerRatio` |
+| `front_diff_coast`, `rear_diff_coast` | LSD ratio off power | live | `Axle.coastRatio` |
+| `weight` | kg | build | the car's `Rigidbody.mass` |
+| `weight_distr` | centre of mass, front-rear | build | `CarDynamics.zlocalPosition` |
+| `susp_height` | suspension travel, both axles | build | `Axle.suspensionTravel` |
+| `front_camber`, `rear_camber` | degrees | build | `Axle.camber` |
+| `steering_angle` | degrees | build | front `Axle.maxSteeringAngle` |
+| `front_spring`, `rear_spring` | spring rate | live | `Axle.suspensionRate` |
+| `front_bump`, `rear_bump`, `front_rebound`, `rear_rebound` | damper rates | live | `Axle.bumpRate`, `reboundRate` |
+| `front_antiroll`, `rear_antiroll` | anti-roll bar rate | live | `Axle.antiRollBarRate` |
+| `front_grip`, `front_side_grip`, `rear_grip`, `rear_side_grip` | factor | build | `Axle.forwardGripFactor`, `sidewaysGripFactor` |
+| `front_tires`, `rear_tires` | a `CarDynamics.Tires` name: `sport_front`, `competition_rear`, `supersport_front`, `touring_rear`, ... (`uv run python -m tools.mod_ini keys` lists all) | live | `Axle.tires` + `SetTiresType` |
+| `tire_pressure` | 0 / 1: the game's tire pressure physics | live | `CarDynamics.tirePressureEnabled` |
+| `front_tire_pressure`, `rear_tire_pressure` | bar | live | `Axle.tiresPressure` |
+| `front_brake_torque`, `rear_brake_torque`, `front_handbrake_torque`, `rear_handbrake_torque` | Nm | live | `Axle.brakeFrictionTorque`, `handbrakeFrictionTorque` + `SetBrakes` |
+| `brake_balance`, `handbrake_balance` | front share | live | `CarDynamics.frontRearBrakeBalance`, `frontRearHandBrakeBalance` |
+| `tcs`, `esp`, `abs` | 0 / 1 | live | `CarController.TCS`, `ESP`, `ABS` |
+| `tcs_slip`, `esp_strength`, `abs_slip` | the assist's setting | live | `TCSAllowedSlip`, `ESPStrength`, `ABSAllowedSlip` |
 
 **Anything else** -- any field of the car's components works as a key too: a field of
 `CarController`, `Drivetrain`, `CarDynamics` or `CarSpecs` by its name (`maxPowerRPM`), any
-other component of the car as `Class.field` (`Wheel.gripMaterial`, `Axle.brakeFrictionTorque`),
-and a name two of them share as `Class.field` (`mod_check` says when). These follow
-"Where it stops" above: the field types, values read once at start-up, the game writing a
-value back. Look at the current values with `inspect` (section 7.4) first.
+other component of the car as `Class.field` (`Wheel.gripMaterial`), and a name two of them
+share as `Class.field` (`mod_check` says when). These are written every second and follow
+"Where it stops" above. Look at the current values with `inspect` (section 7.4) first.
 
 #### What is not reachable
 
-- **Gear ratios from the player's tuning screen** win when the car is built; `gear_N` then
-  overrides them while driving. The tuning screen still shows the player's values.
-- **The specs screen** shows the base power and torque, not the `power` / `torque` you set.
-- **Not covered yet**: wheel size (a Vector3), the torque curve's shape (an AnimationCurve),
-  per-gear numbers above the sixth.
+- **The number of gears**: the length of the car's `gearRatios` array; the game's gear screen
+  has six.
+- **Gear ratios in the race**: `RaceManager.UpdateVehicle` takes them from the player's gear
+  tuning saved per car (`Vehicle.customizations`), not from the originals; so `gear_N` and
+  `final_ratio` reach the garage and the specs, and the race only through that tuning (not
+  checked on the console yet).
+- **The tire model's coefficients** (`Wheel.a1`, `b1`, `c`: arrays), **wheel size** (the
+  game's tuning has none; `Wheel.radius` and `width` are read once at start-up) and
+  **aerodynamics** (only as `Class.field` of its components).
 
 ### Find the class and the field
 

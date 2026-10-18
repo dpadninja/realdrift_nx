@@ -7,6 +7,7 @@
 #ifndef RD_MOD_PATCH_H
 #define RD_MOD_PATCH_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct {
@@ -17,6 +18,13 @@ typedef struct {
 /* Parses text for a field of `type`. Returns 0, -1 if the text is not a valid value of the
  * type, -2 if the type is not supported. */
 int rd_patch_parse(int type, const char *text, rd_patch_value *out);
+
+/* 1 if the field at `offset` of obj already holds v (bitwise; an unsupported type: 0). */
+int rd_patch_same(const void *obj, uint32_t offset, const rd_patch_value *v);
+
+/* The field at `offset` of obj, read as v's type, as text into buf (n bytes): "1.5", "3",
+ * "1"; "?" for an unsupported type. For log lines (old -> new). */
+void rd_patch_format(const void *obj, uint32_t offset, const rd_patch_value *v, char *buf, size_t n);
 
 /* Writes v into the field at `offset` of obj. */
 void rd_patch_write(void *obj, uint32_t offset, const rd_patch_value *v);

@@ -32,6 +32,7 @@ needed: the script reference and the object name are Unity's own types):
 
     uv run python -m tools.mod_assets cars                         # the car names for cars.ini
     uv run python -m tools.mod_assets objects --component Drivetrain
+    uv run python -m tools.mod_assets curves E30M                  # its torque curve for cars.ini
 """
 
 from __future__ import annotations
@@ -39,11 +40,12 @@ from __future__ import annotations
 import argparse
 import functools
 import re
+import struct
 import sys
 import tempfile
 import zipfile
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -199,10 +201,11 @@ class Holder:
     name: str  # the GameObject's name
     archive: str
     member: str  # the Unity file
+    raw: bytes = field(default=b"", compare=False)  # the script's serialized data, if asked
 
 
-def holders_in(uf: UnityFile, joined: bytes, script: str) -> Iterator[Holder]:
-    """The objects of one Unity file that carry a script of class `script`."""
+def holders_in(uf: UnityFile, joined: bytes, script: str, raw: bool = False) -> Iterator[Holder]:
+    """The objects of one Unity file carrying a script of class `script` (raw: its data)."""
     try:
         env = UnityPy.load(joined)
     except Exception:  # UnityPy raises anything on non-Unity data
@@ -213,12 +216,13 @@ def holders_in(uf: UnityFile, joined: bytes, script: str) -> Iterator[Holder]:
         try:  # the script's own fields need a typetree; the header fields do not
             d = obj.read(check_read=False)
             if d.m_Script.read().m_ClassName == script:
-                yield Holder(d.m_GameObject.read().m_Name, uf.archive, uf.name)
+                data = obj.get_raw_data() if raw else b""
+                yield Holder(d.m_GameObject.read().m_Name, uf.archive, uf.name, data)
         except Exception:  # an object UnityPy cannot read is skipped
             continue
 
 
-def holders(archives: dict[str, Path], script: str) -> list[Holder]:
+def holders(archives: dict[str, Path], script: str, raw: bool = False) -> list[Holder]:
     """Every object in the archives carrying a script of class `script`, sorted by name."""
     out: list[Holder] = []
     for archive, path in archives.items():
@@ -226,7 +230,7 @@ def holders(archives: dict[str, Path], script: str) -> list[Holder]:
             continue
         with zipfile.ZipFile(path) as z:
             for uf in unity_files(z, archive):
-                out.extend(holders_in(uf, b"".join(z.read(p) for p in uf.parts), script))
+                out.extend(holders_in(uf, b"".join(z.read(p) for p in uf.parts), script, raw))
     return sorted(set(out), key=lambda h: (h.name, h.member))
 
 
@@ -246,6 +250,69 @@ def _car_names(key: tuple[tuple[str, str, int], ...]) -> tuple[str, ...]:
     """car_names for archives given as (archive, path, mtime) -- hashable, so it can be cached."""
     archives = {a: Path(p) for a, p, _ in key}
     return tuple(sorted({h.name for h in holders(archives, CAR_SCRIPT)}))
+
+
+@dataclass(frozen=True)
+class TorqueCurve:
+    """A car's engine torque curve as its prefab stores it (Drivetrain.torqueCurve)."""
+
+    car: str
+    used: bool  # Drivetrain.useTorqueCurve: the game takes torque from this curve
+    keys: tuple[tuple[float, float], ...]  # (rpm, Nm)
+
+    def line(self) -> str:
+        """The curve as a cars.ini value: rpm as integers, Nm with one decimal."""
+        return " ".join(f"{rpm:.0f}:{round(nm, 1):g}" for rpm, nm in self.keys)
+
+    def peak(self) -> tuple[float, float]:
+        """(Nm, rpm) of the highest key."""
+        rpm, nm = max(self.keys, key=lambda k: k[1])
+        return nm, rpm
+
+
+def _align4(off: int) -> int:
+    """The next 4-byte boundary (Unity aligns after bools and strings)."""
+    return (off + 3) & ~3
+
+
+def drivetrain_curve(raw: bytes) -> tuple[bool, tuple[tuple[float, float], ...]]:
+    """UseTorqueCurve and the keys of Drivetrain.torqueCurve from a Drivetrain's serialized data.
+
+    The layout is Unity's for the MonoBehaviour header (m_GameObject, m_Enabled, m_Script,
+    m_Name) followed by Drivetrain's first serialized fields in declaration order (dump.cs):
+    engineType (int), userTorqueFile (bool), torqueRPMValuesLen (int), torqueCurve
+    (AnimationCurve: count, Keyframes of 28 bytes, pre / post wrap, rotation order),
+    useTorqueCurve (bool). torqueRPMValues (float[,]) is not serialized.
+
+    Raises:
+        ValueError: the data is too short for that layout.
+    """
+    try:
+        off = 12 + 4 + 12  # m_GameObject PPtr, m_Enabled (aligned), m_Script PPtr
+        (name_len,) = struct.unpack_from("<i", raw, off)
+        off = _align4(off + 4 + name_len)
+        off += 4 + 4 + 4  # engineType, userTorqueFile (aligned), torqueRPMValuesLen
+        (count,) = struct.unpack_from("<i", raw, off)
+        if not 0 <= count <= 1024:
+            raise ValueError(f"{count} curve keys")
+        off += 4
+        keys = tuple(struct.unpack_from("<2f", raw, off + 28 * i) for i in range(count))
+        off += 28 * count + 12  # keys, m_PreInfinity, m_PostInfinity, m_RotationOrder
+        used = raw[off] != 0
+    except (struct.error, IndexError) as e:
+        raise ValueError(f"not a Drivetrain of this layout: {e}") from e
+    return used, keys
+
+
+def torque_curves(archives: dict[str, Path]) -> list[TorqueCurve]:
+    """The torque curves of the drivable cars, sorted by car."""
+    cars = set(car_names(archives))
+    out = {}
+    for h in holders(archives, "Drivetrain", raw=True):
+        if h.name in cars and h.name not in out:
+            used, keys = drivetrain_curve(h.raw)
+            out[h.name] = TorqueCurve(h.name, used, keys)
+    return [out[c] for c in sorted(out)]
 
 
 def select(assets: Iterator[Asset], name: str, file: str | None) -> list[Asset]:
@@ -520,6 +587,8 @@ def main(argv: list[str] | None = None) -> int:
     bd.add_argument("mods", nargs="+", type=Path, help="mod folders")
     bd.add_argument("--out", type=Path, required=True, help="where the mods are staged")
     sub.add_parser("cars", help="the drivable cars' names (cars.ini sections)")
+    cv = sub.add_parser("curves", help="the cars' engine torque curves as cars.ini lines")
+    cv.add_argument("car", nargs="?", help="only this car")
     ob = sub.add_parser("objects", help="game objects carrying a script of a class")
     ob.add_argument("--component", required=True, help="the script's class, e.g. Drivetrain")
     args = ap.parse_args(argv)
@@ -529,6 +598,14 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if args.cmd == "cars":
         print("\n".join(car_names(archives)))
+        return 0
+    if args.cmd == "curves":
+        for c in torque_curves(archives):
+            if args.car in (None, c.car):
+                nm, rpm = c.peak()
+                note = "" if c.used else "  (useTorqueCurve is off: the game does not use it)"
+                print(f"[{c.car}]   # peak {nm:.1f} Nm at {rpm:.0f} rpm{note}")
+                print(f"torque_curve = {c.line()}")
         return 0
     if args.cmd == "objects":
         for h in holders(archives, args.component):

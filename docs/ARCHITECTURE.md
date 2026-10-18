@@ -215,6 +215,6 @@ points: they may include headers of every layer to wire implementations to the e
 | `rd_mod_ini.{c,h}` | mod.ini / patch.ini parsing and the mod.ini key table |
 | `rd_mod_patch.{c,h}` | patch.ini values parsed for their field type and written |
 | `rd_mod_cars.{c,h}` | cars.ini: its key table (`rd_car_props`) and parsing, pure |
-| `rd_mods_patches.c` | patch.ini and cars.ini values written into live objects (a car = the object carrying a `CarController`) and into the cars' `Vehicle` records |
+| `rd_mods_patches.c` | patch.ini and cars.ini values written into live objects (a car = every model carrying a `Drivetrain`), each when the game reads it: every second, per scene, or as the car's originals in prefix hooks on `MenuManager.LoadOriginalValues` / `RaceManager.UpdateVehicle` |
 | `rd_modhost.{c,h}` | load order, file/icall claims, the per-frame text queue |
 | `../../sdk/rd_mod.h`, `../../sdk/mod.mk` | the public mod API and the mod build rules |

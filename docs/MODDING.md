@@ -61,18 +61,19 @@ A car's characteristics by its name -- no classes, no patterns:
 ```ini
 [*]                 # every car (a car's own section wins)
 tcs = 0
-[Skyline]           # names: uv run python -m tools.mod_assets cars
-power = 450         # hp; also torque, drive, turbo, turbo_bar, rev_limit, gear_1.., weight..
+[E30M]              # names: uv run python -m tools.mod_assets cars
+power = 197         # hp; also torque_curve, drive, gear_1, rear_diff, weight, ... (the guide)
 Wheel.gripMaterial = 1.1
 ```
 
-- Keys: the table in `docs/MODDING_GUIDE.md` ("cars.ini keys"; `mod_ini_check --keys` prints
-  it). Driving values apply at once; base values (`weight`, `shift_time`, camber, grip...) go
-  into the car's `Vehicle` record and apply when the car is next built, under the player's
-  tuning.
+- Keys: the table in `docs/MODDING_GUIDE.md` ("cars.ini keys"; `uv run python -m tools.mod_ini keys`
+  prints it). Each is one of the game's own values, written when the game reads it: the car's
+  originals right before the game builds the car (garage, race start; the player's tuning
+  applies on top), the engine once per car, the rest every second.
 - Any other key is a field of `CarController`, `Drivetrain`, `CarDynamics` or `CarSpecs`, or
   `Class.field` of any component of the car or its children.
-- Only the car (the object carrying a `CarController`) and what is under it is changed.
+- Every model of the car is changed (race car, garage and menu models): the specs screen
+  shows the values. `mod_assets curves <car>` prints a car's torque curve.
 
 ## patch.ini
 

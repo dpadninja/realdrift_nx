@@ -1,6 +1,7 @@
 /* rd_mod_patch.c -- see rd_mod_patch.h. MIT (see LICENSE). */
 #include <errno.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <strings.h>
 #include "rd_il2cpp.h"
@@ -69,6 +70,33 @@ int rd_name_match(const char *pattern, const char *name) {
   }
   while (*pattern == '*') pattern++;
   return *pattern == 0;
+}
+
+int rd_patch_same(const void *obj, uint32_t offset, const rd_patch_value *v) {
+  const char *p = (const char *)obj + offset;
+  switch (v->type) {
+    case RD_IL2CPP_TYPE_BOOLEAN: return !memcmp(p, &v->v.b, 1);
+    case RD_IL2CPP_TYPE_I4:      return !memcmp(p, &v->v.i32, 4);
+    case RD_IL2CPP_TYPE_U4:      return !memcmp(p, &v->v.u32, 4);
+    case RD_IL2CPP_TYPE_I8:      return !memcmp(p, &v->v.i64, 8);
+    case RD_IL2CPP_TYPE_R4:      return !memcmp(p, &v->v.f32, 4);
+    case RD_IL2CPP_TYPE_R8:      return !memcmp(p, &v->v.f64, 8);
+    default:                     return 0;
+  }
+}
+
+void rd_patch_format(const void *obj, uint32_t offset, const rd_patch_value *v, char *buf, size_t n) {
+  const char *p = (const char *)obj + offset;
+  union { uint8_t b; int32_t i32; uint32_t u32; int64_t i64; float f32; double f64; } x;
+  switch (v->type) {
+    case RD_IL2CPP_TYPE_BOOLEAN: memcpy(&x.b, p, 1); snprintf(buf, n, "%u", x.b); break;
+    case RD_IL2CPP_TYPE_I4:      memcpy(&x.i32, p, 4); snprintf(buf, n, "%d", (int)x.i32); break;
+    case RD_IL2CPP_TYPE_U4:      memcpy(&x.u32, p, 4); snprintf(buf, n, "%u", (unsigned)x.u32); break;
+    case RD_IL2CPP_TYPE_I8:      memcpy(&x.i64, p, 8); snprintf(buf, n, "%lld", (long long)x.i64); break;
+    case RD_IL2CPP_TYPE_R4:      memcpy(&x.f32, p, 4); snprintf(buf, n, "%g", (double)x.f32); break;
+    case RD_IL2CPP_TYPE_R8:      memcpy(&x.f64, p, 8); snprintf(buf, n, "%g", x.f64); break;
+    default:                     snprintf(buf, n, "?"); break;
+  }
 }
 
 void rd_patch_write(void *obj, uint32_t offset, const rd_patch_value *v) {

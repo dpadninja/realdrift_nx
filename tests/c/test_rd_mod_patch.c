@@ -51,6 +51,46 @@ static void test_write(void) {
   CHECK(obj[24] == 0xAA);
 }
 
+/* A field already holding the value is reported the same, so cars.ini writes only on change
+ * (and calls the game's SetWheelsParams only then); each width compares only its own bytes. */
+static void test_same(void) {
+  unsigned char obj[16];
+  memset(obj, 0, sizeof obj);
+  rd_patch_value v;
+  rd_patch_parse(RD_IL2CPP_TYPE_R4, "1.5", &v);
+  CHECK(!rd_patch_same(obj, 4, &v));
+  rd_patch_write(obj, 4, &v);
+  CHECK(rd_patch_same(obj, 4, &v) && !rd_patch_same(obj, 0, &v));
+  obj[8] = 0x7f;   /* the next field differs: still the same */
+  CHECK(rd_patch_same(obj, 4, &v));
+  rd_patch_parse(RD_IL2CPP_TYPE_BOOLEAN, "0", &v);
+  CHECK(rd_patch_same(obj, 0, &v));
+  rd_patch_value bad = { .type = 0x0e };
+  CHECK(!rd_patch_same(obj, 0, &bad));
+}
+
+/* The old value of a field is shown in its own type for the "old -> new" log line. */
+static void test_format(void) {
+  unsigned char obj[16];
+  memset(obj, 0, sizeof obj);
+  rd_patch_value v;
+  char buf[32];
+  rd_patch_parse(RD_IL2CPP_TYPE_R4, "2.25", &v);
+  rd_patch_write(obj, 4, &v);
+  rd_patch_format(obj, 4, &v, buf, sizeof buf);
+  CHECK(!strcmp(buf, "2.25"));
+  rd_patch_parse(RD_IL2CPP_TYPE_I4, "-3", &v);
+  rd_patch_write(obj, 8, &v);
+  rd_patch_format(obj, 8, &v, buf, sizeof buf);
+  CHECK(!strcmp(buf, "-3"));
+  rd_patch_parse(RD_IL2CPP_TYPE_BOOLEAN, "true", &v);
+  rd_patch_format(obj, 0, &v, buf, sizeof buf);
+  CHECK(!strcmp(buf, "0"));
+  rd_patch_value bad = { .type = 0x0e };
+  rd_patch_format(obj, 0, &bad, buf, sizeof buf);
+  CHECK(!strcmp(buf, "?"));
+}
+
 /* Object-name patterns: '*' matches any run (also empty), '?' one character, the rest is
  * literal and case-sensitive, so "Skyline*" picks the spawned "Skyline(Clone)" and a name
  * without '*' must match exactly. */
@@ -74,6 +114,8 @@ static void test_type_names(void) {
 int main(void) {
   RUN(test_parse);
   RUN(test_write);
+  RUN(test_same);
+  RUN(test_format);
   RUN(test_type_names);
   RUN(test_name_match);
   return g_failures != 0;

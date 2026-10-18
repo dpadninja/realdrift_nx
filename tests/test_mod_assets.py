@@ -4,6 +4,7 @@ real-file test that skips without the user's OBB).
 MIT (see LICENSE).
 """
 
+import struct
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -51,12 +52,31 @@ class FakeObj:
         """The object's data."""
         return self.data
 
+    def get_raw_data(self):
+        """The serialized bytes (a behaviour's, when given)."""
+        return getattr(self.data, "raw", b"")
 
-def behaviour(script, owner):
-    """MonoBehaviour data: its script's class and its GameObject's name (both read lazily)."""
+
+def behaviour(script, owner, raw=b""):
+    """MonoBehaviour data: its script's class and its GameObject's name (both read lazily),
+    and its serialized bytes.
+    """
     ref = SimpleNamespace(read=lambda: SimpleNamespace(m_ClassName=script))
     go = SimpleNamespace(read=lambda: SimpleNamespace(m_Name=owner))
-    return SimpleNamespace(m_Script=ref, m_GameObject=go)
+    return SimpleNamespace(m_Script=ref, m_GameObject=go, raw=raw)
+
+
+def drivetrain_bytes(name, keys, used=True):
+    """A Drivetrain's serialized data in Unity's layout: header, engineType, userTorqueFile,
+    torqueRPMValuesLen, torqueCurve, useTorqueCurve.
+    """
+    enc = name.encode()
+    out = bytearray(12) + struct.pack("<B3x", 1) + bytearray(12)
+    out += struct.pack("<i", len(enc)) + enc + bytes(-len(enc) % 4)
+    out += struct.pack("<iB3xi", 0, 0, 0) + struct.pack("<i", len(keys))
+    for rpm, nm in keys:
+        out += struct.pack("<4fi2f", rpm, nm, 0, 0, 0, 1 / 3, 1 / 3)
+    return bytes(out + struct.pack("<3i", 2, 2, 4) + struct.pack("<B3x", used))
 
 
 class FakeEnv:
@@ -95,7 +115,15 @@ def game(tmp_path, monkeypatch):
         b"DUP": [FakeObj(1, "Texture2D", FakeTexture("A"))],
         b"CARS": [
             FakeObj(1, "MonoBehaviour", behaviour("MobileCarController", "Skyline")),
-            FakeObj(2, "MonoBehaviour", behaviour("Drivetrain", "Skyline")),
+            FakeObj(
+                2,
+                "MonoBehaviour",
+                behaviour(
+                    "Drivetrain",
+                    "Skyline",
+                    drivetrain_bytes("Skyline", [(0, 0), (5000, 236.5), (8000, 0)]),
+                ),
+            ),
             FakeObj(3, "MonoBehaviour", behaviour("Drivetrain", "Skyline_Garage")),
             FakeObj(4, "MonoBehaviour", behaviour("MobileCarController", "E30M")),
             FakeObj(5, "MonoBehaviour", SimpleNamespace()),  # unreadable: skipped
@@ -357,6 +385,36 @@ def test_holders_and_car_names(game, capsys):
     assert "Skyline_Garage    # obb fff" in capsys.readouterr().out
 
 
+def test_drivetrain_curve():
+    """The torque curve and useTorqueCurve are read from a Drivetrain's serialized bytes, for
+    names of any length (the 4-byte alignment after the name); short data is an error.
+    """
+    for name in ["E30M", "Skyline", "RS500x"]:
+        used, keys = mod_assets.drivetrain_curve(
+            drivetrain_bytes(name, [(0, 0), (4500, 240)], False)
+        )
+        assert not used and keys == ((0.0, 0.0), (4500.0, 240.0))
+    with pytest.raises(ValueError):
+        mod_assets.drivetrain_curve(b"\0" * 20)
+    with pytest.raises(ValueError):
+        mod_assets.drivetrain_curve(drivetrain_bytes("A", [(0, 0)])[:-30])
+    c = mod_assets.TorqueCurve("E30M", True, ((0, 0), (4500, 240), (7503, -1.72)))
+    assert c.line() == "0:0 4500:240 7503:-1.7" and c.peak() == (240, 4500)
+
+
+def test_curves_command(game, capsys):
+    """The curves command prints each drivable car's curve as a ready cars.ini section with
+    its peak; a car name narrows it.
+    """
+    assert mod_assets.main(["curves"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out == [
+        "[Skyline]   # peak 236.5 Nm at 5000 rpm",
+        "torque_curve = 0:0 5000:236.5 8000:0",
+    ]
+    assert mod_assets.main(["curves", "E30M"]) == 0 and not capsys.readouterr().out
+
+
 def test_real_car_names():
     """On the real OBB the drivable cars are found (22 in 5.0.8), garage models excluded."""
     if not user_archives()["obb"].is_file():
@@ -364,6 +422,16 @@ def test_real_car_names():
     names = mod_assets.car_names(user_archives())
     assert {"Skyline", "E30M", "LadaVTS", "240Z"} <= set(names) and len(names) >= 20
     assert not any(n.endswith(("_Garage", "_cover", "_Cover")) for n in names)
+
+
+def test_real_e30m_curve():
+    """On the real OBB the E30M's curve is the game's: 15 keys, 240 Nm at 4500 rpm, to 7503 rpm,
+    and the game uses it.
+    """
+    if not user_archives()["obb"].is_file():
+        pytest.skip("needs original/<obb>")
+    (c,) = [c for c in mod_assets.torque_curves(user_archives()) if c.car == "E30M"]
+    assert c.used and len(c.keys) == 15 and c.peak() == (240, 4500) and round(c.keys[-1][0]) == 7503
 
 
 def test_main_without_archives(monkeypatch, tmp_path, capsys):

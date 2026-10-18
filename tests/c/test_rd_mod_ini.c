@@ -27,8 +27,8 @@ static void test_errors(void) {
   CHECK(rd_ini_parse("id = a\nnonsense\n", &g_ini) == 2);
   CHECK(rd_ini_parse(" = x\n", &g_ini) == 1);
   CHECK(rd_ini_parse("[open\n", &g_ini) == 1);
-  char longv[400] = "k = ";
-  memset(longv + 4, 'v', 300);
+  char longv[RD_INI_VALUE_LEN + 16] = "k = ";
+  memset(longv + 4, 'v', RD_INI_VALUE_LEN);   /* one byte too many with the terminator */
   CHECK(rd_ini_parse(longv, &g_ini) == 1);
   CHECK(rd_ini_parse("id = a\r\napi = 1\r\n", &g_ini) == 0 && !strcmp(rd_ini_get(&g_ini, "", "api"), "1"));
   CHECK(rd_ini_parse("", &g_ini) == 0 && g_ini.n == 0);

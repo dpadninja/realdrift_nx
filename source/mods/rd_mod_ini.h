@@ -20,7 +20,7 @@
 #define RD_INI_MAX_ENTRIES 128
 #define RD_INI_SECTION_LEN 128
 #define RD_INI_KEY_LEN     64
-#define RD_INI_VALUE_LEN   192
+#define RD_INI_VALUE_LEN   384   /* a torque_curve of 32 "rpm:Nm" pairs */
 
 typedef struct {
   char section[RD_INI_SECTION_LEN];   /* "" before the first [section] */

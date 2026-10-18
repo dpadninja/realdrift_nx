@@ -250,34 +250,71 @@ def test_cars_ambiguous_and_unchecked(tmp_path, monkeypatch):
 
 @needs_cc
 def test_car_keys(tmp_path):
-    """cars.ini's own keys come from the port's table with their units; their values are
-    checked as numbers (drive names by the parser), and the dump is not asked about them.
+    """cars.ini's own keys come from the port's table with kind, timing, axle and enum names;
+    their values are checked as numbers (names and curves by the parser), and the dump is not
+    asked about them. Negative values pass where the game allows them (camber).
     """
     keys = mod_ini.car_keys()
-    assert keys["power"].unit == "hp, peak" and keys["drive"].unit == "RWD FWD AWD XWD"
-    assert keys["weight"] == mod_ini.CarKey("kg", "base", "Vehicle", "originalWeight")
-    assert {"torque", "turbo", "turbo_bar", "shift_time", "weight", "tcs", "esp"} <= set(keys)
+    assert keys["power"].unit == "hp, stock peak" and keys["drive"].names == (
+        "RWD",
+        "FWD",
+        "AWD",
+        "XWD",
+    )
+    assert keys["weight"].when == "build" and keys["front_spring"].when == "live"
+    assert keys["rear_diff"] == mod_ini.CarKey(
+        keys["rear_diff"].unit,
+        "axle",
+        "live",
+        "Axle",
+        "differential",
+        "rear",
+        keys["rear_diff"].names,
+    )
+    assert "two_way_LSD" in keys["rear_diff"].names and "sport_front" in keys["front_tires"].names
+    assert keys["susp_height"].axle == "both" and keys["torque_curve"].when == "once"
     mod = write_cars(
-        tmp_path, "k", "[Skyline]\npower = 420\ndrive = AWD\nweight = 1250\nturbo_bar = 1.1\n"
+        tmp_path,
+        "k",
+        "[Skyline]\npower = 420\ndrive = AWD\nweight = 1250\nfront_camber = -2\n"
+        "rear_diff = two_way_LSD\ntorque_curve = 0:0 5000:240 7500:0\n",
     )
     rep = mod_check.check_mod(mod, parse_dump(CAR_DUMP), None, None, ["Skyline"])
-    assert not rep.errors and "4 car values" in rep.notes
-    bad = write_cars(tmp_path, "b", "[Skyline]\npower = lots\nweight = 0\nshift_time = -1\n")
+    assert not rep.errors and "6 car values" in rep.notes
+    bad = write_cars(tmp_path, "b", "[Skyline]\npower = lots\nweight = 0\ngear_2 = -1\n")
     errors = mod_check.check_mod(bad, None, None, None, ["Skyline"]).errors
     assert errors == [
         "cars.ini:2: power = 'lots' is not a number",
         "cars.ini:3: weight = 0 must be above 0",
-        "cars.ini:4: shift_time = -1 must be above 0",
+        "cars.ini:4: gear_2 = -1 must be above 0",
     ]
-    drive = write_cars(tmp_path, "d", "[Skyline]\ndrive = 4WD\n")
-    assert any("RWD FWD AWD XWD" in e for e in mod_check.check_mod(drive, None, None).errors)
+    for line, why in [
+        ("drive = 4WD", "RWD FWD AWD XWD"),
+        ("rear_diff = lsd", "two_way_LSD"),
+        ("torque_curve = 1:1", "torque_curve"),
+    ]:
+        mod = write_cars(tmp_path, f"e{len(why)}", f"[Skyline]\n{line}\n")
+        assert any(why in e for e in mod_check.check_mod(mod, None, None).errors), line
+
+
+@needs_cc
+def test_mod_ini_keys_command(capsys):
+    """`mod_ini keys` lists every cars.ini key with its timing and unit, or its enum names."""
+    assert mod_ini.main(["keys"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == len(mod_ini.car_keys())
+    assert any(
+        line.split()[:2] == ["rear_diff", "live"] and "two_way_LSD" in line for line in lines
+    )
+    assert mod_ini.main([]) == 2
 
 
 @needs_cc
 def test_car_keys_exist_in_the_game():
-    """Every class and field a cars.ini key writes exists in the real dump: plain fields with a
-    type the port writes, base values and the special keys' helper fields as floats, the gear
-    ratios as an array.
+    """Every class and field a cars.ini key writes exists in the real dump with the type the
+    port writes it as: plain fields of a supported type, axle fields on Axle (enums as the
+    game's enum with exactly the names of the table), special keys' floats, gears, curve and
+    body; the helper fields, methods and the managers' car fields too.
     """
     rel = target_release()
     if not (rel.dump / "dump.cs").is_file():
@@ -289,26 +326,47 @@ def test_car_keys_exist_in_the_game():
     def ftype(cls: str, fld: str) -> str | None:
         return mod_check.field_type(types, find_types(types, cls)[0], fld)
 
+    def enum_names(enum: str) -> tuple[str, ...]:
+        t = find_types(types, enum)[0]
+        return tuple(
+            f.decl.split("=")[0].split()[-1] for f in t.fields if "const" in f.decl.split()
+        )
+
+    enums = {"Axles.Differentials", "CarDynamics.Tires", "Drivetrain.Transmissions"}
     for key, k in mod_ini.car_keys().items():
         t = ftype(k.cls, k.field)
-        if k.kind == "field":
-            assert t in mod_check.PATCH_TYPES, key
-        elif k.kind == "base":
-            assert t == "float", key
+        if k.names:
+            assert t in enums and enum_names(t) == k.names, (key, t)
+        elif k.kind in ("field", "axle"):
+            assert t in mod_check.PATCH_TYPES, (key, t)
         else:
-            assert t in {"float", "float[]", "Drivetrain.Transmissions"}, (key, t)
+            assert t in {"float", "float[]", "AnimationCurve", "Rigidbody"}, (key, t)
     for helper in [
         "maxPower",
         "maxTorque",
-        "externalMultiplier",
+        "maxPowerRPM",
         "externalTurboPressure",
         "actualMaxTurboPressure",
     ]:
         assert ftype("Drivetrain", helper) == "float"
     assert ftype("Drivetrain", "first") == "int"
-    for fld in ["prefabPath", "id", "name"]:
-        assert ftype("Vehicle", fld) == "string"
-    assert ftype("PersistentData", "vehicles") == "Vehicle[]"
+    assert ftype("CarDynamics", "axles") == "Axles"
+    assert ftype("Axles", "frontAxle") == "Axle" and ftype("Axles", "rearAxle") == "Axle"
+    for manager in ["MenuManager", "RaceManager"]:
+        assert ftype(manager, "drivetrain") == "Drivetrain"
+        assert ftype(manager, "carDynamics") == "CarDynamics"
+    assert ftype("MenuManager", "rigidbody") == "Rigidbody"
+    owners = ("CarDynamics", "Drivetrain", "MenuManager", "RaceManager")
+    methods = {m.name for t in owners for m in find_types(types, t)[0].methods}
+    assert {
+        "SetWheelsParams",
+        "SetBrakes",
+        "SetTiresType",
+        "CalcMaxPowerMaxTorque",
+        "SetTransmission",
+        "LoadOriginalValues",
+        "UpdateVehicle",
+    } <= methods
 
 
 def test_car_components_from_the_header(tmp_path):

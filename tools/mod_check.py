@@ -53,7 +53,7 @@ from tools.mod_assets import (
     scan,
     texture_size,
 )
-from tools.mod_ini import CarLine, ModIni, PatchLine, read_mod
+from tools.mod_ini import CarLine, ModIni, PatchLine, car_keys, read_mod
 from tools.unity_ref import library_icalls
 
 ENTRY = "rd_mod_entry"
@@ -67,8 +67,9 @@ LOADER_RELOCS = {
 # Field types patch.ini can write (source/mods/rd_mod_patch.c), as dump.cs spells them.
 PATCH_TYPES = {"bool", "int", "uint", "long", "float", "double"}
 CARS_INI = "cars.ini"
-# 0 is refused by the port (rd_mods_patches.c) or makes no sense
+# 0 and below are refused by the port (rd_mods_patches.c) or make no sense
 POSITIVE_KEYS = {"power", "torque", "weight", "final_ratio"} | {f"gear_{n}" for n in range(1, 7)}
+CURVE_KEY = "torque_curve"  # rpm:Nm pairs, checked by the port's parser (rd_mod_cars.c)
 SYMBOLS_H = ROOT / "source/game/rd_game_symbols.h"
 ICALL_IN_STRINGS = re.compile(rb"UnityEngine\.[\w.]*(?:/\w+)*::\w+")
 
@@ -197,15 +198,16 @@ def check_cars(
 
 
 def check_car_key(c: CarLine, where: str, rep: Report) -> None:
-    """The value of one of cars.ini's own keys (drive names are checked by the parser)."""
-    if c.key == "drive":
+    """The value of one of cars.ini's own keys: a number (names and curves: the parser's)."""
+    key = car_keys().get(c.key)
+    if key is None or key.names or c.key == CURVE_KEY:
         return
     try:
         value = float(c.value)
     except ValueError:
         rep.error(f"{where}: {c.key} = {c.value!r} is not a number")
         return
-    if value < 0 or (value == 0 and c.key in POSITIVE_KEYS):
+    if value <= 0 and c.key in POSITIVE_KEYS:
         rep.error(f"{where}: {c.key} = {c.value} must be above 0")
 
 

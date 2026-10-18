@@ -11,9 +11,10 @@
  *     values may contain spaces; filter is empty for every object)
  *   | car<TAB>line<TAB>car<TAB>class (empty: a car component)<TAB>field<TAB>value<TAB>key
  *     (key: the cars.ini key of rd_car_props, empty for a field)
- *   | carkey<TAB>key<TAB>unit<TAB>kind<TAB>class<TAB>field
- *     (with --keys: the table of cars.ini keys, for tools and docs; kind "field", "base" or
- *     "special")
+ *   | carkey<TAB>key<TAB>unit<TAB>kind<TAB>when<TAB>class<TAB>field<TAB>axle<TAB>names
+ *     (with --keys: the table of cars.ini keys, for tools and docs; kind "field", "axle" or
+ *     "special", when "live", "once" or "build", axle "front", "rear", "both" or "", names
+ *     the enum's value names separated by spaces or "")
  * Exit 0 if mod.ini is valid (patch.ini problems are reported but do not fail).
  * MIT (see LICENSE). */
 #include <stdio.h>
@@ -53,10 +54,16 @@ int main(int argc, char **argv) {
   if (argc == 2 && !strcmp(argv[1], "--keys")) {
     int n;
     const rd_car_prop *props = rd_car_props(&n);
-    for (int i = 0; i < n; i++)
-      printf("carkey\t%s\t%s\t%s\t%s\t%s\n", props[i].key, props[i].unit,
-             props[i].kind == RD_CAR_FIELD ? "field" : props[i].kind == RD_CAR_BASE ? "base" : "special",
-             props[i].cls, props[i].field);
+    static const char *const WHEN[] = { "live", "once", "build" };
+    static const char *const AXLE[] = { "", "front", "rear", "both" };
+    for (int i = 0; i < n; i++) {
+      const rd_car_prop *k = &props[i];
+      printf("carkey\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t", k->key, k->unit,
+             k->kind == RD_CAR_FIELD ? "field" : k->kind == RD_CAR_AXLE ? "axle" : "special",
+             WHEN[k->when], k->cls, k->field, AXLE[k->axle & 3]);
+      for (int j = 0; k->names && k->names[j]; j++) printf("%s%s", j ? " " : "", k->names[j]);
+      printf("\n");
+    }
     return 0;
   }
   if (argc != 2) { fprintf(stderr, "usage: mod_ini_check <mod folder> | --keys\n"); return 2; }

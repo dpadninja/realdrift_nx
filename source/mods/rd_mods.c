@@ -163,12 +163,12 @@ void rd_mods_frame(uint32_t frame) {
     if (active_scene(&h, name, sizeof name) == 0 && h != g_scene) {
       g_scene = h;
       debugPrintf(RD_LOG_TAG_MODS " scene %s\n", name);
-      rd_mods_patches_apply();
+      rd_mods_patches_apply(1);
       for (int i = 0; i < g_nmods; i++)
         if (g_mods[i]->scene) g_mods[i]->scene(g_mods[i]->user, name);
     }
   }
-  if (frame % RD_MODS_PATCH_FRAMES == 0) rd_mods_patches_apply();   /* objects spawned later */
+  if (frame % RD_MODS_PATCH_FRAMES == 0) rd_mods_patches_apply(0);   /* objects spawned later */
   for (int i = 0; i < g_nmods; i++)
     if (g_mods[i]->frame) g_mods[i]->frame(g_mods[i]->user, frame);
 }

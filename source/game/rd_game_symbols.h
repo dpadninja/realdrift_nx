@@ -69,7 +69,6 @@
  * Car components, read by the game while driving: */
 #define RD_CLS_DRIVETRAIN         "Drivetrain"
 #define RD_CLS_CAR_BASE           "CarController"
-#define RD_CLS_WHEEL              "Wheel"
 #define RD_FLD_POWER_MULTIPLIER   "powerMultiplier"     /* x externalMultiplier = actualMultiplier,
                                                            the engine torque factor (FixedUpdate) */
 #define RD_FLD_TUNING_MULTIPLIER  "externalMultiplier"  /* the game's engine tuning */
@@ -85,37 +84,77 @@
 #define RD_FLD_GEAR_RATIOS        "gearRatios"          /* float[]: reverse, neutral, 1st (= `first`).. */
 #define RD_FLD_FIRST_GEAR         "first"
 #define RD_FLD_FINAL_RATIO        "finalDriveRatio"
+#define RD_FLD_SHIFT_TIME         "shiftTime"
 #define RD_FLD_TRANSMISSION       "transmission"        /* enum Transmissions, see RD_DRIVES */
 #define RD_MTH_SET_TRANSMISSION   "SetTransmission"     /* rebuilds poweredWheels */
-#define RD_DRIVES                 { "RWD", "FWD", "AWD", "XWD" }  /* Transmissions 0..3 */
-#define RD_FLD_BRAKE_TORQUE       "brakeFrictionTorque"
+#define RD_DRIVES                 { "RWD", "FWD", "AWD", "XWD", NULL }  /* Transmissions 0..3 */
+#define RD_FLD_BRAKE_TORQUE       "brakeFrictionTorque"      /* Axle; SetBrakes -> the wheels */
 #define RD_FLD_HANDBRAKE_TORQUE   "handbrakeFrictionTorque"
+#define RD_FLD_BRAKE_BALANCE      "frontRearBrakeBalance"    /* CarDynamics */
+#define RD_FLD_HANDBRAKE_BALANCE  "frontRearHandBrakeBalance"
+#define RD_MTH_SET_BRAKES         "SetBrakes"
 #define RD_FLD_TCS                "TCS"
 #define RD_FLD_TCS_SLIP           "TCSAllowedSlip"
 #define RD_FLD_ESP                "ESP"
 #define RD_FLD_ESP_STRENGTH       "ESPStrength"
 #define RD_FLD_ABS                "ABS"
 #define RD_FLD_ABS_SLIP           "ABSAllowedSlip"
-/* The car's base data (PersistentData.vehicles[]: Vehicle), which the game's tuning turns into
- * the car's values when it builds the car (MenuManager.UpdateCar, RaceManager.UpdateVehicle).
- * Not saved: Vehicle.WriteToStream writes only customizations and track results. */
-#define RD_CLS_PERSISTENT         "PersistentData"
-#define RD_FLD_VEHICLES           "vehicles"
-#define RD_CLS_VEHICLE            "Vehicle"
-#define RD_FLD_VEHICLE_PREFAB     "prefabPath"          /* its last part names the car object */
-#define RD_FLD_VEHICLE_ID         "id"
-#define RD_FLD_VEHICLE_NAME       "name"
-#define RD_FLD_BASE_WEIGHT                "originalWeight"
-#define RD_FLD_BASE_SHIFT_TIME            "originalShiftTime"
-#define RD_FLD_BASE_SUSP_HEIGHT           "originalSuspHeight"
-#define RD_FLD_BASE_FRONT_CAMBER          "originalFrontCamber"
-#define RD_FLD_BASE_REAR_CAMBER           "originalRearCamber"
-#define RD_FLD_BASE_STEERING_ANGLE        "originalSteeringAngle"
-#define RD_FLD_BASE_WEIGHT_DISTR          "originalWeightDistr"
-#define RD_FLD_BASE_FRONT_FORWARD_GRIP    "originalFrontForwardGrip"
-#define RD_FLD_BASE_FRONT_SIDEWAYS_GRIP   "originalFrontSidewaysGrip"
-#define RD_FLD_BASE_REAR_FORWARD_GRIP     "originalRearForwardGrip"
-#define RD_FLD_BASE_REAR_SIDEWAYS_GRIP    "originalRearSidewaysGrip"
+#define RD_FLD_MAX_POWER_RPM      "maxPowerRPM"
+#define RD_FLD_MAX_TORQUE_RPM     "maxTorqueRPM"
+#define RD_FLD_TORQUE_CURVE       "torqueCurve"         /* AnimationCurve rpm -> Nm (useTorqueCurve) */
+#define RD_MTH_CALC_MAX_POWER     "CalcMaxPowerMaxTorque"  /* (factor, turbo): scans the curve into
+                                                              maxPower/maxPowerRPM/maxTorque/RPM */
+#define RD_FLD_DRIVETRAIN_BODY    "body"                /* the car's Rigidbody */
+#define RD_ICALL_SET_MASS         "UnityEngine.Rigidbody::set_mass"
+#define RD_ICALL_GET_MASS         "UnityEngine.Rigidbody::get_mass"
+#define RD_ASM_CORE_TYPES         RD_ASM_UNITY_CORE
+#define RD_CLS_KEYFRAME           "Keyframe"            /* UnityEngine, 28 bytes */
+#define RD_ICALL_CURVE_SET_KEYS   "UnityEngine.AnimationCurve::SetKeys"
+#define RD_ICALL_CURVE_SMOOTH     "UnityEngine.AnimationCurve::SmoothTangents"
+/* CarDynamics and its axles (CarDynamics.axles -> Axles.frontAxle / rearAxle: Axle); the game
+ * copies Axle values into the wheels in SetWheelsParams (Start, FixedUpdate, its tuning). */
+#define RD_CLS_CAR_DYNAMICS       "CarDynamics"
+#define RD_FLD_AXLES              "axles"
+#define RD_CLS_AXLES              "Axles"
+#define RD_CLS_AXLE               "Axle"
+#define RD_FLD_FRONT_AXLE         "frontAxle"
+#define RD_FLD_REAR_AXLE          "rearAxle"
+#define RD_MTH_SET_WHEELS_PARAMS  "SetWheelsParams"
+#define RD_MTH_SET_TIRES_TYPE     "SetTiresType"        /* loads the tire data of Axle.tires */
+#define RD_FLD_COM_Z              "zlocalPosition"      /* centre of mass, front-rear: the game's
+                                                           "weight distribution" original */
+#define RD_FLD_TIRE_PRESSURE_ON   "tirePressureEnabled"
+#define RD_FLD_SUSP_TRAVEL        "suspensionTravel"
+#define RD_FLD_SUSP_RATE          "suspensionRate"
+#define RD_FLD_SUSP_BUMP          "bumpRate"
+#define RD_FLD_SUSP_REBOUND       "reboundRate"
+#define RD_FLD_ANTIROLL           "antiRollBarRate"
+#define RD_FLD_CAMBER             "camber"
+#define RD_FLD_STEERING_ANGLE     "maxSteeringAngle"
+#define RD_FLD_FORWARD_GRIP       "forwardGripFactor"
+#define RD_FLD_SIDEWAYS_GRIP      "sidewaysGripFactor"
+#define RD_FLD_TIRES              "tires"               /* enum CarDynamics.Tires, see RD_TIRES */
+#define RD_FLD_TIRES_PRESSURE     "tiresPressure"
+#define RD_FLD_DIFFERENTIAL       "differential"        /* enum Axles.Differentials, see RD_DIFFS */
+#define RD_FLD_DIFF_PRELOAD       "preLoad"
+#define RD_FLD_DIFF_POWER         "powerRatio"
+#define RD_FLD_DIFF_COAST         "coastRatio"
+#define RD_DIFFS { "open", "viscous", "locked", "one_way_LSD", "two_way_LSD", "one_point_five_way_LSD", NULL }
+#define RD_TIRES { "F1_front", "F1_rear", "competition_front", "competition_rear",               \
+                   "competition_frontNew", "competition_rearNew", "supersport_front",            \
+                   "supersport_rear", "sport_front", "sport_rear", "touring_front", "touring_rear", \
+                   "offroad_front", "offroad_rear", "truck_front", "truck_rear", NULL }
+/* The garage loads "<prefab>_Garage" or "<prefab>_cover" (MenuManager.LoadCar), the race
+ * "<prefab>(Clone)"; MenuManager.LoadOriginalValues then reads the car's originals from that
+ * model, and RaceManager.UpdateVehicle builds the race car from them. */
+#define RD_CAR_NAME_SUFFIXES      { "(Clone)", "_Garage", "_cover", "_Cover", NULL }
+#define RD_FLD_MANAGER_DRIVETRAIN "drivetrain"          /* MenuManager / RaceManager: the car */
+#define RD_FLD_MANAGER_DYNAMICS   "carDynamics"
+#define RD_FLD_MANAGER_BODY       "rigidbody"           /* MenuManager only */
+#define RD_CLS_MENU_MANAGER       "MenuManager"
+#define RD_MTH_LOAD_ORIGINALS     "LoadOriginalValues"
+#define RD_CLS_RACE_MANAGER       "RaceManager"
+#define RD_MTH_UPDATE_VEHICLE     "UpdateVehicle"
 
 #define RD_ICALL_ACTIVE_SCENE     "UnityEngine.SceneManagement.SceneManager::GetActiveScene_Injected"
 #define RD_ICALL_SCENE_NAME       "UnityEngine.SceneManagement.Scene::GetNameInternal"

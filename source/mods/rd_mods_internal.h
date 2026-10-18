@@ -51,10 +51,12 @@ int rd_mods_ascii(void *str, char *buf, size_t n);
 
 /* patch.ini and cars.ini (rd_mods_patches.c), main thread. _load adds the values of mod `id`
  * (either ini may be NULL; id must outlive the patches) and returns how many; _resolve looks
- * the classes and fields up once the game is ready; _apply writes them into live objects. */
+ * the classes and fields up once the game is ready and hooks the game's car building;
+ * _apply writes the values into live objects -- with scene_changed also the ones written once
+ * per scene (torque curve, power). */
 int  rd_mods_patches_load(const char *id, const rd_ini *patches, const rd_ini *cars);
 void rd_mods_patches_resolve(void);
-void rd_mods_patches_apply(void);
+void rd_mods_patches_apply(int scene_changed);
 
 /* Live objects of klass (rd_mods.c): up to max into out; count, or a negative RD_MOD_E*. */
 int rd_mods_find_objects(void *klass, void **out, int max);
