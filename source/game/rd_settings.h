@@ -57,9 +57,10 @@ typedef struct {
     .action = {                                                       \
       [RD_ACT_THROTTLE]  = RD_BTN_ZR,   [RD_ACT_BRAKE]     = RD_BTN_ZL, \
       [RD_ACT_HANDBRAKE] = RD_BTN_B,    [RD_ACT_GEAR_UP]   = RD_BTN_UP, \
-      [RD_ACT_GEAR_DOWN] = RD_BTN_DOWN, [RD_ACT_CAMERA]    = RD_BTN_Y,  \
+      [RD_ACT_GEAR_DOWN] = RD_BTN_DOWN, [RD_ACT_CAMERA]    = 0,         \
     },                                                                \
     .steer_left = RD_BTN_LEFT, .steer_right = RD_BTN_RIGHT,           \
+    .clutch = RD_BTN_Y,                                               \
     .deadzone = RD_DEADZONE_DEFAULT,                                  \
   },                                                                  \
   .pause = RD_BTN_PLUS,                                               \

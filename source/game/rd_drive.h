@@ -5,6 +5,10 @@
  * set through OnThrottlePress/Release, OnBrakePress/Release, ... (dump.cs). We emulate those
  * buttons on press/release EDGES (so the game's own logic runs, e.g. the reverse flag at
  * +0xD3) and write analog steering straight into mobileSteerInput.
+ *
+ * The mobile controller has no clutch: its GetInput always returns clutchInput = 0, while the
+ * car's physics (Drivetrain) does use it. The clutch button therefore sets GetInput's clutch
+ * output to 1 after the game's own GetInput ran, for as long as it is held.
  * MIT (see LICENSE). */
 #ifndef RD_DRIVE_H
 #define RD_DRIVE_H
@@ -20,6 +24,7 @@ enum {
 typedef struct {
   uint64_t action[RD_ACT_COUNT];   /* button mask per action (any bit held => active) */
   uint64_t steer_left, steer_right;/* digital steering (D-pad) */
+  uint64_t clutch;                 /* held => clutch fully pressed */
   float    deadzone;               /* stick deadzone, 0..1 */
 } rd_bindings;                     /* part of rd_settings (rd_settings.h) */
 
@@ -28,6 +33,7 @@ typedef struct {
   int   release[RD_ACT_COUNT];     /* 1 on the frame it stopped */
   int   write_steer;               /* 1 if `steer` must be written this frame */
   float steer;                     /* -1 (left) .. +1 (right) */
+  int   clutch;                    /* 1 while the clutch button is held */
 } rd_drive_out;
 
 typedef struct {

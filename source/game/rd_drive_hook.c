@@ -54,8 +54,8 @@ static void get_input(void *self, float *throttle, float *brake, float *steer,
                       float *handbrake, float *clutch, uint8_t *start_engine,
                       uint8_t *change_camera, int32_t *target_gear, const void *mi) {
   g_last_drive_frame = port_frame_count();
+  rd_drive_out o = {0};
   if (self) {
-    rd_drive_out o;
     rd_drive_step(&config.binds, &g_state, nxp_pad_held(), nxp_pad_stick_x(), &o);
     for (int a = 0; a < RD_ACT_COUNT; a++) {
       if (o.press[a] && g_press[a].fn)     g_press[a].fn(self, g_press[a].mi);
@@ -65,6 +65,7 @@ static void get_input(void *self, float *throttle, float *brake, float *steer,
   }
   g_orig_get_input(self, throttle, brake, steer, handbrake, clutch, start_engine,
                    change_camera, target_gear, mi);
+  if (o.clutch && clutch) *clutch = 1.0f;   /* the mobile GetInput always returns 0 here */
 }
 
 /* Gives up on controller driving for good (logs why); returns 0 for the caller to return. */

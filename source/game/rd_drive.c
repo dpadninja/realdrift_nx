@@ -34,6 +34,7 @@ void rd_drive_step(const rd_bindings *b, rd_drive_state *st, uint64_t held, floa
    * touch buttons so both input methods keep working. */
   out->write_steer = steer != 0.0f || st->steer_prev != 0.0f;
   out->steer = steer;
+  out->clutch = (held & b->clutch) != 0;
 
   st->held_prev = held;
   st->steer_prev = steer;
