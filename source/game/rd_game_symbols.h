@@ -81,7 +81,10 @@
 #define RD_FLD_MAX_RPM            "maxRPM"
 #define RD_FLD_IDLE_RPM           "minRPM"
 #define RD_FLD_GEAR_RATIOS        "gearRatios"          /* float[]: reverse, neutral, 1st (= `first`).. */
-#define RD_FLD_FIRST_GEAR         "first"
+#define RD_GEAR_FIRST_INDEX       2   /* gearRatios: reverse, neutral, 1st..; the game's own
+                                         constant (LoadOriginalValues copies gearRatios[2..],
+                                         ApplyGearRatiosTuning writes gear N at N + 1) -- `first`
+                                         is still 0 on a garage model nobody has started */
 #define RD_ASM_CORLIB             "mscorlib"
 #define RD_NS_SYSTEM              "System"
 #define RD_CLS_SINGLE             "Single"              /* float[] elements */
@@ -118,6 +121,7 @@
 #define RD_ICALL_CURVE_SMOOTH     "UnityEngine.AnimationCurve::SmoothTangents"
 #define RD_ICALL_CURVE_EVALUATE   "UnityEngine.AnimationCurve::Evaluate"
 #define RD_FLD_ACTUAL_MULTIPLIER  "actualMultiplier"    /* powerMultiplier x externalMultiplier */
+#define RD_FLD_ORIGINAL_MAX_POWER "originalMaxPower"    /* ApplyTurbo: boost target = power / it */
 /* CarDynamics and its axles (CarDynamics.axles -> Axles.frontAxle / rearAxle: Axle); the game
  * copies Axle values into the wheels in SetWheelsParams (Start, FixedUpdate, its tuning). */
 #define RD_CLS_CAR_DYNAMICS       "CarDynamics"

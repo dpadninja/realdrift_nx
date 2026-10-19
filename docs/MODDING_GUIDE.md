@@ -132,10 +132,10 @@ The port writes each key when the game reads it:
 
 | Key | Value | When | The game's value |
 |---|---|---|---|
-| `power` | hp at the curve's peak, stock (the player's engine tuning adds on top): scales the whole curve | once | `Drivetrain.powerMultiplier`, from `CalcMaxPowerMaxTorque` |
+| `power` | hp at the curve's peak without boost, stock (the player's engine tuning and turbo add on top): scales the whole curve | once | `Drivetrain.powerMultiplier`, from `CalcMaxPowerMaxTorque` at turbo pressure 0 |
 | `torque_curve` | 2 to 32 `rpm:Nm` pairs, rpm rising (`curves` prints the car's own) | once | `Drivetrain.torqueCurve` via `AnimationCurve.SetKeys` + `SmoothTangents` |
-| `turbo` | 0 / 1 | live | `Drivetrain.turboCharged` |
-| `turbo_bar` | bar | live | `Drivetrain.maxTurboPressure` (+ the limit `Awake` derives) |
+| `turbo` | 0 / 1: forces the turbo on or off, whatever the player bought | live | `Drivetrain.turboCharged` |
+| `turbo_bar` | bar: the car's own boost; a bought turbo adds its pressure on top | live | `Drivetrain.maxTurboPressure` (+ the limit: bar + the bought increase) |
 | `rev_limit` | rpm: where the revs stop | live | `Drivetrain.limiterRPM` |
 | `max_rpm` | rpm: the scale of engine friction, the end of the range the specs' peak is looked for in | live | `Drivetrain.maxRPM` |
 | `idle_rpm` | rpm | live | `Drivetrain.minRPM` |
@@ -169,6 +169,21 @@ The port writes each key when the game reads it:
 other component of the car as `Class.field` (`Wheel.gripMaterial`), and a name two of them
 share as `Class.field` (`mod_check` says when). These are written every second and follow
 "Where it stops" above. Look at the current values with `inspect` (section 7.4) first.
+
+#### With the player's purchases
+
+The game's upgrades still apply over cars.ini, as over a stock car:
+
+- **Engine parts** (engine, firmware, intake, exhaust) multiply the engine curve
+  (`externalMultiplier`) over `power` / `torque_curve`.
+- **A turbo** switches `turboCharged` on and adds its pressure over the car's own
+  (`turbo_bar`); the boost multiplies torque by `1 + 0.5 x pressure` as the pressure builds with
+  load. `power` is measured without boost, so the turbo adds on top. A `turbo` key overrides
+  the purchase either way.
+- **Weight reduction, shift time, suspension height, camber, steering angle, weight
+  distribution, tires** apply over the build keys.
+- **Gear ratios and final drive**: where cars.ini sets `gears` / `final_ratio`, the player's
+  gear tuning is skipped (below).
 
 #### What is not reachable
 

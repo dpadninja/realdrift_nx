@@ -252,8 +252,7 @@ static int resolve_car_key(patch *p) {
   case RD_CAR_GEARS:
     p->nkeys = rd_car_gears_parse(p->e.value, p->rpm, RD_CAR_GEARS_MAX);
     return p->nkeys >= 1 && g_single_class && g_il2cpp.array_new && g_il2cpp.array_length &&
-           field_of(p->klass, RD_FLD_GEAR_RATIOS, 0, &p->offset) &&
-           field_of(p->klass, RD_FLD_FIRST_GEAR, RD_IL2CPP_TYPE_I4, &p->aux);
+           field_of(p->klass, RD_FLD_GEAR_RATIOS, 0, &p->offset);
   case RD_CAR_MASS:
     p->method = g_il2cpp.resolve_icall ? g_il2cpp.resolve_icall(RD_ICALL_SET_MASS) : NULL;
     return float_value(p, 1) && p->method && g_off_body;
@@ -293,10 +292,12 @@ static void hook_load_originals(void *self, void *mi) {   /* MenuManager.LoadOri
 static void log_race_car(void *dt) {
   static const char *const F[] = { RD_FLD_POWER_MULTIPLIER, RD_FLD_TUNING_MULTIPLIER,
                                    RD_FLD_ACTUAL_MULTIPLIER, RD_FLD_MAX_POWER, RD_FLD_MAX_POWER_RPM,
-                                   RD_FLD_IDLE_RPM, RD_FLD_MAX_RPM, RD_FLD_REV_LIMIT, RD_FLD_FINAL_RATIO };
+                                   RD_FLD_ORIGINAL_MAX_POWER, RD_FLD_TURBO_BAR, RD_FLD_TURBO_EXTRA,
+                                   RD_FLD_TURBO_LIMIT, RD_FLD_IDLE_RPM, RD_FLD_MAX_RPM,
+                                   RD_FLD_REV_LIMIT, RD_FLD_FINAL_RATIO };
   static float (*evaluate)(void *curve, float t);
   uint32_t off;
-  char line[512], name[RD_MODS_NAME_LEN];
+  char line[768], name[RD_MODS_NAME_LEN];
   int n = 0;
   if (!dt || !g_drivetrain_class) return;
   if (!evaluate && g_il2cpp.resolve_icall) evaluate = g_il2cpp.resolve_icall(RD_ICALL_CURVE_EVALUATE);
@@ -304,6 +305,8 @@ static void log_race_car(void *dt) {
   for (size_t i = 0; i < sizeof F / sizeof F[0]; i++)
     if (field_of(g_drivetrain_class, F[i], RD_IL2CPP_TYPE_R4, &off))
       n += snprintf(line + n, sizeof line - (size_t)n, " %s=%g", F[i], (double)*(float *)((char *)dt + off));
+  if (field_of(g_drivetrain_class, RD_FLD_TURBO, RD_IL2CPP_TYPE_BOOLEAN, &off))
+    n += snprintf(line + n, sizeof line - (size_t)n, " %s=%d", RD_FLD_TURBO, *((uint8_t *)dt + off));
   void *gears = field_ptr(dt, g_off_gears);
   const uint32_t len = gears && g_il2cpp.array_length ? g_il2cpp.array_length(gears) : 0;
   n += snprintf(line + n, sizeof line - (size_t)n, " gearRatios=");
@@ -489,9 +492,13 @@ static int invoke(const patch *p, void *mi, void *obj, void **args) {
   return exc ? -1 : 0;
 }
 
-/* The game's scan of the torque curve at `factor` into maxPower / maxTorque and their rpm. */
+/* The game's scan of the torque curve at `factor` into maxPower / maxTorque and their rpm --
+ * without boost: with the game's "no override" (-1) the scan spools a fitted turbo up and its
+ * boost lands in the peak, so `power` would cancel a turbo the player buys. Pressure 0 is the
+ * naturally aspirated engine; the game adds the turbo (and the player's engine tuning) on top.
+ * Side effect, as in the game: currentTurboPressure is set to 0. */
 static int calc_max_power(const patch *p, void *dt, float factor) {
-  float turbo = -1;   /* the game's "no override" */
+  float turbo = 0;
   void *args[2] = { &factor, &turbo };
   return invoke(p, p->method, dt, args);
 }
@@ -528,12 +535,12 @@ static void write_power(patch *p, void *dt, const char *car) {
   calc_max_power(p, dt, m);
 }
 
-/* Replaces the forward gears of Drivetrain dt: a new gearRatios with the entries before `first`
- * (reverse, neutral) kept and the mod's ratios after them -- the array's length is the number
+/* Replaces the forward gears of Drivetrain dt: a new gearRatios with the entries before the
+ * first gear (reverse, neutral: RD_GEAR_FIRST_INDEX) kept and the mod's ratios after them -- the array's length is the number
  * of gears to the game (ShiftGear, LoadOriginalValues). */
 static void write_gears(patch *p, void *dt, const char *car) {
   void *old = field_ptr(dt, p->offset);
-  const int32_t first = *(int32_t *)((char *)dt + p->aux);
+  const int32_t first = RD_GEAR_FIRST_INDEX;
   const uint32_t len = old ? g_il2cpp.array_length(old) : 0;
   if (!old || first < 0 || (uint32_t)first > len) return;
   const float *was = (const float *)((char *)old + RD_IL2CPP_ARRAY_DATA);
