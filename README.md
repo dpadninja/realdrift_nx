@@ -2,6 +2,8 @@
 
 A Nintendo Switch homebrew loader that runs the **original Android build of [Real Drift Car Racing](https://play.google.com/store/apps/details?id=com.realdrift.sipon)** (com.realdrift.sipon, Unity 2018.4, IL2CPP) natively on the console.
 
+<img src="scr_handheld.jpg" width="60%"/>
+
 It does not emulate a phone and does not reimplement the game. The game's own arm64 libraries (`libunity.so`, `libil2cpp.so`, `libmain.so`) are loaded into a libnx process, and the Android environment they expect is provided by shims: bionic → newlib, the NDK, EGL/GLES via switch-mesa, OpenSL ES for FMOD audio, and a fake JNI/Java layer.
 
 > **This repository contains no game code or assets.** You need your own copy of Real Drift. The loader reads it from the original APK and OBB on your SD card.
