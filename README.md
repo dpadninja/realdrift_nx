@@ -13,8 +13,9 @@ It does not emulate a phone and does not reimplement the game. The game's own ar
 Playable: menus, races, sound, controller driving and saving work on hardware.
 
 Known issues:
-- loading a scene takes a few seconds (the CPU is boosted while loading);
-- heavy tyre smoke can drop the frame rate (the GPU is the limit); `smoke_size` / `smoke_amount` in `config.txt` make it lighter.
+- loading a scene takes a few seconds (the CPU is boosted while loading)
+- frame rate drops with “Graphics Enhancements” enabled
+- heavy tire smoke also can drop the frame rate (the GPU is the limit); `smoke_size` / `smoke_amount` in `config.txt` make it lighter
 
 ## Features
 
