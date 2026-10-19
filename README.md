@@ -17,8 +17,10 @@ Known issues:
 - frame rate drops with “Graphics Enhancements” enabled
 - heavy tire smoke also can drop the frame rate (the GPU is the limit); `smoke_size` / `smoke_amount` in `config.txt` make it lighter
 
-## Features
+Limitations:
+- network-related functions are obviously not supported
 
+## Features
 - **Controller driving.** Physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
 - **Separate clutch** (`Y` by default), which the original game does not have: you can now use the clutch separately (e.g. for low-powered cars).
 - **Pause** on a button (`+` by default).
