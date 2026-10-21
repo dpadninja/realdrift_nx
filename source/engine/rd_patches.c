@@ -67,7 +67,6 @@ int rd_install_engine_patches(uintptr_t unity_base, int *total) {
 #define CLOCK_THREAD_STACK   0x8000
 #define CLOCK_THREAD_PRIO    0x2C          /* Horizon: lower value = higher priority */
 #define CLOCK_THREAD_CPU     -2            /* libnx: the default core */
-#define BOOST_LOG_MAX        6             /* log only the first CPU boost switches */
 static Thread g_clock_thr;
 /* Background service thread (own bionic TLS): every CLOCK_POLL_NS flushes debug.log about once
  * a second and switches the CPU boost on long loading frames (boost_loading). */
@@ -77,7 +76,6 @@ static void rd_clock_thread(void *arg) {
   install_bionic_tls(clk_tls);
   uint64_t last_flush = 0;
   rd_boost boost = {0};
-  unsigned boost_logged = 0;
   while (!jni_quit_requested) {
     svcSleepThread(CLOCK_POLL_NS);
     uint64_t now = rd_now_ns();
@@ -87,9 +85,8 @@ static void rd_clock_thread(void *arg) {
       rd_boost_update(&boost, now, g_rd_in_frame, g_rd_frame_start_ns,
                       RD_BOOST_THRESHOLD_NS, RD_BOOST_TAIL_NS);
       if (boost.on != was) {
-        cpu_boost(boost.on);
-        if (boost_logged++ < BOOST_LOG_MAX)
-          debugPrintf("[perf] CPU boost %s\n", boost.on ? "ON (loading)" : "off");
+        cpu_boost(boost.on);   /* every switch logged: it also lowers the GPU clock */
+        debugPrintf("[perf] CPU boost %s\n", boost.on ? "ON (loading)" : "off");
       }
     }
   }

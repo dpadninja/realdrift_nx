@@ -14,8 +14,7 @@ Playable: menus, races, sound, controller driving and saving work on hardware.
 
 Known issues:
 - loading a scene takes a few seconds (the CPU is boosted while loading)
-- frame rate drops with “Graphics Enhancements” enabled
-- heavy tire smoke also can drop the frame rate (the GPU is the limit); `smoke_size` / `smoke_amount` in `config.txt` make it lighter
+- heavy tire smoke can drop the frame rate (the GPU is the limit); `smoke_size` / `smoke_amount` in `config.txt` make it lighter
 
 Limitations:
 - network-related functions are obviously not supported

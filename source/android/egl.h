@@ -18,13 +18,17 @@ EGLSurface egl_CreateWindowSurface_log(EGLDisplay d, EGLConfig cfg, void *win, c
 /* eglDestroySurface: never destroys the window surface (the process keeps its one swapchain
  * for its whole life); other surfaces are destroyed normally. */
 EGLBoolean egl_DestroySurface_keep(EGLDisplay d, EGLSurface s);
-/* eglSwapBuffers: draws the overlays (FPS counter, cursor) on the finished frame, then swaps;
- * the swap time goes to nx_stat_swap_ns. */
+/* eglSwapBuffers: ends a traced frame (debug_gl_trace), draws the overlays (FPS counter,
+ * cursor) on the finished frame, then swaps; the swap time goes to nx_stat_swap_ns. */
 EGLBoolean egl_SwapBuffers_log(EGLDisplay d, EGLSurface s);
 /* glBufferData timed into nx_stat_glwait_ns (it may wait for the GPU to release the buffer). */
 void timed_glBufferData(GLenum t, GLsizeiptr n, const void *d, GLenum u);
+/* A GL function the engine gets (from our import table or eglGetProcAddress): with
+ * debug_gl_trace its frame-trace wrapper (rd_gltrace_gl.h), else `real` itself. */
+void *egl_wrap_gl(const char *name, void *real);
 /* eglGetProcAddress for the engine: GL calls that can wait for the GPU come back wrapped so
- * their time is counted (nx_stat_glwait_ns, rd_perfstat.h); everything else is mesa's. */
+ * their time is counted (nx_stat_glwait_ns, rd_perfstat.h), and with debug_gl_trace the
+ * render-target calls the frame trace follows (rd_gltrace_gl.h); everything else is mesa's. */
 void *egl_GetProcAddress_timed(const char *name);
 
 #endif

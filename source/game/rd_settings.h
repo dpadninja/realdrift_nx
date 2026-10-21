@@ -50,6 +50,7 @@ typedef struct {
   int         smoke_amount;          /* percent of the smoke puffs emitted (rd_smoke.h) */
   int         debug_log;             /* RD_LOG_FULL / RD_LOG_MINIMAL (rd_log.h) */
   int         debug_fps_counter;     /* 1: FPS overlay in the top-left corner (rd_fps.h) */
+  int         debug_gl_trace;        /* 1: GPU time per render target of a frame (rd_gltrace.h) */
 } rd_settings;
 
 #define RD_SETTINGS_DEFAULT {                                         \
@@ -71,6 +72,7 @@ typedef struct {
   .smoke_amount = RD_SMOKE_PERCENT_ORIG,                              \
   .debug_log = RD_LOG_MINIMAL,                                        \
   .debug_fps_counter = 0,                                             \
+  .debug_gl_trace = 0,                                                \
 }
 
 /* Parses a button list. Returns 0 and *out on success, -1 on an unknown name. */

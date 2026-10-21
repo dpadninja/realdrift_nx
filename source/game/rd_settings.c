@@ -81,6 +81,9 @@ static const setting SETTINGS[] = {
   { "debug_fps_counter", T_SWITCH, F(debug_fps_counter),
     "# debug_fps_counter: 1 shows frames per second and the slowest frame (ms) of the last\n"
     "#   half second in the top-left corner.\n" },
+  { "debug_gl_trace", T_SWITCH, F(debug_gl_trace),
+    "# debug_gl_trace: 1 logs where a frame's GPU time goes, per render target ([gltrace]\n"
+    "#   lines, with debug_log = 1), about every 10 s. Frames run slower while one is taken.\n" },
 };
 #define NSETTINGS ((int)(sizeof SETTINGS / sizeof SETTINGS[0]))
 

@@ -37,3 +37,6 @@ debug_log=0
 # debug_fps_counter: 1 shows frames per second and the slowest frame (ms) of the last
 #   half second in the top-left corner.
 debug_fps_counter=0
+# debug_gl_trace: 1 logs where a frame's GPU time goes, per render target ([gltrace]
+#   lines, with debug_log = 1), about every 10 s. Frames run slower while one is taken.
+debug_gl_trace=0
