@@ -34,8 +34,9 @@ typedef struct {
 #define RD_BOOST_THRESHOLD_NS (250ull * 1000 * 1000)
 #define RD_BOOST_TAIL_NS      (500ull * 1000 * 1000)
 
-/* `in_frame` = main thread is inside nativeRender, started at `frame_start_ns`.
- * Returns the new desired state (also stored in b->on). */
+/* `in_frame` = main thread is inside nativeRender, started at `frame_start_ns`. The poller reads
+ * now_ns first, so a frame may have started after it: that is not a long frame. Returns the new
+ * desired state (also stored in b->on). */
 int rd_boost_update(rd_boost *b, uint64_t now_ns, int in_frame, uint64_t frame_start_ns,
                     uint64_t threshold_ns, uint64_t tail_ns);
 

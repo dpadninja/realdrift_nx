@@ -31,6 +31,15 @@ static void test_boost_only_on_long_frames(void) {
   CHECK(!rd_boost_update(&b, 7501 * MS, 1, 7495 * MS, T, TAIL));       /* tail expired */
 }
 
+/* The poller takes the time, then reads the frame's start; when the main thread starts a frame
+ * in between, the start is after "now". That must not count as an endless frame: it turned the
+ * boost on mid-race (GPU at 76 MHz, every few frames late; research 16). */
+static void test_boost_frame_started_after_now(void) {
+  rd_boost b = {0};
+  CHECK(!rd_boost_update(&b, 1000 * MS, 1, 1000 * MS + 1, RD_BOOST_THRESHOLD_NS, RD_BOOST_TAIL_NS));
+  CHECK(!b.on && !b.until_ns);
+}
+
 /* The boost is off before any long frame was seen. */
 static void test_boost_starts_off(void) {
   rd_boost b = {0};
@@ -42,5 +51,6 @@ int main(void) {
   RUN(test_resolution);
   RUN(test_boost_only_on_long_frames);
   RUN(test_boost_starts_off);
+  RUN(test_boost_frame_started_after_now);
   return g_failures != 0;
 }
