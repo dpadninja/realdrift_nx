@@ -10,6 +10,11 @@
  * (0 is never a valid B encoding, so callers can treat it as an error). */
 uint32_t rd_a64_b(uint64_t from, uint64_t to);
 
+/* An absolute jump to `to` from anywhere (beyond B's +-128MB): `ldr x16, #8; br x16` and the
+ * 64-bit address, 4 words into out (16 bytes; x16 is the AAPCS64 intra-call scratch register). */
+#define RD_A64_ABS_JUMP_WORDS 4
+void rd_a64_abs_jump(uint32_t out[RD_A64_ABS_JUMP_WORDS], uint64_t to);
+
 /* Target of the B / BL / B.cond instruction `insn` located at `from`; 0 if it is none. */
 uint64_t rd_a64_branch_target(uint64_t from, uint32_t insn);
 
@@ -29,6 +34,8 @@ int rd_a64_add_x_imm(uint32_t insn, unsigned *rd, unsigned *rn, uint32_t *imm);
 #define RD_A64_COND_LT      0xbu
 
 #define RD_A64_RET          0xd65f03c0u   /* ret                         */
+#define RD_A64_LDR_X16_8    0x58000050u   /* ldr x16, #8 (literal)       */
+#define RD_A64_BR_X16       0xd61f0200u   /* br x16                      */
 #define RD_A64_LDP_X19_X30  0xa9417bf3u   /* ldp x19, x30, [sp, #0x10]   */
 #define RD_A64_SUB_SP_0X20  0xd10083ffu   /* sub sp, sp, #0x20           */
 #define RD_A64_BL_OPCODE    0x94000000u   /* bl <imm26>: (insn & MASK) == OPCODE */

@@ -63,8 +63,17 @@ static void test_encodings(void) {
   CHECK(!rd_a64_is_bl(0x14000001u) && !rd_a64_is_bl(RD_A64_RET));
 }
 
+/* The absolute jump loads the address stored right after it (ldr x16 reads pc + 8) and
+ * branches there: the words of llvm-mc's "ldr x16, #8; br x16" and the address, low word first. */
+static void test_abs_jump(void) {
+  uint32_t w[RD_A64_ABS_JUMP_WORDS];
+  rd_a64_abs_jump(w, 0x123456789abcdef0ull);
+  CHECK(w[0] == 0x58000050u && w[1] == 0xd61f0200u && w[2] == 0x9abcdef0u && w[3] == 0x12345678u);
+}
+
 int main(void) {
   RUN(test_encodings);
+  RUN(test_abs_jump);
   RUN(test_adrp_ldr_add_decode);
   RUN(test_bcond_target_of_real_instruction);
   RUN(test_b_forward_and_backward);

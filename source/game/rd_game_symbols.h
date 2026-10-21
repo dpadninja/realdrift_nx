@@ -62,4 +62,10 @@
 #define RD_ICALL_GAME_OBJECT      "UnityEngine.Component::get_gameObject"
 #define RD_ICALL_SHARED_MATERIAL  "UnityEngine.Renderer::GetSharedMaterial"
 
+/* ---- Graphics Enhancements: SleekRender post-process (rd_sleek_hook.c) ---------------- */
+#define RD_ASM_FIRSTPASS          "Assembly-CSharp-firstpass"   /* SleekRender is a plugin */
+#define RD_NS_SLEEK               "SleekRender"
+#define RD_CLS_SLEEK_POST         "SleekRenderPostProcess"
+#define RD_MTH_SLEEK_SET_CLEAR    "SetActiveRenderTextureAndClear"   /* static, 1 argument */
+
 #endif

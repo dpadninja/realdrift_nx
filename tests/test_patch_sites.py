@@ -19,6 +19,9 @@ EXPECTED = {
     "5.0.7": {
         "choreo_gate": 0x30F834,
         "choreo_skip": 0x30F89C,
+        "blit.get_settings": 0x3EB124,
+        "blit.get_manager": 0x480220,
+        "blit.field": 0x240,
         "gc.sig_suspend": 0x1F16A98,
         "gc.sig_restart": 0x1F16A9C,
         "gc.retry_signals": 0x1F56908,
@@ -29,6 +32,9 @@ EXPECTED = {
     "5.0.8": {
         "choreo_gate": 0x3136DC,
         "choreo_skip": 0x313744,
+        "blit.get_settings": 0x3ECDE8,
+        "blit.get_manager": 0x480EE4,
+        "blit.field": 0x240,
         "gc.sig_suspend": 0x1F1C730,
         "gc.sig_restart": 0x1F1C734,
         "gc.retry_signals": 0x1F5C548,

@@ -8,6 +8,13 @@ uint32_t rd_a64_b(uint64_t from, uint64_t to) {
   return 0x14000000u | ((uint32_t)(d >> 2) & 0x03ffffffu);
 }
 
+void rd_a64_abs_jump(uint32_t out[RD_A64_ABS_JUMP_WORDS], uint64_t to) {
+  out[0] = RD_A64_LDR_X16_8;
+  out[1] = RD_A64_BR_X16;
+  out[2] = (uint32_t)to;          /* little-endian: low word first */
+  out[3] = (uint32_t)(to >> 32);
+}
+
 /* Sign-extends the low `bits` bits of v (branch offsets are signed immediates). */
 static int64_t sext(uint64_t v, int bits) {
   return (int64_t)(v << (64 - bits)) >> (64 - bits);

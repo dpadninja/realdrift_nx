@@ -74,6 +74,13 @@ int main(int argc, char **argv) {
       if (r == RD_SITE_OK) printf("choreo_gate=0x%llx\nchoreo_skip=0x%llx\n",
                                   (unsigned long long)gate, (unsigned long long)skip);
       else failed = 1;
+      uint64_t gs = 0, gm = 0;
+      uint32_t field = 0;
+      r = rd_find_blit_type(&im, &gs, &gm, &field);
+      printf("blit.result=%d\n", r);
+      if (r == RD_SITE_OK) printf("blit.get_settings=0x%llx\nblit.get_manager=0x%llx\nblit.field=0x%x\n",
+                                  (unsigned long long)gs, (unsigned long long)gm, field);
+      else failed = 1;
     }
     if (strstr(argv[a], "libil2cpp")) {
       rd_gc_vars v;

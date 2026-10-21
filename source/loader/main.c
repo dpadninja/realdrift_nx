@@ -20,6 +20,7 @@
 #include "rd_il2cpp.h"
 #include "rd_platform.h"
 #include "rd_patches.h"
+#include "rd_sleek.h"
 #include "libc_shim.h"
 #include "nx_fonts.h"
 #include "util.h"
@@ -375,7 +376,10 @@ static void run_main_loop(void) {
     if (frame < RD_LOG_FIRST_FRAMES || (frame % RD_LOG_FRAME_EVERY) == 0) debugPrintf("[boot] frame %d rendered\n", frame);
     if (frame == 1) debugPrintf("[input] UnityEngine.Input icalls replaced: %d\n", rd_icall_applied());
     if (frame == 1 || (frame > 0 && (frame % RD_CLOCK_LOG_FRAMES) == 0)) rd_log_clocks(frame == 1 ? "start" : "running");
-    if ((frame % RD_DRIVE_RETRY_FRAMES) == 0) rd_drive_try_install();
+    if ((frame % RD_DRIVE_RETRY_FRAMES) == 0) {
+      rd_drive_try_install();
+      rd_sleek_try_install();
+    }
     frame++;
     if ((frame % RD_SD_FLUSH_FRAMES) == 0) nx_sd_flush();   /* commit pending saves */
     /* FRAME LIMITER (~60fps). No real display vsync -> pace to 16.6ms so we don't

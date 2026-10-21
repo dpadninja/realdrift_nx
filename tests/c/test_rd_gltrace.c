@@ -23,6 +23,8 @@ static void build(rd_gltrace_frame *f) {
   rd_gltrace_blit(f, 0, 720, 1280, 0);
 }
 
+/* build()'s frame has four segments: a bind of the same framebuffer joins the current one, and
+ * each segment keeps its own counts, viewport and the last blit's size and flip. */
 static void test_segments(void) {
   rd_gltrace_frame f;
   build(&f);

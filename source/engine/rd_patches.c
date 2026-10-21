@@ -43,8 +43,47 @@ static int install_choreographer_sdk_gate(uintptr_t ub) {
   return 1;
 }
 
+/* ---- Android blit type "Never" ------------------------------------------------
+ * The game ships PlayerSettings.androidBlitType = Always: Unity renders every frame into its own
+ * back-buffer FBO and then copies that to the window (~0.45 ms GPU at 720p, every scene). With
+ * Never it renders straight into the window. GetPlayerSettings() is replaced by an absolute jump
+ * to get_settings_never, which returns the same object with the field set to Never -- so every
+ * reader, whenever it reads, sees Never (analysis/research/16-graphics-enhancements.md). */
+#define BLIT_NEVER 1   /* Unity's AndroidBlitType: 0 Always, 1 Never, 2 Auto */
+static void *(*g_get_manager)(int context);
+static uint32_t g_blit_field;
+
+static void *get_settings_never(void) {
+  void *ps = g_get_manager(0);
+  int32_t *blit = ps ? (int32_t *)((char *)ps + g_blit_field) : NULL;
+  if (blit && *blit != BLIT_NEVER) {
+    debugPrintf("[patch] androidBlitType %d -> %d (render straight to the window)\n", *blit, BLIT_NEVER);
+    *blit = BLIT_NEVER;
+  }
+  return ps;
+}
+
+static int install_blit_type_never(uintptr_t ub) {
+  rd_image im;
+  uint64_t gs = 0, gm = 0;
+  int r = rd_image_from_module(&unity_mod, &im) == 0 ? rd_find_blit_type(&im, &gs, &gm, &g_blit_field)
+                                                     : RD_SITE_NOT_FOUND;
+  if (r != RD_SITE_OK) {
+    debugPrintf("[patch] blit type: pattern not found (result %d)\n", r);
+    return 0;
+  }
+  g_get_manager = (void *(*)(int))(ub + gm);
+  uint32_t jump[RD_A64_ABS_JUMP_WORDS];
+  rd_a64_abs_jump(jump, (uint64_t)(uintptr_t)&get_settings_never);
+  if (so_patch_code((void *)(ub + gs), jump, sizeof jump)) return 0;
+  debugPrintf("[patch] GetPlayerSettings @libunity+0x%llx -> blit type Never (field +0x%x)\n",
+              (unsigned long long)gs, g_blit_field);
+  return 1;
+}
+
 static const struct { const char *name; int (*install)(uintptr_t unity_base); } ENGINE_PATCHES[] = {
   { "Choreographer SDK gate", install_choreographer_sdk_gate },
+  { "Blit type Never", install_blit_type_never },
 };
 
 int rd_install_engine_patches(uintptr_t unity_base, int *total) {

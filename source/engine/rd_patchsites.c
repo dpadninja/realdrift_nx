@@ -61,6 +61,82 @@ int rd_find_choreo_gate(const rd_image *im, uint64_t *gate, uint64_t *skip) {
   return RD_SITE_OK;
 }
 
+/* ---------------------------------------------------------------- libunity: blit type */
+static const rd_sigw BLIT_TYPE[] = {
+  RD_SIG_BL,                     /*  0 bl   GetPlayerSettings          */
+  RD_SIG_LDRW(8, 0),             /*  1 ldr  w8, [x0, #androidBlitType] */
+  RD_SIG_X(0x7100091f),          /*  2 cmp  w8, #0x2 (Auto)            */
+  RD_SIG_BCOND(RD_A64_COND_EQ),  /*  3 b.eq                            */
+  RD_SIG_X(0x7100051f),          /*  4 cmp  w8, #0x1 (Never)           */
+  RD_SIG_BCOND(RD_A64_COND_NE),  /*  5 b.ne                            */
+};
+static const rd_sigw GET_SETTINGS[] = {
+  RD_SIG_X(0xf81f0ffe),          /*  0 str  x30, [sp, #-0x10]!         */
+  RD_SIG_X(0x2a1f03e0),          /*  1 mov  w0, wzr  (context 0)       */
+  RD_SIG_BL,                     /*  2 bl   GetManagerFromContext      */
+  RD_SIG_X(0xf84107fe),          /*  3 ldr  x30, [sp], #0x10           */
+  RD_SIG_X(RD_A64_RET),          /*  4 ret                             */
+};
+
+/* 1 if the words at link-time address va match pat. */
+static int matches_at(const rd_image *im, uint64_t va, const rd_sigw *pat, size_t plen) {
+  if (va < im->vaddr || (va - im->vaddr) % 4) return 0;
+  const size_t at = (size_t)((va - im->vaddr) / 4);
+  if (at + plen > im->nwords) return 0;
+  for (size_t k = 0; k < plen; k++)
+    if ((im->code[at + k] & pat[k].mask) != pat[k].val) return 0;
+  return 1;
+}
+
+int rd_find_blit_type(const rd_image *im, uint64_t *get_settings, uint64_t *get_manager,
+                      uint32_t *field) {
+  size_t i = 0;
+  int n = rd_sig_scan(im->code, im->nwords, BLIT_TYPE, NPAT(BLIT_TYPE), &i);
+  if (n == 0) return RD_SITE_NOT_FOUND;
+  if (n > 1) return RD_SITE_AMBIGUOUS;
+  const uint64_t gs = rd_a64_branch_target(va_of(im, i), im->code[i]);
+  if (!matches_at(im, gs, GET_SETTINGS, NPAT(GET_SETTINGS))) return RD_SITE_BAD_CHECK;
+  const size_t g = (size_t)((gs - im->vaddr) / 4);
+  uint32_t off = 0;
+  rd_a64_ldr_w_uimm(im->code[i + 1], NULL, &off);
+  *get_settings = gs;
+  *get_manager = rd_a64_branch_target(gs + 8, im->code[g + 2]);
+  *field = off;
+  return RD_SITE_OK;
+}
+
+/* ---------------------------------------------------------------- il2cpp: skip a clear */
+static const rd_sigw SET_AND_CLEAR[] = {
+  RD_SIG_X(RD_A64_SUB_SP_0X20),  /*  0 sub  sp, sp, #0x20              */
+  RD_SIG_X(0xa9017bfd),          /*  1 stp  x29, x30, [sp, #0x10]      */
+  RD_SIG_X(0x910043fd),          /*  2 add  x29, sp, #0x10             */
+  RD_SIG_X(0xaa1f03e1),          /*  3 mov  x1, xzr  (MethodInfo)      */
+  RD_SIG_BL,                     /*  4 bl   RenderTexture.set_active   */
+};
+static const rd_sigw FRAME_EPILOGUE[] = {
+  RD_SIG_X(0xa9417bfd),          /*  0 ldp  x29, x30, [sp, #0x10]      */
+  RD_SIG_X(0x910083ff),          /*  1 add  sp, sp, #0x20              */
+  RD_SIG_X(RD_A64_RET),          /*  2 ret                             */
+};
+
+int rd_find_skip_clear(const uint32_t *code, size_t n, size_t *after_set, size_t *epilogue) {
+  size_t i = 0, e = 0;
+  if (n < NPAT(SET_AND_CLEAR) || rd_sig_scan(code, NPAT(SET_AND_CLEAR), SET_AND_CLEAR,
+                                             NPAT(SET_AND_CLEAR), &i) != 1)
+    return RD_SITE_NOT_FOUND;
+  const size_t from = NPAT(SET_AND_CLEAR);
+  int k = rd_sig_scan(code + from, n - from, FRAME_EPILOGUE, NPAT(FRAME_EPILOGUE), &e);
+  if (k == 0) return RD_SITE_NOT_FOUND;
+  if (k > 1) return RD_SITE_AMBIGUOUS;
+  e += from;
+  int calls = 0;                                     /* the clear: at least one call between */
+  for (size_t j = from; j < e; j++) calls += rd_a64_is_bl(code[j]);
+  if (!calls) return RD_SITE_BAD_CHECK;
+  *after_set = from;
+  *epilogue = e;
+  return RD_SITE_OK;
+}
+
 /* ---------------------------------------------------------------- libil2cpp: Boehm GC */
 /* GC_suspend_handler_inner, from `bl pthread_self` to `bl sem_post`. */
 static const rd_sigw GC_INNER[] = {
