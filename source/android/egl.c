@@ -15,6 +15,7 @@
 #include "egl.h"
 #include "android_native_unity.h"
 #include "rd_perfstat.h"
+#include "rd_gltrace_gl.h"
 
 // ---------------------------------------------------------------------------
 // EGL surface-size fixup
@@ -79,6 +80,11 @@ EGLBoolean egl_SwapBuffers_log(EGLDisplay d, EGLSurface s) {
   /* Re-assert the nwindow transform for the first few frames while mesa settles its swapchain. */
   static unsigned frame = 0;
   if (frame < 5) { frame++; nx_window_reassert(); }
+  if (config.debug_gl_trace) {   /* before the overlays: the game's frame only */
+    static unsigned traced;
+    if (++traced % RD_GLTRACE_PERIOD_FRAMES == 0) rd_gltrace_arm("every 10 s");
+    rd_gltrace_frame_end();
+  }
   if (config.debug_fps_counter) fps_overlay_draw();
   nxp_draw();   /* on-screen cursor overlay; saves/restores all GL state */
   const uint64_t t0 = rd_now_ns();
@@ -119,9 +125,16 @@ static GLenum timed_glClientWaitSync(GLsync s, GLbitfield f, GLuint64 timeout) {
 }
 static void timed_glFinish(void) { GL_TIMED(glFinish()); }
 
+void *egl_wrap_gl(const char *name, void *real) {
+  void *w = config.debug_gl_trace && real ? rd_gltrace_wrap(name, real) : NULL;
+  return w ? w : real;
+}
+
 void *egl_GetProcAddress_timed(const char *name) {
   void *real = (void *)eglGetProcAddress(name);
   if (!real || !name) return real;
+  void *traced = egl_wrap_gl(name, real);   /* the frame trace (rd_gltrace_gl.h) */
+  if (traced != real) return traced;
 #define TIMED(fn) if (!strcmp(name, #fn)) { real_##fn = real; return (void *)&timed_##fn; }
   TIMED(glBufferSubData) TIMED(glMapBufferRange) TIMED(glUnmapBuffer) TIMED(glClientWaitSync)
 #undef TIMED

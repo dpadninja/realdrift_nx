@@ -48,6 +48,7 @@ void *dlsym_fake(void *handle, const char *symbol) {
   /* 2) one of our libc/GLES/EGL shims (the engine dlopen()s libGLESv2.so etc.
    *    and dlsym()s glGetString/glGetIntegerv, which are shims, not exports) */
   uintptr_t shim = dynlib_find_export(symbol);
+  if (shim && !strncmp(symbol, "gl", 2)) shim = (uintptr_t)egl_wrap_gl(symbol, (void *)shim);
   if (shim) { debugPrintf("dlsym(%s) -> %p [shim]\n", symbol, (void *)shim); return (void *)shim; }
   /* 3) the full GLES/EGL API (~150 entry points) lives in mesa, beyond our
    *    static table -- resolve any gl or egl symbol via eglGetProcAddress. */
