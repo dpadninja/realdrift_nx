@@ -31,6 +31,13 @@ boost_loading=1
 smoke_size=100
 # smoke_amount: percent of the smoke puffs that are emitted, 10 .. 100 (try 50).
 smoke_amount=100
+
+# Gameplay.
+# classic_scoring: 1 counts drift points as Real Drift 4.9 and earlier did: each corner's
+#   points x the combo are added at the transition, every corner over 1000 points raises
+#   the combo, hitting a wall loses the current corner. 0 = the 5.0.8 rules. Scores and
+#   medals go into the same save either way.
+classic_scoring=0
 # debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,
 #   stalls, GC and startup lines. The log is buffered either way.
 debug_log=0

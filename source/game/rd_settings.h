@@ -48,6 +48,7 @@ typedef struct {
   int         boost_loading;         /* 1: CPU boost while a loading frame runs (rd_perf.h) */
   int         smoke_size;            /* percent of the smoke puffs' size (rd_smoke.h) */
   int         smoke_amount;          /* percent of the smoke puffs emitted (rd_smoke.h) */
+  int         classic_scoring;       /* 1: drift points counted as in 4.9 (rd_classic.h) */
   int         debug_log;             /* RD_LOG_FULL / RD_LOG_MINIMAL (rd_log.h) */
   int         debug_fps_counter;     /* 1: FPS overlay in the top-left corner (rd_fps.h) */
   int         debug_gl_trace;        /* 1: GPU time per render target of a frame (rd_gltrace.h) */
@@ -70,6 +71,7 @@ typedef struct {
   .boost_loading = 1,                                                 \
   .smoke_size = RD_SMOKE_PERCENT_ORIG,                                \
   .smoke_amount = RD_SMOKE_PERCENT_ORIG,                              \
+  .classic_scoring = 0,                                               \
   .debug_log = RD_LOG_MINIMAL,                                        \
   .debug_fps_counter = 0,                                             \
   .debug_gl_trace = 0,                                                \

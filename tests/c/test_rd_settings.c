@@ -29,7 +29,7 @@ static void test_format_roundtrip(void) {
 }
 
 /* The defaults match the README: driving on the triggers, gears on the D-pad, pause on +, and
- * both smoke knobs at 100 so the game looks original. */
+ * both smoke knobs at 100 so the game looks original, the game's own scoring. */
 static void test_defaults_put_gears_on_dpad(void) {
   rd_settings s = RD_SETTINGS_DEFAULT;
   const rd_bindings b = s.binds;
@@ -41,6 +41,7 @@ static void test_defaults_put_gears_on_dpad(void) {
   CHECK(s.pause == RD_BTN_PLUS && s.hide_touch_controls == 1);
   CHECK(s.render_res == RD_RES_AUTO && s.boost_loading == 1);
   CHECK(s.smoke_size == RD_SMOKE_PERCENT_ORIG && s.smoke_amount == RD_SMOKE_PERCENT_ORIG);
+  CHECK(s.classic_scoring == 0);                /* the 5.0.8 rules unless asked for */
   CHECK(s.debug_log == RD_LOG_MINIMAL && s.debug_fps_counter == 0);
 }
 
@@ -88,7 +89,9 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "smoke_amount", "5") == -1 && s.smoke_amount == 50);
   CHECK(rd_settings_set(&s, "smoke_amount", "101") == -1);
   CHECK(rd_settings_set(&s, "smoke_amount", "50%") == -1);
-  CHECK(rd_settings_count() == 19 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_set(&s, "classic_scoring", "1") == idx("classic_scoring") && s.classic_scoring == 1);
+  CHECK(rd_settings_set(&s, "classic_scoring", "2") == -1 && s.classic_scoring == 1);
+  CHECK(rd_settings_count() == 20 && idx("bind_throttle") == 0);
 }
 
 /* config.txt written with non-default values reads back identically, and a file with missing
@@ -108,6 +111,7 @@ static void test_write_then_read_roundtrip(const char *dir) {
   in.debug_fps_counter = 1;
   in.smoke_size = 30;
   in.smoke_amount = 40;
+  in.classic_scoring = 1;
   FILE *f = fopen(path, "w"); rd_settings_write(&in, f); fclose(f);
 
   rd_settings out = RD_SETTINGS_DEFAULT;

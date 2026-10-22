@@ -185,6 +185,7 @@ One line per module; each file's header comment has the details.
 | `rd_drive.{c,h}`, `rd_drive_hook.c` | controller driving: button mapping (pure) and the car-controller hook |
 | `rd_race.{c,h}`, `rd_race_hook.c` | race HUD: hide touch controls, pause button |
 | `rd_smoke.{c,h}`, `rd_smoke_hook.c` | lighter tyre smoke through the particle Emit icall |
+| `rd_classic.{c,h}`, `rd_classic_hook.c` | optional classic (4.9) drift scoring: a wrapper of `PointsManager.FixedUpdate` |
 | `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
 
 `main.c` and the import tables (`imports.c`, `unity_imports.c`, `rd_imports.c`) are composition

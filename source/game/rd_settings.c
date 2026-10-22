@@ -75,6 +75,12 @@ static const setting SETTINGS[] = {
     "# smoke_size: size of the smoke puffs in percent, %d .. %d (try 50).\n" },
   { "smoke_amount", T_SMOKE, F(smoke_amount),
     "# smoke_amount: percent of the smoke puffs that are emitted, %d .. %d (try 50).\n" },
+  { "classic_scoring", T_SWITCH, F(classic_scoring),
+    "\n# Gameplay.\n"
+    "# classic_scoring: 1 counts drift points as Real Drift 4.9 and earlier did: each corner's\n"
+    "#   points x the combo are added at the transition, every corner over 1000 points raises\n"
+    "#   the combo, hitting a wall loses the current corner. 0 = the 5.0.8 rules. Scores and\n"
+    "#   medals go into the same save either way.\n" },
   { "debug_log", T_SWITCH, F(debug_log),
     "# debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,\n"
     "#   stalls, GC and startup lines. The log is buffered either way.\n" },

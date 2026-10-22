@@ -62,6 +62,33 @@
 #define RD_ICALL_GAME_OBJECT      "UnityEngine.Component::get_gameObject"
 #define RD_ICALL_SHARED_MATERIAL  "UnityEngine.Renderer::GetSharedMaterial"
 
+/* ---- classic scoring: PointsManager (rd_classic_hook.c) ------------------------------- */
+#define RD_CLS_POINTS_MANAGER     "PointsManager"
+#define RD_MTH_FIXED_UPDATE       "FixedUpdate"
+/* PointsManager fields; the order is the PM_* enum (rd_classic_hook.c). */
+#define RD_PM_FIELD_NAMES         { "totalPoints", "oldTotalPoints", "driftComboFactor", \
+                                    "partialPoints", "oldPartialPoints", "deltaPoints", \
+                                    "bestCombo", "proximityFactor", "driftTimeFactor", \
+                                    "driftTimer", "driftAngle", "speedFactor", "tmpPartialPoints", \
+                                    "driftCombo", "comboUpdated", "raceEnded", "collision", \
+                                    "pointsCalcEnabled", "calcPoints", "carDynamics", \
+                                    "wrongDirectionChecker", "totalPointsText", \
+                                    "partialPointsText", "comboMultiplier", "radialSlider" }
+#define RD_CLS_CAR_DYNAMICS       "CarDynamics"
+#define RD_FLD_ALL_WHEELS_OFF     "allWheelsOutOfTrack"     /* bool */
+#define RD_CLS_WRONG_DIRECTION    "WrongDirectionChecker"
+#define RD_WDC_FIELD_NAMES        { "wrongDirection", "isPlayerBehind" }   /* bools */
+#define RD_TXT_POINTS_LOST        "Points Lost!"            /* 4.9's text; 5.0.8 "Combo Lost!" */
+#define RD_ASM_TMP                "Unity.TextMeshPro"
+#define RD_NS_TMP                 "TMPro"
+#define RD_CLS_TMP_TEXT           "TMP_Text"
+#define RD_MTH_SET_TEXT           "set_text"                /* non-virtual, 1 argument */
+#define RD_ASM_UI                 "UnityEngine.UI"
+#define RD_NS_UI                  "UnityEngine.UI"
+#define RD_CLS_IMAGE              "Image"
+#define RD_MTH_SET_FILL_AMOUNT    "set_fillAmount"          /* 1 argument */
+#define RD_ICALL_DELTA_TIME       "UnityEngine.Time::get_deltaTime"
+
 /* ---- Graphics Enhancements: SleekRender post-process (rd_sleek_hook.c) ---------------- */
 #define RD_ASM_FIRSTPASS          "Assembly-CSharp-firstpass"   /* SleekRender is a plugin */
 #define RD_NS_SLEEK               "SleekRender"
