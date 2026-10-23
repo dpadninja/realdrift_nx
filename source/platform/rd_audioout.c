@@ -3,6 +3,7 @@
 #include <string.h>
 #include <switch.h>
 #include "rd_audioout.h"
+#include "rd_platform.h"
 #include "util.h"
 
 #define BUFFERS        3          /* 3 x 21 ms queued: a late thread is a click, not a gap */
@@ -58,7 +59,9 @@ static void free_buffers(void) {
 
 int rd_audioout_open(rd_audioout_fill fill, void *ctx) {
   if (g_open) return (int)audoutGetSampleRate();
+  const uint64_t t0 = rd_now_ns();      /* audout can be slow to open right after a relaunch */
   Result rc = audoutInitialize();
+  const uint64_t t_init = rd_now_ns();
   if (R_FAILED(rc)) { debugPrintf("[audio] audoutInitialize failed: 0x%x\n", rc); return 0; }
   rc = audoutStartAudioOut();
   if (R_FAILED(rc)) {
@@ -89,8 +92,10 @@ int rd_audioout_open(rd_audioout_fill fill, void *ctx) {
     return 0;
   }
   g_open = 1;
-  debugPrintf("[audio] audout %u Hz, %d x %d frames, thread on core %d\n",
-              audoutGetSampleRate(), BUFFERS, BUFFER_FRAMES, core);
+  debugPrintf("[audio] audout %u Hz, %d x %d frames, thread on core %d; opened in %llu ms "
+              "(audoutInitialize %llu ms)\n", audoutGetSampleRate(), BUFFERS, BUFFER_FRAMES, core,
+              (unsigned long long)((rd_now_ns() - t0) / RD_NS_PER_MS),
+              (unsigned long long)((t_init - t0) / RD_NS_PER_MS));
   return (int)audoutGetSampleRate();
 }
 
