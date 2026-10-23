@@ -29,7 +29,7 @@ static void test_format_roundtrip(void) {
 }
 
 /* The defaults match the README: driving on the triggers, gears on the D-pad, pause on +, and
- * both smoke knobs at 100 so the game looks original. */
+ * both smoke knobs at 100 so the game looks original, menus on the controller with A / B. */
 static void test_defaults_put_gears_on_dpad(void) {
   rd_settings s = RD_SETTINGS_DEFAULT;
   const rd_bindings b = s.binds;
@@ -42,6 +42,9 @@ static void test_defaults_put_gears_on_dpad(void) {
   CHECK(s.render_res == RD_RES_AUTO && s.boost_loading == 1);
   CHECK(s.smoke_size == RD_SMOKE_PERCENT_ORIG && s.smoke_amount == RD_SMOKE_PERCENT_ORIG);
   CHECK(s.debug_log == RD_LOG_MINIMAL && s.debug_fps_counter == 0);
+  CHECK(s.menu_navigation == 1 && s.ui_select == RD_BTN_A && s.ui_back == RD_BTN_B);
+  CHECK(s.ui_prev == RD_BTN_L && s.ui_next == RD_BTN_R);
+  CHECK(s.debug_ui_nav == 0);
 }
 
 /* index of `key` in config.txt order */
@@ -88,7 +91,11 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "smoke_amount", "5") == -1 && s.smoke_amount == 50);
   CHECK(rd_settings_set(&s, "smoke_amount", "101") == -1);
   CHECK(rd_settings_set(&s, "smoke_amount", "50%") == -1);
-  CHECK(rd_settings_count() == 19 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_set(&s, "menu_navigation", "0") == idx("menu_navigation") && !s.menu_navigation);
+  CHECK(rd_settings_set(&s, "bind_ui_back", "B,Y") == idx("bind_ui_back") &&
+        s.ui_back == (RD_BTN_B | RD_BTN_Y));
+  CHECK(rd_settings_set(&s, "bind_ui_next", "ZR") == idx("bind_ui_next") && s.ui_next == RD_BTN_ZR);
+  CHECK(rd_settings_count() == 25 && idx("bind_throttle") == 0);
 }
 
 /* config.txt written with non-default values reads back identically, and a file with missing
@@ -108,6 +115,9 @@ static void test_write_then_read_roundtrip(const char *dir) {
   in.debug_fps_counter = 1;
   in.smoke_size = 30;
   in.smoke_amount = 40;
+  in.menu_navigation = 0;
+  in.ui_select = RD_BTN_X;
+  in.debug_ui_nav = 1;
   FILE *f = fopen(path, "w"); rd_settings_write(&in, f); fclose(f);
 
   rd_settings out = RD_SETTINGS_DEFAULT;

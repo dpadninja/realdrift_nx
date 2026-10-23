@@ -23,6 +23,8 @@ static const struct { const char *name; size_t off; } API[] = {
   { "il2cpp_string_chars",               offsetof(rd_il2cpp_api, string_chars) },
   { "il2cpp_class_get_nested_types",     offsetof(rd_il2cpp_api, class_get_nested_types) },
   { "il2cpp_class_get_name",             offsetof(rd_il2cpp_api, class_get_name) },
+  { "il2cpp_object_new",                 offsetof(rd_il2cpp_api, object_new) },
+  { "il2cpp_object_get_class",           offsetof(rd_il2cpp_api, object_get_class) },
 };
 
 int rd_il2cpp_load(rd_il2cpp_api *api, rd_sym_fn sym, void *ctx,

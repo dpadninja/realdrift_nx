@@ -114,7 +114,22 @@ const rd_icall_override *nx_input_icall_table(void) { return g_input_icalls; }
  * and an id that disappeared is reported for exactly ONE more frame as Ended at its last
  * position -- Unity's contract, and what lets the game see a tap complete.
  * Fingers keep their slot order, so Input.GetTouch(i) is stable across frames. */
-void nx_input_hook_update_multi(const NxTouchIn *in, int n) {
+static int g_synth_down;
+static NxTouchIn g_synth;
+
+void nx_input_hook_synth(int down, float x, float y) {
+  g_synth_down = down;
+  g_synth = (NxTouchIn){ NX_SYNTH_TOUCH_ID, x, y };
+}
+
+void nx_input_hook_update_multi(const NxTouchIn *in_real, int n) {
+  NxTouchIn with_synth[NX_MAX_TOUCH];
+  const NxTouchIn *in = in_real;
+  if (g_synth_down && n >= 0 && n < NX_MAX_TOUCH) {  /* the synthetic finger joins the real ones */
+    for (int i = 0; i < n; i++) with_synth[i] = in_real[i];
+    with_synth[n++] = g_synth;
+    in = with_synth;
+  }
   static HookTouch prev[NX_MAX_TOUCH];
   static int prev_n = 0;
   HookTouch cur[NX_MAX_TOUCH];

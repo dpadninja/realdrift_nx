@@ -44,6 +44,9 @@ typedef struct {
   rd_bindings binds;                 /* driving: buttons per action, steering, deadzone */
   uint64_t    pause;                 /* toggles the race pause menu (rd_race_hook.c) */
   int         hide_touch_controls;   /* 1: hide on-screen driving buttons during a race */
+  int         menu_navigation;       /* 1: focus frame + A/B in the menus, no cursor (rd_menu.h) */
+  uint64_t    ui_select, ui_back;    /* menu navigation: tap the focused element / go back */
+  uint64_t    ui_prev, ui_next;      /* menu navigation: previous / next car, tab, track */
   int         render_res;            /* RD_RES_AUTO / RD_RES_720 / RD_RES_1080 (rd_perf.h) */
   int         boost_loading;         /* 1: CPU boost while a loading frame runs (rd_perf.h) */
   int         smoke_size;            /* percent of the smoke puffs' size (rd_smoke.h) */
@@ -51,6 +54,7 @@ typedef struct {
   int         debug_log;             /* RD_LOG_FULL / RD_LOG_MINIMAL (rd_log.h) */
   int         debug_fps_counter;     /* 1: FPS overlay in the top-left corner (rd_fps.h) */
   int         debug_gl_trace;        /* 1: GPU time per render target of a frame (rd_gltrace.h) */
+  int         debug_ui_nav;          /* 1: log the navigation targets of each screen (rd_menu.h) */
 } rd_settings;
 
 #define RD_SETTINGS_DEFAULT {                                         \
@@ -66,6 +70,9 @@ typedef struct {
   },                                                                  \
   .pause = RD_BTN_PLUS,                                               \
   .hide_touch_controls = 1,                                           \
+  .menu_navigation = 1,                                               \
+  .ui_select = RD_BTN_A, .ui_back = RD_BTN_B,                         \
+  .ui_prev = RD_BTN_L, .ui_next = RD_BTN_R,                           \
   .render_res = RD_RES_AUTO,                                          \
   .boost_loading = 1,                                                 \
   .smoke_size = RD_SMOKE_PERCENT_ORIG,                                \
@@ -73,6 +80,7 @@ typedef struct {
   .debug_log = RD_LOG_MINIMAL,                                        \
   .debug_fps_counter = 0,                                             \
   .debug_gl_trace = 0,                                                \
+  .debug_ui_nav = 0,                                                  \
 }
 
 /* Parses a button list. Returns 0 and *out on success, -1 on an unknown name. */

@@ -62,6 +62,20 @@
 #define RD_ICALL_GAME_OBJECT      "UnityEngine.Component::get_gameObject"
 #define RD_ICALL_SHARED_MATERIAL  "UnityEngine.Renderer::GetSharedMaterial"
 
+/* ---- menu navigation (rd_menu_hook.c; the uGUI names are in engine/rd_ugui.c) -------- */
+#define RD_ICALL_GET_KEY_DOWN     "UnityEngine.Input::GetKeyDownInt"     /* wrapped: Escape */
+#define RD_ICALL_ACTIVE_SELF      "UnityEngine.GameObject::get_activeSelf"
+/* The loading screen between menu and track: drawn with the legacy GUILayer, invisible to uGUI
+ * raycasts, while the menu's buttons still exist behind it. */
+#define RD_CLS_LOADING_SCREEN     "LoadingScreenRandomizer"
+/* The track preview before a race: UIManager.Update starts the race on any touch while
+ * introSequence (a uSequencer) plays and introSequenceStopped is false. */
+#define RD_UIM_INTRO_FIELD_NAMES  { "introSequence", "introSequenceStopped" }
+#define RD_ASM_USEQ               "uSequencerRuntime"
+#define RD_NS_USEQ                "WellFired"
+#define RD_CLS_USEQ               "USSequencer"
+#define RD_MTH_IS_PLAYING         "get_IsPlaying"
+
 /* ---- Graphics Enhancements: SleekRender post-process (rd_sleek_hook.c) ---------------- */
 #define RD_ASM_FIRSTPASS          "Assembly-CSharp-firstpass"   /* SleekRender is a plugin */
 #define RD_NS_SLEEK               "SleekRender"

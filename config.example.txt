@@ -19,6 +19,18 @@ bind_pause=PLUS
 # 1 hides the on-screen steering/throttle/brake/handbrake/gear buttons in races
 hide_touch_controls=1
 
+# Menus.
+# menu_navigation: 1 = a frame marks a menu element; the D-pad or the left stick moves it,
+#   bind_ui_select taps it, bind_ui_back goes back. The touchscreen keeps working.
+#   0 = the on-screen cursor of earlier versions (stick moves it, A taps, + hides it).
+menu_navigation=1
+bind_ui_select=A
+bind_ui_back=B
+# bind_ui_prev / bind_ui_next: previous / next car in the garage, tab, leaderboard track.
+#   bind_ui_select and bind_ui_back also skip the track preview before a race.
+bind_ui_prev=L
+bind_ui_next=R
+
 # Performance.
 # render_resolution: auto = 720 handheld / 1080 docked (picked at launch), or 720 / 1080.
 #   Handheld shows 720p anyway; rendering 1080p there costs 2.25x pixels (smoke!).
@@ -40,3 +52,6 @@ debug_fps_counter=0
 # debug_gl_trace: 1 logs where a frame's GPU time goes, per render target ([gltrace]
 #   lines, with debug_log = 1), about every 10 s. Frames run slower while one is taken.
 debug_gl_trace=0
+# debug_ui_nav: 1 logs the elements menu navigation finds on each new screen ([uinav]
+#   lines, with debug_log = 1): names, parents, rectangles.
+debug_ui_nav=0
