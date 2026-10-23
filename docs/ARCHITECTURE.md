@@ -150,6 +150,8 @@ One line per module; each file's header comment has the details.
 |---|---|
 | `rd_il2cpp.{c,h}` | the il2cpp runtime API, resolved once, plus helpers (classes, fields, arrays, strings) |
 | `rd_icall.{c,h}` | replace or wrap engine icalls by name at registration |
+| `rd_uinav.{c,h}` | focus navigation geometry (pure): direction moves, auto-repeat, refocus |
+| `rd_ugui.{c,h}` | the clickable uGUI elements on screen and their rectangles, for menu navigation |
 | `rd_sig.{c,h}` | masked AArch64 instruction-pattern search |
 | `rd_patchsites.{c,h}` | the patterns that locate every engine patch site and GC variable |
 | `rd_patches.{c,h}` | apply the libunity patches; the background clock thread (CPU boost, log flush) |
@@ -185,6 +187,7 @@ One line per module; each file's header comment has the details.
 | `rd_drive.{c,h}`, `rd_drive_hook.c` | controller driving: button mapping (pure) and the car-controller hook |
 | `rd_race.{c,h}`, `rd_race_hook.c` | race HUD: hide touch controls, pause button |
 | `rd_smoke.{c,h}`, `rd_smoke_hook.c` | lighter tyre smoke through the particle Emit icall |
+| `rd_menu.{c,h}`, `rd_menu_hook.c` | menus on the controller: focus frame, A taps, B goes back (synthetic touch) |
 | `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
 
 `main.c` and the import tables (`imports.c`, `unity_imports.c`, `rd_imports.c`) are composition

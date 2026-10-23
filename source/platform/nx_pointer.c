@@ -503,6 +503,13 @@ void nxp_update(void) {
     s_was_docked = docked;
   }
 
+  if (nxp_cfg.no_cursor) {                 /* touchscreen only */
+    nxp_visible = 0;
+    s_nev = 0;
+    if (!docked) do_touch();
+    return;
+  }
+
   const u64 held    = padGetButtons(&s_pad);
   const u64 pressed = padGetButtonsDown(&s_pad);
 

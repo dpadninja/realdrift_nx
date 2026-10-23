@@ -14,6 +14,7 @@
 #include "libc_shim.h"
 #include "unity_input_hook.h"   /* nx_input_icall_table */
 #include "rd_smoke.h"          /* rd_smoke_icall_table */
+#include "rd_menu.h"           /* rd_menu_icall_table */
 #include "egl.h"
 
 
@@ -37,10 +38,11 @@ void *dlsym_fake(void *handle, const char *symbol) {
    * our wrapper so UnityEngine.Input icalls are replaced and the particle Emit icall is
    * wrapped by name (rd_icall.h). */
   if (p && !strcmp(symbol, "il2cpp_add_internal_call")) {
-    static const rd_icall_override *tables[2];
+    static const rd_icall_override *tables[3];
     tables[0] = nx_input_icall_table();
     tables[1] = rd_smoke_icall_table();
-    rd_icall_setup(tables, 2, (rd_add_icall_fn)p);
+    tables[2] = rd_menu_icall_table();
+    rd_icall_setup(tables, 3, (rd_add_icall_fn)p);
     debugPrintf("[input] dlsym(il2cpp_add_internal_call) -> icall override wrapper\n");
     return (void *)rd_add_internal_call;
   }

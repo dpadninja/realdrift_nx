@@ -28,6 +28,8 @@ typedef struct {
   const uint16_t *(*string_chars)(void *str);          /* UTF-16 */
   void  *(*class_get_nested_types)(void *klass, void **iter);   /* NULL when done */
   const char *(*class_get_name)(void *klass);
+  void  *(*object_new)(void *klass);                   /* fields zeroed, no constructor run */
+  void  *(*object_get_class)(void *obj);
 } rd_il2cpp_api;
 
 extern rd_il2cpp_api g_il2cpp;

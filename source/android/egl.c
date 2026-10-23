@@ -12,6 +12,7 @@
 #include "rd_platform.h"
 
 #include "config.h"
+#include "rd_menu.h"
 #include "egl.h"
 #include "android_native_unity.h"
 #include "rd_perfstat.h"
@@ -87,6 +88,7 @@ EGLBoolean egl_SwapBuffers_log(EGLDisplay d, EGLSurface s) {
   }
   if (config.debug_fps_counter) fps_overlay_draw();
   nxp_draw();   /* on-screen cursor overlay; saves/restores all GL state */
+  rd_menu_draw();   /* menu navigation focus frame */
   const uint64_t t0 = rd_now_ns();
   const EGLBoolean r = eglSwapBuffers(d, s);
   __atomic_add_fetch(&nx_stat_swap_ns, rd_now_ns() - t0, __ATOMIC_RELAXED);

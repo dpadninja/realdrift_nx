@@ -22,6 +22,12 @@ typedef struct { int id; float x, y; } NxTouchIn;
  * finger ids against last frame. This is the multi-touch entry point. */
 void nx_input_hook_update_multi(const NxTouchIn *in, int n);
 
+/* A synthetic finger (menu navigation, rd_menu_hook.c), id NX_SYNTH_TOUCH_ID: while `down` it
+ * is added to the real fingers at (x, y) in Unity screen space; releasing it ends the touch on
+ * the next update like a lifted finger. */
+#define NX_SYNTH_TOUCH_ID 1001        /* above HID finger ids and the cursor's (1000) */
+void nx_input_hook_synth(int down, float x, float y);
+
 /* Name -> replacement table for UnityEngine.Input icalls (rd_icall.h). */
 #include "rd_icall.h"
 const rd_icall_override *nx_input_icall_table(void);

@@ -245,6 +245,7 @@ void android_native_input_init(void){
     .stick_speed = 0.0f,                            /* 0 => module default (14 px/frame)    */
     .mouse_sens  = 0.0f,
     .log = NULL,
+    .no_cursor = config.menu_navigation,            /* the menus are driven by rd_menu.c */
     .fopen_fn  = fopen_fake,
     .fclose_fn = fclose_fake,
   };

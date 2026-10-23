@@ -73,6 +73,9 @@ typedef struct {
 
   void (*log)(const char *msg);  /* optional; may be NULL                   */
 
+  int   no_cursor;               /* 1: touchscreen only -- no cursor, gyro, mouse or their
+                                    buttons (the port's menu navigation owns the pad)     */
+
   /* OPTIONAL locked file I/O.
    * so-loader ports MUST serialise newlib file calls: devkitPro's handle table
    * is not thread-safe, and the game's worker threads hammer it constantly. If

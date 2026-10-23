@@ -21,6 +21,7 @@
 #include "rd_platform.h"
 #include "rd_patches.h"
 #include "rd_sleek.h"
+#include "rd_menu.h"
 #include "libc_shim.h"
 #include "nx_fonts.h"
 #include "util.h"
@@ -356,6 +357,7 @@ static void run_main_loop(void) {
     int _alive = Unity_nativeRender(fake_env, fake_unityplayer_thiz);
     g_rd_in_frame = 0;
     if (!_alive) break;
+    rd_menu_frame();                                       /* controller menu navigation */
 
     {
       long _ms = (long)((rd_now_ns() - t0) / RD_NS_PER_MS);
@@ -379,6 +381,7 @@ static void run_main_loop(void) {
     if ((frame % RD_DRIVE_RETRY_FRAMES) == 0) {
       rd_drive_try_install();
       rd_sleek_try_install();
+      rd_menu_try_install();
     }
     frame++;
     if ((frame % RD_SD_FLUSH_FRAMES) == 0) nx_sd_flush();   /* commit pending saves */

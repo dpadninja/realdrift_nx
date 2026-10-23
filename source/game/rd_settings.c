@@ -62,6 +62,17 @@ static const setting SETTINGS[] = {
     "# pause / resume the race (also closes the pause menu)\n" },
   { "hide_touch_controls", T_SWITCH, F(hide_touch_controls),
     "# 1 hides the on-screen steering/throttle/brake/handbrake/gear buttons in races\n" },
+  { "menu_navigation", T_SWITCH, F(menu_navigation),
+    "\n# Menus.\n"
+    "# menu_navigation: 1 = a frame marks a menu element; the D-pad or the left stick moves it,\n"
+    "#   bind_ui_select taps it, bind_ui_back goes back. The touchscreen keeps working.\n"
+    "#   0 = the on-screen cursor of earlier versions (stick moves it, A taps, + hides it).\n" },
+  { "bind_ui_select",   T_BUTTONS, F(ui_select), "" },
+  { "bind_ui_back",     T_BUTTONS, F(ui_back),   "" },
+  { "bind_ui_prev",     T_BUTTONS, F(ui_prev),
+    "# bind_ui_prev / bind_ui_next: previous / next car in the garage, tab, leaderboard track.\n"
+    "#   bind_ui_select and bind_ui_back also skip the track preview before a race.\n" },
+  { "bind_ui_next",     T_BUTTONS, F(ui_next),   "" },
 
   { "render_resolution", T_RESOLUTION, F(render_res),
     "\n# Performance.\n"
@@ -84,6 +95,9 @@ static const setting SETTINGS[] = {
   { "debug_gl_trace", T_SWITCH, F(debug_gl_trace),
     "# debug_gl_trace: 1 logs where a frame's GPU time goes, per render target ([gltrace]\n"
     "#   lines, with debug_log = 1), about every 10 s. Frames run slower while one is taken.\n" },
+  { "debug_ui_nav", T_SWITCH, F(debug_ui_nav),
+    "# debug_ui_nav: 1 logs the elements menu navigation finds on each new screen ([uinav]\n"
+    "#   lines, with debug_log = 1): names, parents, rectangles.\n" },
 };
 #define NSETTINGS ((int)(sizeof SETTINGS / sizeof SETTINGS[0]))
 
