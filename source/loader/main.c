@@ -409,6 +409,10 @@ int main(int argc, char *argv[]) {
 
   boot_enter_game_folder();
   boot_read_config();
+  if (config.boost_loading) {                          /* modules, init, JNI: CPU bound */
+    cpu_boost(1);
+    debugPrintf("[perf] CPU boost ON (boot)\n");
+  }
   check_syscalls();
   debugPrintf("[boot] syscalls ok\n");
   mem_log_boot();
@@ -448,7 +452,7 @@ int main(int argc, char *argv[]) {
   debugPrintf("[boot] il2cpp API: %d function(s) missing\n", il2cpp_missing);
 
   /* Controller driving + race UI (rd_drive_hook.c) are installed lazily in the loop. */
-  rd_start_clock_thread();
+  rd_start_clock_thread(config.boost_loading);
   debugPrintf("[boot] GC off + clock thread started; entering render loop\n");
 
   diag_thread_register(NULL, 0);

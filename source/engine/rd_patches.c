@@ -212,13 +212,14 @@ int rd_install_engine_patches(uintptr_t unity_base, int *total) {
 #define CLOCK_THREAD_CPU     -2            /* libnx: the default core */
 static Thread g_clock_thr;
 /* Background service thread (own bionic TLS): every CLOCK_POLL_NS flushes debug.log about once
- * a second and switches the CPU boost on long loading frames (boost_loading). */
+ * a second and switches the CPU boost on long loading frames (boost_loading). arg != NULL: the
+ * boost is already on since boot. */
 static void rd_clock_thread(void *arg) {
-  (void)arg;
   static uint8_t clk_tls[BIONIC_TLS_SIZE] __attribute__((aligned(16)));
   install_bionic_tls(clk_tls);
   uint64_t last_flush = 0;
   rd_boost boost = {0};
+  if (arg) rd_boost_start(&boost, rd_now_ns(), RD_BOOST_TAIL_NS);   /* on since boot */
   while (!jni_quit_requested) {
     svcSleepThread(CLOCK_POLL_NS);
     uint64_t now = rd_now_ns();
@@ -235,8 +236,8 @@ static void rd_clock_thread(void *arg) {
   }
 }
 
-void rd_start_clock_thread(void) {
-  if (R_SUCCEEDED(threadCreate(&g_clock_thr, rd_clock_thread, NULL, NULL, CLOCK_THREAD_STACK,
-                               CLOCK_THREAD_PRIO, CLOCK_THREAD_CPU)))
+void rd_start_clock_thread(int boosted) {
+  if (R_SUCCEEDED(threadCreate(&g_clock_thr, rd_clock_thread, boosted ? &g_clock_thr : NULL, NULL,
+                               CLOCK_THREAD_STACK, CLOCK_THREAD_PRIO, CLOCK_THREAD_CPU)))
     threadStart(&g_clock_thr);
 }

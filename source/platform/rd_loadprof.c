@@ -17,6 +17,7 @@ void rd_loadprof_io_diff(const rd_loadprof_io *a, const rd_loadprof_io *b, rd_lo
   d->sd_read_ns = b->sd_read_ns - a->sd_read_ns;
   d->cache_hits = b->cache_hits - a->cache_hits;
   d->cache_misses = b->cache_misses - a->cache_misses;
+  d->readlog_hits = b->readlog_hits - a->readlog_hits;
   d->writes = b->writes - a->writes;
   d->write_bytes = b->write_bytes - a->write_bytes;
   d->write_ns = b->write_ns - a->write_ns;
@@ -33,7 +34,7 @@ int rd_loadprof_format_io(const rd_loadprof_io *d, uint64_t frame_ns, uint64_t a
   return snprintf(buf, n,
                   "frame %llu ms, at %llu ms | engine: fopen %llu, fread %llu, fseek %llu, "
                   "read %llu, %llu KB in %llu ms | SD: open %llu in %llu ms, read %llu x avg "
-                  "%llu B = %llu KB in %llu ms | cache: hit %llu, miss %llu | write %llu, "
+                  "%llu B = %llu KB in %llu ms | cache: hit %llu, miss %llu, prefetched %llu | write %llu, "
                   "%llu KB in %llu ms | commit %llu in %llu ms",
                   MS(frame_ns), MS(at_ns), (unsigned long long)d->fopens,
                   (unsigned long long)d->freads, (unsigned long long)d->fseeks,
@@ -41,6 +42,7 @@ int rd_loadprof_format_io(const rd_loadprof_io *d, uint64_t frame_ns, uint64_t a
                   (unsigned long long)d->sd_opens, MS(d->sd_open_ns),
                   (unsigned long long)d->sd_reads, avg, KB(d->sd_read_bytes), MS(d->sd_read_ns),
                   (unsigned long long)d->cache_hits, (unsigned long long)d->cache_misses,
+                  (unsigned long long)d->readlog_hits,
                   (unsigned long long)d->writes, KB(d->write_bytes), MS(d->write_ns),
                   (unsigned long long)d->commits, MS(d->commit_ns));
 }

@@ -19,6 +19,10 @@
 #include "rd_platform.h"
 #include "rd_archcache.h"
 #include "rd_sdcommit.h"
+#include "rd_readlog.h"
+#include "rd_game.h"
+#include <stdio.h>
+#include <sys/stat.h>
 #include "config.h"        /* archive_cache */
 
 
@@ -148,10 +152,113 @@ static long arch_read_locked(int fd, void *buf, size_t n, long off, int ahead) {
   return r;
 }
 
+/* ---- launch prefetch (rd_readlog.h) ----
+ * The first archive read loads <game>/RD_READLOG_FILE if its stamp matches both archives
+ * (replay); otherwise the small reads of the next RD_READLOG_RECORD_NS are recorded and the file
+ * is written once (a valid log is never rewritten). All under g_arch_lock. */
+enum { RL_UNSET, RL_REPLAY, RL_RECORD, RL_OFF };
+extern int nx_sd_dirty;                  /* the SD commit section below */
+static int g_rl = RL_UNSET;
+static rd_readlog_view g_rl_view;
+static uint8_t *g_rl_file;               /* the loaded log (replay), kept for the run */
+static rd_readlog g_rl_rec;
+static char g_rl_stamp[RD_READLOG_STAMP_MAX];
+static uint64_t g_rl_until;
+
+/* The whole file at `path` (malloc'd) and its size in *len, or NULL. */
+static uint8_t *read_whole(const char *path, size_t *len) {
+  FILE *f = fopen(path, "rb");
+  if (!f) return NULL;
+  uint8_t *buf = NULL;
+  long size = -1;
+  if (fseek(f, 0, SEEK_END) == 0) size = ftell(f);
+  if (size > 0 && fseek(f, 0, SEEK_SET) == 0 && (buf = malloc((size_t)size))) {
+    if (fread(buf, 1, (size_t)size, f) != (size_t)size) { free(buf); buf = NULL; }
+  }
+  fclose(f);
+  *len = buf ? (size_t)size : 0;
+  return buf;
+}
+
+static void readlog_start_locked(void) {
+  g_rl = RL_OFF;
+  struct stat a, o;
+  if (stat(RD_GAME_HOME "/" RD_BASE_APK_NAME, &a) || stat(RD_GAME_HOME "/" RD_GAME_OBB_NAME, &o) ||
+      rd_readlog_stamp(g_rl_stamp, sizeof g_rl_stamp, a.st_size, a.st_mtime, o.st_size,
+                       o.st_mtime) < 0)
+    return;
+  const uint64_t t0 = rd_now_ns();
+  size_t len = 0;
+  g_rl_file = read_whole(RD_GAME_HOME "/" RD_READLOG_FILE, &len);
+  if (g_rl_file && rd_readlog_parse(&g_rl_view, g_rl_file, len, g_rl_stamp)) {
+    g_rl = RL_REPLAY;
+    debugPrintf("[io] readlog: %d ranges, %zu KB prefetched in %llu ms\n", g_rl_view.n, len >> 10,
+                (unsigned long long)((rd_now_ns() - t0) / RD_NS_PER_MS));
+    return;
+  }
+  free(g_rl_file);
+  g_rl_file = NULL;
+  rd_readlog_range *ranges = malloc(RD_READLOG_MAX_RANGES * sizeof *ranges);
+  uint8_t *data = malloc(RD_READLOG_MAX_BYTES);
+  if (!ranges || !data) { free(ranges); free(data); return; }
+  rd_readlog_init(&g_rl_rec, ranges, RD_READLOG_MAX_RANGES, data, RD_READLOG_MAX_BYTES);
+  g_rl = RL_RECORD;
+  g_rl_until = rd_now_ns() + RD_READLOG_RECORD_NS;
+  debugPrintf("[io] readlog: %s, recording this launch's small archive reads\n",
+              len ? "stale" : "none yet");
+}
+
+/* Writes the recorded log once and stops recording. */
+static void readlog_finish_locked(void) {
+  g_rl = RL_OFF;
+  const size_t need = rd_readlog_serialize(&g_rl_rec, g_rl_stamp, NULL, 0);
+  uint8_t *out = malloc(need);
+  const size_t len = out ? rd_readlog_serialize(&g_rl_rec, g_rl_stamp, out, need) : 0;
+  FILE *f = len ? fopen(RD_GAME_HOME "/" RD_READLOG_FILE, "wb") : NULL;
+  int ok = 0;
+  if (f) { ok = fwrite(out, 1, len, f) == len; ok &= fclose(f) == 0; }
+  if (f) nx_sd_dirty = 1;               /* committed by the next nx_sd_flush */
+  debugPrintf("[io] readlog %s: %d reads, %zu KB\n", ok ? "written" : "NOT written", g_rl_rec.n,
+              len >> 10);
+  if (f && !ok) remove(RD_GAME_HOME "/" RD_READLOG_FILE);
+  free(out);
+  free(g_rl_rec.ranges);
+  free(g_rl_rec.data);
+  g_rl_rec = (rd_readlog){ 0 };
+}
+
+/* A read of n bytes at `off` of fd from the prefetched log: n, or 0 when it is not there. */
+static long readlog_serve_locked(int fd, void *buf, size_t n, long off) {
+  if (g_rl == RL_UNSET) readlog_start_locked();
+  const rd_archfile *f = g_rl == RL_REPLAY ? rd_archfiles_file(&g_arch_files, fd) : NULL;
+  const uint8_t *p = f ? rd_readlog_find(&g_rl_view, f->key, off, n) : NULL;
+  if (!p || !n) return 0;
+  memcpy(buf, p, n);
+  __atomic_add_fetch(&nx_stat_readlog_hit, 1, __ATOMIC_RELAXED);
+  return (long)n;
+}
+
+/* After a cache read of r bytes at `off`: records it while recording (small reads only). */
+static void readlog_note_locked(int fd, const void *buf, long r, long off, int ahead) {
+  if (g_rl != RL_RECORD) return;
+  const rd_archfile *f = rd_archfiles_file(&g_arch_files, fd);
+  if (f && r > 0 && !ahead && r <= RD_READLOG_MAX_READ &&
+      !rd_readlog_add(&g_rl_rec, f->key, off, buf, (size_t)r)) {
+    readlog_finish_locked();                       /* full: what we have is the log */
+    return;
+  }
+  if (rd_now_ns() > g_rl_until) readlog_finish_locked();
+}
+
 long arch_read(int fd, void *buf, size_t n, int ahead) {
   mutexLock(&g_arch_lock);
-  ahead = ahead || rd_archfiles_sequential(&g_arch_files, fd);
-  const long r = arch_read_locked(fd, buf, n, (long)rd_archfiles_pos(&g_arch_files, fd), ahead);
+  const long pos = (long)rd_archfiles_pos(&g_arch_files, fd);
+  long r = readlog_serve_locked(fd, buf, n, pos);
+  if (!r) {
+    ahead = ahead || rd_archfiles_sequential(&g_arch_files, fd);
+    r = arch_read_locked(fd, buf, n, pos, ahead);
+    readlog_note_locked(fd, buf, r, pos, ahead);
+  }
   if (r > 0) rd_archfiles_advance(&g_arch_files, fd, r);
   mutexUnlock(&g_arch_lock);
   return r;
@@ -159,7 +266,11 @@ long arch_read(int fd, void *buf, size_t n, int ahead) {
 
 long arch_pread(int fd, void *buf, size_t n, long off) {
   mutexLock(&g_arch_lock);
-  const long r = arch_read_locked(fd, buf, n, off, 0);
+  long r = readlog_serve_locked(fd, buf, n, off);
+  if (!r) {
+    r = arch_read_locked(fd, buf, n, off, 0);
+    readlog_note_locked(fd, buf, r, off, 0);
+  }
   mutexUnlock(&g_arch_lock);
   return r;
 }

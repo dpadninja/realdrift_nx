@@ -16,6 +16,19 @@ static void test_resolution(void) {
   rd_pick_resolution(12345, 0, &w, &h);       CHECK(w == 1280 && h == 720);   /* unknown = auto */
 }
 
+/* A boost started at boot stays on through the tail, is carried on by the first (long, loading)
+ * frame, and ends a tail after the short frames begin -- the menu runs at the normal clocks. */
+static void test_boost_from_boot(void) {
+  const uint64_t T = RD_BOOST_THRESHOLD_NS, TAIL = RD_BOOST_TAIL_NS;
+  rd_boost b = {0};
+  rd_boost_start(&b, 1000 * MS, TAIL);
+  CHECK(b.on);
+  CHECK(rd_boost_update(&b, 1100 * MS, 1, 1050 * MS, T, TAIL));         /* frame 0, 50 ms in */
+  CHECK(rd_boost_update(&b, 3000 * MS, 1, 1050 * MS, T, TAIL));         /* frame 0 is long */
+  CHECK(rd_boost_update(&b, 3200 * MS, 1, 3190 * MS, T, TAIL));         /* tail */
+  CHECK(!rd_boost_update(&b, 3600 * MS, 1, 3590 * MS, T, TAIL));        /* menu: off */
+}
+
 /* The CPU boost turns on only for a frame longer than the threshold (a loading frame, not a
  * 200 ms hitch) and stays on for the tail after loading ends; the boost lowers the GPU clock,
  * so it must not stick during play. */
@@ -48,6 +61,7 @@ static void test_boost_starts_off(void) {
 }
 
 int main(void) {
+  RUN(test_boost_from_boot);
   RUN(test_resolution);
   RUN(test_boost_only_on_long_frames);
   RUN(test_boost_starts_off);

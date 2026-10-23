@@ -9,7 +9,8 @@
 /* Installs every engine patch it can; returns how many applied, *total = how many exist. */
 int  rd_install_engine_patches(uintptr_t unity_base, int *total);
 
-/* Fake vsync, debug.log flush, CPU boost while loading, engine clock during scene loads. */
-void rd_start_clock_thread(void);
+/* Fake vsync, debug.log flush, CPU boost while loading, engine clock during scene loads.
+ * `boosted`: main() already switched the boost on at boot. */
+void rd_start_clock_thread(int boosted);
 
 #endif

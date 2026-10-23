@@ -21,6 +21,7 @@ static void io_sample(rd_loadprof_io *s) {
     .sd_reads = LOAD(nx_stat_sd_read), .sd_read_bytes = LOAD(nx_stat_sd_read_bytes),
     .sd_read_ns = LOAD(nx_stat_sd_read_ns),
     .cache_hits = LOAD(nx_stat_cache_hit), .cache_misses = LOAD(nx_stat_cache_miss),
+    .readlog_hits = LOAD(nx_stat_readlog_hit),
     .writes = LOAD(nx_stat_write), .write_bytes = LOAD(nx_stat_write_bytes),
     .write_ns = LOAD(nx_stat_write_ns),
     .commits = LOAD(nx_stat_commit), .commit_ns = LOAD(nx_stat_commit_ns),

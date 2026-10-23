@@ -9,5 +9,6 @@ volatile unsigned long long nx_stat_fopen = 0, nx_stat_fread = 0, nx_stat_fseek 
 volatile unsigned long long nx_stat_sd_open = 0, nx_stat_sd_open_ns = 0;
 volatile unsigned long long nx_stat_sd_read = 0, nx_stat_sd_read_bytes = 0, nx_stat_sd_read_ns = 0;
 volatile unsigned long long nx_stat_cache_hit = 0, nx_stat_cache_miss = 0;
+volatile unsigned long long nx_stat_readlog_hit = 0;
 volatile unsigned long long nx_stat_write = 0, nx_stat_write_bytes = 0, nx_stat_write_ns = 0;
 volatile unsigned long long nx_stat_commit_ns = 0, nx_stat_start_ns = 0;

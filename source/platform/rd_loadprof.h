@@ -25,6 +25,7 @@ typedef struct {
   uint64_t sd_opens, sd_open_ns;                   /* FS file opens */
   uint64_t sd_reads, sd_read_bytes, sd_read_ns;    /* FS file reads */
   uint64_t cache_hits, cache_misses;               /* archive_cache block lookups */
+  uint64_t readlog_hits;                           /* reads served by the launch prefetch */
   uint64_t writes, write_bytes, write_ns;          /* write / fwrite */
   uint64_t commits, commit_ns;                     /* SD commits (fsdevCommitDevice) */
 } rd_loadprof_io;

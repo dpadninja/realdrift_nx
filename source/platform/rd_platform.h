@@ -47,6 +47,10 @@ static inline uint64_t rd_now_ns(void) {
 #define RD_ARCHIVE_CACHE_BLOCK         (128 * 1024)  /* archive_cache: unit kept (rd_archcache.h) */
 #define RD_ARCHIVE_CACHE_SECTOR        (16 * 1024)   /* archive_cache: smallest SD read */
 #define RD_ARCHIVE_CACHE_BYTES         (64 << 20)    /* archive_cache: blocks kept in memory */
+#define RD_READLOG_RECORD_NS  (10ull * 1000 * 1000 * 1000) /* launch prefetch: reads recorded (rd_readlog.h); boot needs ~6 s */
+#define RD_READLOG_MAX_READ   (64 * 1024)              /* larger reads are not "small" */
+#define RD_READLOG_MAX_RANGES 16384
+#define RD_READLOG_MAX_BYTES  (8 << 20)
 #define RD_PATH_MAX                    768           /* path buffers on the SD card */
 
 /* Unity probes case sensitivity by creating CASESENSITIVETEST<guid> in the data folder;

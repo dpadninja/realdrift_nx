@@ -11,10 +11,10 @@
  * against SD opens / reads with the average SD read size, the cache hits / misses, the writes
  * and SD commits, and the time since start. */
 static void test_io(void) {
-  const rd_loadprof_io a = { 1, 2, 3, 4, 1024, MS_, 1, MS_, 10, 10 * 1024, MS_, 7, 3,
+  const rd_loadprof_io a = { 1, 2, 3, 4, 1024, MS_, 1, MS_, 10, 10 * 1024, MS_, 7, 3, 4,
                              5, 1024, MS_, 2, MS_ };
   const rd_loadprof_io b = { 11, 102, 53, 4, 1024 + 512 * 1024, 101 * MS_, 6, 21 * MS_,
-                             110, 10 * 1024 + 100 * 131072, 81 * MS_, 907, 103,
+                             110, 10 * 1024 + 100 * 131072, 81 * MS_, 907, 103, 1779,
                              26, 1024 + 3072 * 1024, 41 * MS_, 23, 1201 * MS_ };
   rd_loadprof_io d;
   rd_loadprof_io_diff(&a, &b, &d);
@@ -25,7 +25,7 @@ static void test_io(void) {
   CHECK(strstr(buf, "frame 4000 ms, at 9500 ms |") != NULL);
   CHECK(strstr(buf, "fopen 10, fread 100, fseek 50, read 0, 512 KB in 100 ms") != NULL);
   CHECK(strstr(buf, "open 5 in 20 ms, read 100 x avg 131072 B = 12800 KB in 80 ms") != NULL);
-  CHECK(strstr(buf, "| cache: hit 900, miss 100") != NULL);
+  CHECK(strstr(buf, "| cache: hit 900, miss 100, prefetched 1775 |") != NULL);
   CHECK(strstr(buf, "| write 21, 3072 KB in 40 ms | commit 21 in 1200 ms") != NULL);
   const rd_loadprof_io z = { 0 };
   rd_loadprof_format_io(&z, 0, 0, buf, sizeof buf);

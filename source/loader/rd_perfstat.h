@@ -24,6 +24,8 @@ extern volatile unsigned long long nx_stat_write, nx_stat_write_bytes, nx_stat_w
 extern volatile unsigned long long nx_stat_commit_ns, nx_stat_start_ns;
 /* archive_cache block lookups served from memory / read from the card (bionic/shim_fs_cache.c). */
 extern volatile unsigned long long nx_stat_cache_hit, nx_stat_cache_miss;
+/* archive reads served by the launch prefetch (rd_readlog.h). */
+extern volatile unsigned long long nx_stat_readlog_hit;
 /* Time in eglSwapBuffers, and in GL calls that can wait for the GPU (android/egl). */
 extern volatile unsigned long long nx_stat_swap_ns, nx_stat_glwait_ns;
 /* Time mesa waits for a free window buffer / for GPU fences (platform/rd_gpuwait.c). */

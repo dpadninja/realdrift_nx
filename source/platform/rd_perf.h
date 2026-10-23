@@ -34,6 +34,10 @@ typedef struct {
 #define RD_BOOST_THRESHOLD_NS (250ull * 1000 * 1000)
 #define RD_BOOST_TAIL_NS      (500ull * 1000 * 1000)
 
+/* The boost already switched on at boot (before the first frame): on, and held for tail_ns from
+ * now_ns so the first frame's opening 250 ms are covered until it counts as a long frame. */
+void rd_boost_start(rd_boost *b, uint64_t now_ns, uint64_t tail_ns);
+
 /* `in_frame` = main thread is inside nativeRender, started at `frame_start_ns`. The poller reads
  * now_ns first, so a frame may have started after it: that is not a long frame. Returns the new
  * desired state (also stored in b->on). */

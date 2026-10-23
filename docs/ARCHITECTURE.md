@@ -115,6 +115,7 @@ One line per module; each file's header comment has the details.
 | `shim_fs_path.c` | path rewrites: APK asset root, case-sensitivity probe, `mkdir -p`, synthetic `/proc` and `/sys` |
 | `shim_fs_cache.c` | per-fd state: the archive block cache for `base.apk` / OBB fds, read-ahead windows, synthetic inodes, open-fd cache for `.so` files, SD commit after writes |
 | `rd_sdcommit.{c,h}` | which written files commit the SD card on close (not Unity's per-launch il2cpp copy) |
+| `rd_readlog.{c,h}` | archive_cache: the launch prefetch -- the first launch's small archive reads, saved once and served from memory later |
 | `rd_archcache.{c,h}` | archive_cache: the block pool (LRU) shared by every open of `base.apk` / the OBB |
 | `shim_stdio.c` | `fopen` (archive FILEs read through the block cache) and the fake `stdin`/`stdout`/`stderr` streams |
 | `shim_mmap.{c,h}` | `mmap`/`munmap`/`mprotect`/`madvise`, memalign fallback, read-only file-map cache; `shim_mmap.h` is internal |
