@@ -24,7 +24,8 @@ Limitations:
 - **Separate clutch** (`Y` by default), which the original game does not have: you can now use the clutch separately (e.g. for low-powered cars).
 - **Pause** on a button (`+` by default).
 - **Touch driving controls hidden** during races (optional).
-- **Menus:** use the touchscreen, a USB mouse, or the on-screen cursor (`+` toggles it outside a race, the left stick moves it, `A` taps, `-` toggles gyro pointing).
+- **Controller menu navigation:** a frame marks the selected menu element. The D-pad or the left stick moves it to the neighbour in that direction, as with a TV remote; `A` selects, `B` goes back. `L` / `R` switch the car in the garage, the leaderboard track and the settings and profile tabs. On a slider, `A` starts editing: left / right change the value, `A` keeps it, `B` restores the old one. `A` or `B` skip the track preview before a race. The touchscreen keeps working.
+- **On-screen cursor** instead of the navigation (`menu_navigation=0`): the left stick moves it, `A` taps, `+` toggles it outside a race, `-` toggles gyro pointing; a USB mouse works too.
 - **Render resolution:** 720p handheld / 1080p docked by default, or fixed.
 - **Lighter tyre smoke** (optional): smaller and fewer smoke puffs for a steady frame rate.
 - **FPS counter** (optional) in the top-left corner.
@@ -96,6 +97,16 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 | `bind_pause` | `PLUS` | pause / resume the race (also closes the pause menu) |
 | `stick_deadzone` | `0.15` | left stick deadzone, `0.0`–`0.9` |
 
+### Menus
+
+| Key | Default | Meaning |
+|---|---|---|
+| `menu_navigation` | `1` | `1` = controller navigation with a focus frame (no cursor); `0` = the on-screen cursor |
+| `bind_ui_select` | `A` | select the focused element; start / finish editing a slider; skip the track preview |
+| `bind_ui_back` | `B` | go back; cancel slider editing; skip the track preview |
+| `bind_ui_prev` | `L` | previous car in the garage, tab, leaderboard track |
+| `bind_ui_next` | `R` | next car in the garage, tab, leaderboard track |
+
 ### Performance
 
 | Key | Values | Default | Meaning |
@@ -111,6 +122,8 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 |---|---|---|---|
 | `debug_log` | `0` / `1` | `0` | `1` = full `debug.log` for bug reports; `0` = only crashes, stalls and startup |
 | `debug_fps_counter` | `0` / `1` | `0` | show frames per second and the slowest frame (ms) in the top-left corner |
+| `debug_gl_trace` | `0` / `1` | `0` | log where a frame's GPU time goes, per render target, about every 10 s (with `debug_log=1`) |
+| `debug_ui_nav` | `0` / `1` | `0` | log what menu navigation finds on each screen, what it skips and why, and every move (with `debug_log=1`) |
 
 ### Other
 
@@ -174,6 +187,8 @@ Real Drift and all of its files (code, assets, `.so` libraries, APK, OBB) belong
 | [colorsheep_nx](https://github.com/ChanseyIsTheBest/colorsheep_nx), [zookeeperdx_nx](https://github.com/ChanseyIsTheBest/zookeeperdx_nx) | ChanseyIsTheBest | the so-loader port lineage badpiggies_nx descends from |
 | [vln_nx](https://github.com/NaGaa95/vln_nx), [cr3_nx](https://github.com/NaGaa95/cr3_nx) | naga | the so-loader port lineage badpiggies_nx descends from (cr3_nx: the OpenSL ES shim and fake fds) |
 | so-loader (Android game ports to Vita/Switch): [gtasa_vita](https://github.com/TheOfficialFloW/gtasa_vita), [max_nx](https://github.com/fgsfdsfgs/max_nx) | Andy Nguyen (TheFloW), fgsfds, Rinnegatamante | ELF loading and relocation (`so_util.c`), import table (`imports.c`), `util.c`, `error.c` |
+
+**Algorithms:** menu navigation follows the rules of Android's [FocusFinder](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/view/FocusFinder.java) (AOSP, Apache-2.0); the code is our own.
 
 **Libraries linked into the `.nro`** (from devkitPro, not in this repository):
 
