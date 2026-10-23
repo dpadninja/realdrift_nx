@@ -81,6 +81,18 @@ int main(int argc, char **argv) {
       if (r == RD_SITE_OK) printf("blit.get_settings=0x%llx\nblit.get_manager=0x%llx\nblit.field=0x%x\n",
                                   (unsigned long long)gs, (unsigned long long)gm, field);
       else failed = 1;
+      uint64_t call = 0, copy = 0, veneer = 0;
+      r = rd_find_il2cpp_copy(&im, &call, &copy, &veneer);
+      printf("il2cpp_copy.result=%d\n", r);
+      if (r == RD_SITE_OK) printf("il2cpp_copy.call=0x%llx\nil2cpp_copy.copy=0x%llx\n"
+                                  "il2cpp_copy.veneer=0x%llx\n", (unsigned long long)call,
+                                  (unsigned long long)copy, (unsigned long long)veneer);
+      else failed = 1;
+      uint32_t splash = 0;
+      r = rd_find_splash_flag(&im, &splash);
+      printf("splash.result=%d\n", r);
+      if (r == RD_SITE_OK) printf("splash.field=0x%x\n", splash);
+      else failed = 1;
     }
     if (strstr(argv[a], "libil2cpp")) {
       rd_gc_vars v;
