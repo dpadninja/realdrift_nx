@@ -47,6 +47,10 @@ smoke_amount=100
 #   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after
 #   many cars and tracks new textures stop fitting and show black. Loads take a bit longer.
 texture_transcode=1
+# archive_cache: 1 keeps recently read parts of base.apk and the OBB in memory (64 MB),
+#   shared by every open of them, so loads read each part from the SD card once; 0 reads
+#   the card directly (slower loads).
+archive_cache=1
 # debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,
 #   stalls, GC and startup lines. The log is buffered either way.
 debug_log=0

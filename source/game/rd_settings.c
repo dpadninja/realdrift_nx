@@ -90,6 +90,10 @@ static const setting SETTINGS[] = {
     "# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads\n"
     "#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after\n"
     "#   many cars and tracks new textures stop fitting and show black. Loads take a bit longer.\n" },
+  { "archive_cache", T_SWITCH, F(archive_cache),
+    "# archive_cache: 1 keeps recently read parts of base.apk and the OBB in memory (64 MB),\n"
+    "#   shared by every open of them, so loads read each part from the SD card once; 0 reads\n"
+    "#   the card directly (slower loads).\n" },
   { "debug_log", T_SWITCH, F(debug_log),
     "# debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,\n"
     "#   stalls, GC and startup lines. The log is buffered either way.\n" },

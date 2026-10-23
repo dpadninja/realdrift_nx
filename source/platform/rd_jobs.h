@@ -5,7 +5,8 @@
  * of work into parts and runs them on a worker per free core plus the calling thread, which
  * returns when all parts are done. Workers run only our own pure code (no engine calls, no
  * bionic TLS). They start on the first rd_jobs_run; without free cores (e.g. run as an applet)
- * everything runs in the caller. Calls are serialised. MIT (see LICENSE). */
+ * everything runs in the caller. Calls are serialised. No host test: libnx threads and
+ * semaphores only; the row split it runs is rd_etc2bc_split (tested). MIT (see LICENSE). */
 #ifndef RD_JOBS_H
 #define RD_JOBS_H
 

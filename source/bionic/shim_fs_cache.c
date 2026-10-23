@@ -7,6 +7,7 @@
  * MIT (see LICENSE). */
 #define _GNU_SOURCE
 
+#include <errno.h>
 #include <string.h>
 
 #include "util.h"
@@ -15,6 +16,10 @@
 #include "shim_fs.h"
 #include "diag.h"
 #include "rd_perfstat.h"
+#include "rd_platform.h"
+#include "rd_archcache.h"
+#include "rd_sdcommit.h"
+#include "config.h"        /* archive_cache */
 
 
 /* ---- read-ahead cache for big archive files (data.unity3d, sharedassets) ----
@@ -78,11 +83,101 @@ long ra_read(struct RaCache *c, int fd, void *buf, size_t count) {
   return (long)done;
 }
 
+/* ---- archive block cache (rd_archcache.h) ----
+ * Every open of base.apk / the OBB shares one block pool. Each fd has a virtual position; a
+ * missing block is read through the fd that asked for it (its real position is scratch), all
+ * under one lock. */
+#define ARCH_BLOCKS (RD_ARCHIVE_CACHE_BYTES / RD_ARCHIVE_CACHE_BLOCK)
+static rd_archfd g_arch_fd[FD_INO_MAX];
+static rd_archfiles g_arch_files;
+static rd_archcache_block g_arch_blocks[ARCH_BLOCKS];
+static rd_archcache g_arch;
+static Mutex g_arch_lock;
+
+int arch_path(const char *path) {
+  return config.archive_cache && rd_archcache_is_archive(path);
+}
+
+void arch_attach(int fd, const char *path, long size) {
+  mutexLock(&g_arch_lock);
+  if (!g_arch.blocks) {
+    rd_archcache_init(&g_arch, g_arch_blocks, ARCH_BLOCKS, RD_ARCHIVE_CACHE_BLOCK,
+                      RD_ARCHIVE_CACHE_SECTOR);
+    rd_archfiles_init(&g_arch_files, g_arch_fd, FD_INO_MAX);
+  }
+  rd_archfiles_attach(&g_arch_files, fd, path_ino(path), size);
+  mutexUnlock(&g_arch_lock);
+}
+
+void arch_detach(int fd) {
+  mutexLock(&g_arch_lock);
+  if (g_arch.blocks) rd_archfiles_detach(&g_arch_files, fd);
+  mutexUnlock(&g_arch_lock);
+}
+
+int arch_has(int fd) {
+  mutexLock(&g_arch_lock);
+  const int r = g_arch.blocks && rd_archfiles_file(&g_arch_files, fd) != NULL;
+  mutexUnlock(&g_arch_lock);
+  return r;
+}
+
+/* rd_archcache fill: n bytes at `off` through the fd in ctx (newlib, looping on short reads). */
+static long arch_fill(void *ctx, int64_t off, void *buf, size_t n) {
+  const int fd = (int)(intptr_t)ctx;
+  if (lseek(fd, (off_t)off, SEEK_SET) < 0) return -1;
+  size_t got = 0;
+  while (got < n) {
+    const ssize_t r = read(fd, (char *)buf + got, n - got);
+    if (r < 0) return got ? (long)got : -1;
+    if (r == 0) break;
+    got += (size_t)r;
+  }
+  return (long)got;
+}
+
+/* The cache read for fd at `off`, publishing the hit / miss counts for debug_load; caller
+ * holds g_arch_lock. */
+static long arch_read_locked(int fd, void *buf, size_t n, long off, int ahead) {
+  const rd_archfile *f = g_arch.blocks ? rd_archfiles_file(&g_arch_files, fd) : NULL;
+  if (!f) return -1;
+  const long r = rd_archcache_read(&g_arch, f->key, f->size, off, buf, n, ahead, arch_fill,
+                                   (void *)(intptr_t)fd);
+  __atomic_store_n(&nx_stat_cache_hit, g_arch.hits, __ATOMIC_RELAXED);
+  __atomic_store_n(&nx_stat_cache_miss, g_arch.misses, __ATOMIC_RELAXED);
+  return r;
+}
+
+long arch_read(int fd, void *buf, size_t n, int ahead) {
+  mutexLock(&g_arch_lock);
+  ahead = ahead || rd_archfiles_sequential(&g_arch_files, fd);
+  const long r = arch_read_locked(fd, buf, n, (long)rd_archfiles_pos(&g_arch_files, fd), ahead);
+  if (r > 0) rd_archfiles_advance(&g_arch_files, fd, r);
+  mutexUnlock(&g_arch_lock);
+  return r;
+}
+
+long arch_pread(int fd, void *buf, size_t n, long off) {
+  mutexLock(&g_arch_lock);
+  const long r = arch_read_locked(fd, buf, n, off, 0);
+  mutexUnlock(&g_arch_lock);
+  return r;
+}
+
+long arch_seek(int fd, long off, int whence) {
+  mutexLock(&g_arch_lock);
+  const int64_t np = rd_archfiles_seek(&g_arch_files, fd, off, whence);
+  mutexUnlock(&g_arch_lock);
+  if (np < 0) { errno = EINVAL; return -1; }
+  return (long)np;
+}
+
 /* lseek for arm64: off_t is already 64-bit, so this also services lseek64.
  * lseek64 was previously stubbed to return 0 (no seek) -- that made libunity's
  * archive reader see data.unity3d as empty/mis-positioned ("Unable to read
  * header from archive file"), since it lseek64(SEEK_END)s to size the file. */
 long z_lseek(int fd, long off, int whence) {
+  if (arch_has(fd)) return arch_seek(fd, off, whence);
   struct RaCache *c = ra_find(fd);
   if (c) {   /* virtualized position -- don't touch the real fd here */
     mutexLock(&g_ra_lock);
@@ -143,7 +238,20 @@ int fd_close_by_path(const char *path) {
 #define WFD_MAX 4096
 static unsigned char g_write_fd[WFD_MAX];
 int nx_sd_dirty = 0;   /* a file has been opened for writing since the last commit */
-void mark_write_fd(int fd)   { nx_sd_dirty = 1; if (fd >= 0 && fd < WFD_MAX) g_write_fd[fd] = 1; }
+#define WFD_COMMIT 1                  /* commit on close */
+#define WFD_LATER  2                  /* left to nx_sd_flush (rd_sdcommit.h) */
+void mark_write_fd(int fd, const char *path) {
+  nx_sd_dirty = 1;
+  if (fd >= 0 && fd < WFD_MAX) g_write_fd[fd] = rd_sdcommit_on_close(path) ? WFD_COMMIT : WFD_LATER;
+}
+
+/* fsdevCommitDevice, counted and timed for [perf] / [load]. */
+static void commit_sd(void) {
+  const uint64_t t0 = rd_now_ns();
+  nx_stat_commit++;
+  fsdevCommitDevice("sdmc");
+  __atomic_add_fetch(&nx_stat_commit_ns, rd_now_ns() - t0, __ATOMIC_RELAXED);
+}
 
 /* Close of a file that was written: commit the SD card now.
  *
@@ -157,10 +265,11 @@ void mark_write_fd(int fd)   { nx_sd_dirty = 1; if (fd >= 0 && fd < WFD_MAX) g_w
  * progress across reloads. */
 void commit_write_fd(int fd) {
   if (fd < 0 || fd >= WFD_MAX || !g_write_fd[fd]) return;
+  const int now = g_write_fd[fd] == WFD_COMMIT;
   g_write_fd[fd] = 0;
+  if (!now) return;                   /* nx_sd_dirty stays set: the next flush commits it */
   nx_sd_dirty = 0;
-  nx_stat_commit++;
-  fsdevCommitDevice("sdmc");
+  commit_sd();
 }
 
 /* Commit any pending writes to the physical card. Called periodically from the render loop and
@@ -168,8 +277,7 @@ void commit_write_fd(int fd) {
 void nx_sd_flush(void) {
   if (!nx_sd_dirty) return;
   nx_sd_dirty = 0;
-  nx_stat_commit++;
-  fsdevCommitDevice("sdmc");
+  commit_sd();
 }
 
 /* ---- OPEN-FD CACHE for repeatedly re-opened read-only files ---------------------------

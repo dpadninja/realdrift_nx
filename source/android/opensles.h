@@ -19,8 +19,8 @@
 
 /* The audio output the engine is told about vs. what the Switch plays. FMOD asks Android's
  * AudioManager (jni_fake.c getProperty) for the native rate / buffer size and opens OpenSL ES
- * with them; we play through SDL at the device rate and resample each player in mix_player. */
-#define RD_AUDIO_DEVICE_RATE       48000
+ * with them; we play through rd_audioout at audout's 48 kHz and resample each player in
+ * mix_player. */
 #define RD_AUDIO_REPORTED_RATE     24000
 #define RD_AUDIO_FRAMES_PER_BUFFER 256
 
@@ -29,11 +29,11 @@ uint32_t slCreateEngine(void **pEngine, uint32_t numOptions, const void *pEngine
                         uint32_t numInterfaces, const void *pInterfaceIds,
                         const void *pInterfaceRequired);
 
-/* debug_audio, main loop about once a second: logs when the SDL audio callback stopped being
+/* debug_audio, main loop about once a second: logs when the audio output callback stopped being
  * called since the previous check (and when it runs again), with the players' state. */
 void opensles_audio_watch(void);
 
-/* Closes the SDL audio device (at exit). */
+/* Stops the sound output (at exit). */
 void opensles_shutdown(void);
 
 

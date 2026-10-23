@@ -2,7 +2,8 @@
  *
  * Two "[load]" lines per frame of at least RD_LOAD_PROFILE_NS: the file traffic -- what the
  * engine asked for (fopen / fread / fseek / read) against what reached the SD card (FS opens
- * and reads, their bytes and time) -- and the CPU time each engine thread used in the frame.
+ * and reads, their bytes and time; archive_cache hits and misses; writes and SD commits), with
+ * the time since the loader started (what the player waits at boot) -- and the CPU time each engine thread used in the frame.
  * Reading 128 KB stdio buffers for small reads, or many opens, show up as SD bytes far above
  * the engine's; one thread with nearly all the CPU means the load cannot gain from more
  * cores, several busy ones on the same core (all engine threads run on core 0) means it can.
@@ -23,6 +24,9 @@ typedef struct {
   uint64_t read_bytes, read_ns;                    /* what fread / read returned, and the time */
   uint64_t sd_opens, sd_open_ns;                   /* FS file opens */
   uint64_t sd_reads, sd_read_bytes, sd_read_ns;    /* FS file reads */
+  uint64_t cache_hits, cache_misses;               /* archive_cache block lookups */
+  uint64_t writes, write_bytes, write_ns;          /* write / fwrite */
+  uint64_t commits, commit_ns;                     /* SD commits (fsdevCommitDevice) */
 } rd_loadprof_io;
 
 /* One thread's cumulative CPU time. */
@@ -35,9 +39,10 @@ typedef struct {
 /* d = b - a, field by field. */
 void rd_loadprof_io_diff(const rd_loadprof_io *a, const rd_loadprof_io *b, rd_loadprof_io *d);
 
-/* The file-traffic line (no prefix, no newline) for a frame of frame_ns with traffic d.
- * Returns snprintf's result. */
-int rd_loadprof_format_io(const rd_loadprof_io *d, uint64_t frame_ns, char *buf, size_t n);
+/* The file-traffic line (no prefix, no newline) for a frame of frame_ns with traffic d, ending
+ * at_ns after the loader started. Returns snprintf's result. */
+int rd_loadprof_format_io(const rd_loadprof_io *d, uint64_t frame_ns, uint64_t at_ns, char *buf,
+                          size_t n);
 
 /* The CPU line: each thread of `after` that also is in `before` (same tid) with the CPU time it
  * used between them, busiest first, at most RD_LOADPROF_TOP, as "name ms (pct%)" of frame_ns;

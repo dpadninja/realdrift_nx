@@ -7,20 +7,65 @@
 #define _GNU_SOURCE
 
 #include <string.h>
+#include <sys/stat.h>
 
 #include "config.h"        /* DEBUG_LOG */
 #include "rd_platform.h"
 #include "util.h"
 #include "libc_shim.h"
 #include "shim_fs.h"
+#include "rd_archcache.h"   /* rd_archcache_is_archive */
 #include "nx_fonts.h"     /* system fonts served as /system/fonts */
 #include "rd_synth.h"
 #include "rd_perfstat.h"
 
 
 
-// fopen with the port's path redirects (fonts, assets, synthetic /proc) and a large stdio
-// buffer for the game archives.
+/* archive_cache: newlib reads and seeks a FILE through its _read / _seek hooks, with the FILE
+ * itself as the cookie. Pointed at the block cache, the stdio buffer refills from RAM while
+ * fileno() and fstat() keep the real fd. No host test: these are fields of newlib's __sFILE64
+ * (glibc's FILE has none); the cache and fd table behind them are tested (rd_archcache). */
+static _READ_WRITE_RETURN_TYPE arch_sread(struct _reent *r, void *cookie, char *buf,
+                                          _READ_WRITE_BUFSIZE_TYPE n) {
+  (void)r;
+  return arch_read(((FILE *)cookie)->_file, buf, n, 1);
+}
+
+static _fpos_t arch_sseek(struct _reent *r, void *cookie, _fpos_t off, int whence) {
+  (void)r;
+  return arch_seek(((FILE *)cookie)->_file, off, whence);
+}
+
+#ifdef __LARGE64_FILES
+static _fpos64_t arch_sseek64(struct _reent *r, void *cookie, _fpos64_t off, int whence) {
+  (void)r;
+  return arch_seek(((FILE *)cookie)->_file, off, whence);
+}
+#endif
+
+/* Buffering of a freshly opened read-only FILE of `path`: the game archives read through the
+ * block cache with a small buffer, or (archive_cache=0, or the cache's file table full) with a
+ * large one, since newlib's default 1 KB made each of Unity's small reads an SD request. */
+static void archive_buffering(FILE *f, const char *path) {
+  if (!rd_archcache_is_archive(path)) return;
+  struct stat st;
+  if (arch_path(path) && fstat(fileno(f), &st) == 0) {
+    arch_attach(fileno(f), path, (long)st.st_size);
+    if (arch_has(fileno(f))) {
+      f->_read = arch_sread;            /* before setvbuf, which looks at _seek */
+      f->_seek = arch_sseek;
+#ifdef __LARGE64_FILES
+      f->_seek64 = arch_sseek64;
+#endif
+      setvbuf(f, NULL, _IOFBF, RD_ARCHIVE_CACHED_STDIO_BYTES);
+      return;
+    }
+  }
+  setvbuf(f, NULL, _IOFBF, RD_ARCHIVE_STDIO_BUFFER_BYTES);
+}
+
+// fopen with the port's path redirects (fonts, assets, synthetic /proc) and the game archives
+// through the block cache (archive_buffering).
 FILE *fopen_fake(const char *path, const char *mode) {
   __atomic_add_fetch(&nx_stat_fopen, 1, __ATOMIC_RELAXED);           /* debug_load */
   path = nx_fonts_resolve(path);   /* Switch system fonts as /system/fonts */
@@ -47,15 +92,9 @@ FILE *fopen_fake(const char *path, const char *mode) {
   }
   if (!f)
     return NULL;
-  if (writing) mark_write_fd(fileno(f));
+  if (writing) mark_write_fd(fileno(f), path);
   debugPrintf("[io] fopen(%s,%s) -> %p\n", path, mode, (void *)f);
-  if (strchr(mode, 'r')) {
-    const char *ext = strrchr(path, '.');
-    /* Unity reads the APK/OBB zip through stdio with many small reads (headers, object
-     * tables); newlib's default 1 KB buffer made each one an SD request. */
-    if (ext && (strcasecmp(ext, ".obb") == 0 || strcasecmp(ext, ".apk") == 0))
-      setvbuf(f, NULL, _IOFBF, RD_ARCHIVE_STDIO_BUFFER_BYTES);
-  }
+  if (!writing) archive_buffering(f, path);
   return f;
 }
 
@@ -85,7 +124,12 @@ size_t fwrite_fake(const void *ptr, size_t size, size_t n, FILE *f) {
 #endif
     return n;
   }
-  return fwrite(ptr, size, n, f);
+  const uint64_t t0 = rd_now_ns();                                   /* debug_load */
+  const size_t r = fwrite(ptr, size, n, f);
+  __atomic_add_fetch(&nx_stat_write, 1, __ATOMIC_RELAXED);
+  __atomic_add_fetch(&nx_stat_write_ns, rd_now_ns() - t0, __ATOMIC_RELAXED);
+  __atomic_add_fetch(&nx_stat_write_bytes, (unsigned long long)(r * size), __ATOMIC_RELAXED);
+  return r;
 }
 size_t fread_fake(void *ptr, size_t size, size_t n, FILE *f) {
   if (is_fake_file(f)) return 0;
@@ -100,7 +144,7 @@ int fputc_fake(int c, FILE *f) { if (is_fake_file(f)) return c; return fputc(c, 
 int fputs_fake(const char *s, FILE *f) { if (is_fake_file(f)) { debugPrintf("stdio: %s", s); return 0; } return fputs(s, f); }
 int fflush_fake(FILE *f) { if (is_fake_file(f) || f == NULL) return 0; return fflush(f); }
 int fclose_fake(FILE *f) { if (is_fake_file(f)) return 0;
-  int fd = fileno(f); fd_ino_clear(fd);   /* keep g_fd_ino free of stale entries: fd_close_by_path
+  int fd = fileno(f); fd_ino_clear(fd); arch_detach(fd);   /* keep g_fd_ino free of stale entries: fd_close_by_path
                                              (rename_fake) closes fds by that table */
   int r = fclose(f); commit_write_fd(fd); return r; }
 int ferror_fake(FILE *f) { if (is_fake_file(f)) return 0; return ferror(f); }

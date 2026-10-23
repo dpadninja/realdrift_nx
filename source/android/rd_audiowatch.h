@@ -1,6 +1,6 @@
 /* rd_audiowatch.h -- config.txt debug_audio: notices when the sound output goes quiet and when it
  * comes back, so a lost sound shows up in debug.log with the state of the OpenSL players at
- * that moment (opensles_mixer.c logs it). The SDL audio callback feeds every device block.
+ * that moment (opensles_mixer.c logs it). The output callback feeds every device block.
  * Pure logic, host-tested (tests/c/test_rd_audiowatch.c). MIT (see LICENSE). */
 #ifndef RD_AUDIOWATCH_H
 #define RD_AUDIOWATCH_H

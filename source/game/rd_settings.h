@@ -56,6 +56,7 @@ typedef struct {
   int         debug_gl_trace;        /* 1: GPU time per render target of a frame (rd_gltrace.h) */
   int         debug_ui_nav;          /* 1: log the navigation targets of each screen (rd_menu.h) */
   int         texture_transcode;     /* 1: ETC2 textures stored as S3TC (rd_etc2bc_gl.h) */
+  int         archive_cache;         /* 1: base.apk / OBB reads through rd_archcache.h */
   int         debug_mem;
   int         debug_load;            /* 1: where long (loading) frames spend their time (rd_loadprof.h) */
   int         debug_audio;           /* 1: silences and the OpenSL players' state (rd_audiowatch.h) */             /* 1: memory report and GL allocation errors (rd_memwatch.h) */
@@ -86,6 +87,7 @@ typedef struct {
   .debug_gl_trace = 0,                                                \
   .debug_ui_nav = 0,                                                  \
   .texture_transcode = 1,                                             \
+  .archive_cache = 1,                                                 \
   .debug_load = 0,                                                    \
   .debug_audio = 0,                                                   \
   .debug_mem = 0,                                                     \

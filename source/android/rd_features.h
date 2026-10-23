@@ -5,7 +5,7 @@
  * "android.hardware.audio.low_latency") (after isBluetoothA2dpOn()). The inherited fake JNI
  * answered false, so FMOD chose the Java AudioTrack output, which has no working sink here
  * (no JVM run() loop) -> silence (run 11). Claiming low-latency audio makes FMOD use
- * OpenSL ES, which opensles.c implements on top of SDL audio.
+ * OpenSL ES, which opensles.c implements on top of libnx audout (rd_audioout.h).
  * MIT (see LICENSE). */
 #ifndef RD_FEATURES_H
 #define RD_FEATURES_H

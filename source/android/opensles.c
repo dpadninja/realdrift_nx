@@ -19,6 +19,8 @@
 #include "util.h"
 #include "opensles_internal.h"
 #include "config.h"   /* debug_audio */
+#include "rd_audioout.h"
+#include "rd_slvolume.h"
 
 // --- interface-id sentinels -------------------------------------------------
 
@@ -38,12 +40,6 @@ DEF_IID(PRESETREVERB); DEF_IID(RATEPITCH); DEF_IID(RECORD); DEF_IID(SEEK); DEF_I
 DEF_IID(VIBRA); DEF_IID(VIRTUALIZER); DEF_IID(VISUALIZATION); DEF_IID(VOLUME);
 #undef DEF_IID
 
-
-/* OpenSL volume in millibels to a linear gain (0 mB = 1.0; -9600 mB and below = silence). */
-static float mb_to_linear(SLmillibel mb) {
-  if (mb <= -9600) return 0.0f;
-  return powf(10.0f, (float)mb / 2000.0f); // 100 mB = 1 dB
-}
 
 // The interface methods below implement the OpenSL ES 1.0.1 methods of the same name
 // (<interface>_<Method>). `self` points at the interface's vtable pointer inside the object;
@@ -139,14 +135,10 @@ static const SLPlayItf_ play_vtable = {
 
 static SLresult vol_SetVolumeLevel(void *self, SLmillibel level) {
   Player *p = CONTAINER(self, Player, vol_vt);
-  // Clamp to the valid OpenSL volume range [-9600, 0] mB before converting. Callers
-  // sometimes passes a garbage/zero-extended value (e.g. 32768) that would yield
-  // an astronomically huge gain; treat out-of-range high as 0 mB (unity/full) so
-  // the single unified-mix player is never accidentally muted or overflowed.
-  int mb = (int)level;
-  if (mb > 0) mb = 0;
-  if (mb < -9600) mb = -9600;
-  const float g = mb_to_linear(mb);
+  // Callers sometimes pass a garbage/zero-extended value (e.g. 32768); rd_slvolume_gain
+  // takes anything above 0 mB as full volume, so the single unified-mix player is never
+  // accidentally muted or overflowed.
+  const float g = rd_slvolume_gain((int32_t)level);
   if (config.debug_audio && g != p->gain)
     debugPrintf("[audio] player %p: SetVolumeLevel(%d mB) -> gain %.3f\n", (void *)p, (int)level, g);
   p->gain = g;
@@ -154,8 +146,7 @@ static SLresult vol_SetVolumeLevel(void *self, SLmillibel level) {
 }
 static SLresult vol_GetVolumeLevel(void *self, SLmillibel *p) { (void)self; if (p) *p = 0; return SL_RESULT_SUCCESS; }
 static SLresult vol_GetMaxVolumeLevel(void *self, SLmillibel *p) { (void)self; if (p) *p = 0; return SL_RESULT_SUCCESS; }
-/* Mute keeps the volume level: clearing it brings the old level back (setting the gain to 0
- * here, as before, left a player silent for good after mute -> unmute). */
+/* Mute keeps the volume level (rd_slvolume.h): clearing it brings the old level back. */
 static SLresult vol_SetMute(void *self, SLboolean m) {
   Player *p = CONTAINER(self, Player, vol_vt);
   if (config.debug_audio && (int)!!m != p->muted)
@@ -427,8 +418,6 @@ uint32_t slCreateEngine(void **pEngine, uint32_t numOptions, const void *pEngine
 }
 
 void opensles_shutdown(void) {
-  if (g_dev) {
-    SDL_CloseAudioDevice(g_dev);
-    g_dev = 0;
-  }
+  rd_audioout_close();
+  g_dev = 0;
 }

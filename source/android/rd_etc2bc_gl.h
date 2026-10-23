@@ -6,6 +6,7 @@
  * images) and upload S3TC, the latter only when the texture's storage is S3TC (read back with
  * glGetTexLevelParameteriv), so textures made before or by others are left alone. Data in a
  * bound GL_PIXEL_UNPACK_BUFFER is read through glMapBufferRange. GL thread.
+ * No host test: GL glue; the re-encoding is rd_etc2bc (tested).
  * MIT (see LICENSE). */
 #ifndef RD_ETC2BC_GL_H
 #define RD_ETC2BC_GL_H

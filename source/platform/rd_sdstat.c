@@ -2,6 +2,7 @@
  * read() end in libnx's fsdev, which opens and reads files with fsFsOpenFile / fsFileRead.
  * The Makefile links them through -Wl,--wrap; each call is counted with its bytes and time
  * (always: an atomic add and two clock reads against an IPC round trip).
+ * No host test: libnx FS wraps that only count.
  * MIT (see LICENSE). */
 #include <switch.h>
 #include "rd_platform.h"

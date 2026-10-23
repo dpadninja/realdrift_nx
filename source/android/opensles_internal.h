@@ -4,7 +4,7 @@
  * locator structs, and the interface vtables in spec method order. Every object the engine
  * gets is a pointer to one of the *_vt members; CONTAINER() recovers the object from it.
  *   opensles.c        the interfaces, objects, engine and slCreateEngine
- *   opensles_mixer.c  the SDL audio device, the player registry and the software mixer
+ *   opensles_mixer.c  the sound output (rd_audioout.h), the player registry and the software mixer
  * MIT (see LICENSE). */
 #ifndef OPENSLES_INTERNAL_H
 #define OPENSLES_INTERNAL_H
@@ -228,14 +228,14 @@ typedef struct {
 
 /* ---- mixer (opensles_mixer.c) ---------------------------------------------------------- */
 
-/* The SDL audio device (0 until the first player is created). */
-extern SDL_AudioDeviceID g_dev;
+/* 1 once the sound output runs (from the first player on). */
+extern int g_dev;
 /* Players the mixer sums, slots 0..g_player_count-1 (NULL = free); guarded by g_reg_lock,
  * which the audio callback also holds while mixing. */
 extern Player *g_players[MAX_PLAYERS];
 extern int g_player_count;
 extern SDL_mutex *g_reg_lock;
-/* Opens and starts the SDL device on first use at RD_AUDIO_DEVICE_RATE (`rate` is ignored:
+/* Starts the sound output on first use at audout's rate (`rate` is ignored:
  * every player is resampled in the mixer); creates g_reg_lock if needed. */
 void ensure_device(int rate);
 

@@ -15,21 +15,34 @@ void rd_loadprof_io_diff(const rd_loadprof_io *a, const rd_loadprof_io *b, rd_lo
   d->sd_reads = b->sd_reads - a->sd_reads;
   d->sd_read_bytes = b->sd_read_bytes - a->sd_read_bytes;
   d->sd_read_ns = b->sd_read_ns - a->sd_read_ns;
+  d->cache_hits = b->cache_hits - a->cache_hits;
+  d->cache_misses = b->cache_misses - a->cache_misses;
+  d->writes = b->writes - a->writes;
+  d->write_bytes = b->write_bytes - a->write_bytes;
+  d->write_ns = b->write_ns - a->write_ns;
+  d->commits = b->commits - a->commits;
+  d->commit_ns = b->commit_ns - a->commit_ns;
 }
 
 #define MS(ns) ((unsigned long long)((ns) / RD_NS_PER_MS))
 #define KB(b)  ((unsigned long long)((b) >> 10))
 
-int rd_loadprof_format_io(const rd_loadprof_io *d, uint64_t frame_ns, char *buf, size_t n) {
+int rd_loadprof_format_io(const rd_loadprof_io *d, uint64_t frame_ns, uint64_t at_ns, char *buf,
+                          size_t n) {
   const unsigned long long avg = d->sd_reads ? (unsigned long long)(d->sd_read_bytes / d->sd_reads) : 0;
   return snprintf(buf, n,
-                  "frame %llu ms | engine: fopen %llu, fread %llu, fseek %llu, read %llu, "
-                  "%llu KB in %llu ms | SD: open %llu in %llu ms, read %llu x avg %llu B = "
-                  "%llu KB in %llu ms",
-                  MS(frame_ns), (unsigned long long)d->fopens, (unsigned long long)d->freads,
-                  (unsigned long long)d->fseeks, (unsigned long long)d->reads, KB(d->read_bytes),
-                  MS(d->read_ns), (unsigned long long)d->sd_opens, MS(d->sd_open_ns),
-                  (unsigned long long)d->sd_reads, avg, KB(d->sd_read_bytes), MS(d->sd_read_ns));
+                  "frame %llu ms, at %llu ms | engine: fopen %llu, fread %llu, fseek %llu, "
+                  "read %llu, %llu KB in %llu ms | SD: open %llu in %llu ms, read %llu x avg "
+                  "%llu B = %llu KB in %llu ms | cache: hit %llu, miss %llu | write %llu, "
+                  "%llu KB in %llu ms | commit %llu in %llu ms",
+                  MS(frame_ns), MS(at_ns), (unsigned long long)d->fopens,
+                  (unsigned long long)d->freads, (unsigned long long)d->fseeks,
+                  (unsigned long long)d->reads, KB(d->read_bytes), MS(d->read_ns),
+                  (unsigned long long)d->sd_opens, MS(d->sd_open_ns),
+                  (unsigned long long)d->sd_reads, avg, KB(d->sd_read_bytes), MS(d->sd_read_ns),
+                  (unsigned long long)d->cache_hits, (unsigned long long)d->cache_misses,
+                  (unsigned long long)d->writes, KB(d->write_bytes), MS(d->write_ns),
+                  (unsigned long long)d->commits, MS(d->commit_ns));
 }
 
 int rd_loadprof_format_cpu(const rd_loadprof_thread *before, int nb,

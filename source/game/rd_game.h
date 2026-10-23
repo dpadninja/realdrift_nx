@@ -42,5 +42,8 @@
 #define RD_PREFS_FILE          "prefs.kv"     /* PlayerPrefs store (unity_jni.c) */
 #define RD_LOG_FILE            "debug.log"
 #define RD_LOG_PATH            RD_GAME_HOME "/" RD_LOG_FILE
+/* Unity copies its il2cpp data (global-metadata.dat, mono etc/) here from the APK on every
+ * launch, deleting the old copy first (libunity, after loading libil2cpp). */
+#define RD_IL2CPP_DATA_DIR     "il2cpp"
 
 #endif

@@ -403,6 +403,7 @@ static void run_main_loop(void) {
 
 int main(int argc, char *argv[]) {
   (void)argc; (void)argv;
+  nx_stat_start_ns = rd_now_ns();                          /* [load] "at" times */
   socketInitializeDefault();
   debugPrintf(RD_LOG_TAG_BANNER " realdrift_nx start (Real Drift " RD_GAME_VERSION_NAME ", Unity " RD_UNITY_VERSION ") ===\n");
 
@@ -415,7 +416,7 @@ int main(int argc, char *argv[]) {
   boot_pick_resolution();
 
   SDL_SetMainReady();
-  if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0)
+  if (SDL_Init(SDL_INIT_GAMECONTROLLER)   /* sound: rd_audioout */ < 0)
     debugPrintf("SDL_Init failed: %s\n", SDL_GetError());
 
   check_data();
