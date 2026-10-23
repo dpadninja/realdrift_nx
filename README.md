@@ -13,7 +13,7 @@ It does not emulate a phone and does not reimplement the game. The game's own ar
 Playable: menus, races, sound, controller driving and saving work on hardware.
 
 Known issues:
-- loading a scene takes a few seconds (the CPU is boosted while loading)
+- loading still takes a moment: ~5.5 s from start to the garage and 2–3 s per track (the first start after installing, or after replacing the APK, takes ~11 s while Unity copies its data)
 - heavy tire smoke can drop the frame rate (the GPU is the limit); `smoke_size` / `smoke_amount` in `config.txt` make it lighter
 
 Limitations:
@@ -28,6 +28,9 @@ Limitations:
 - **On-screen cursor** instead of the navigation (`menu_navigation=0`): the left stick moves it, `A` taps, `+` toggles it outside a race, `-` toggles gyro pointing; a USB mouse works too.
 - **Render resolution:** 720p handheld / 1080p docked by default, or fixed.
 - **Lighter tyre smoke** (optional): smaller and fewer smoke puffs for a steady frame rate.
+- **Faster loading:** recently read parts of the APK and OBB are kept in memory and shared by every open of them, so a part is read from the SD card once (tracks load about twice as fast). The thousands of small reads Unity makes at every start are saved once into `.realdrift_nx-reads` and served from memory on later starts, like an OS launch prefetch. Unity's il2cpp data is copied from the APK only when the APK changed, not on every start, and the game's blank 2-second splash screen is skipped.
+- **No black textures:** the game's ETC2 textures, which the Switch GPU cannot read, are re-encoded to S3TC on load (on the otherwise idle CPU cores). Mesa used to unpack them to 4–8 times the memory, so after many cars and tracks new objects turned black.
+- **Steady sound:** the audio output runs on its own thread over libnx `audout`. SDL's Switch audio could stop for good when a load kept its thread off the CPU, leaving the game silent until restart.
 - **FPS counter** (optional) in the top-left corner.
 - **Saves** are stored on the SD card (`prefs.kv` next to the game).
 - No per-version offsets: engine patch sites are found at runtime by instruction patterns, and game classes are found by name through the IL2CPP API.
@@ -73,6 +76,8 @@ switch/realdrift_nx/
 └── main.76.com.realdrift.sipon.obb
 ```
 
+The loader adds a few files of its own there at run time: `config.txt`, `prefs.kv` (saves), `il2cpp/` (Unity's data copied from the APK) and `.realdrift_nx-reads` (the start-up prefetch, about 120 KB). Deleting `il2cpp/` or `.realdrift_nx-reads` is safe; they are recreated on the next start.
+
 **4. Copy the `switch` folder to the root of the SD card** and start *Real Drift* from the Homebrew Menu in title-takeover mode (hold `R` while starting any game). Applet mode (from the Album) has not been tested and most likely does not give the game enough memory.
 
 ## Controls and configuration
@@ -112,7 +117,10 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 | Key | Values | Default | Meaning |
 |---|---|---|---|
 | `render_resolution` | `auto` / `720` / `1080` | `auto` | `auto` = 720p handheld, 1080p docked |
-| `boost_loading` | `0` / `1` | `1` | raise the CPU clock while a scene loads |
+| `boost_loading` | `0` / `1` | `1` | raise the CPU clock at start and while a scene loads |
+| `archive_cache` | `0` / `1` | `1` | keep recently read parts of the APK and OBB in memory (64 MB) and prefetch the small reads made at start; `0` reads the SD card directly (slower loads) |
+| `fast_boot` | `0` / `1` | `1` | copy Unity's il2cpp data from the APK only when the APK changed, and skip the blank Unity splash screen; `0` = as the original game |
+| `texture_transcode` | `0` / `1` | `1` | store the game's ETC2 textures as S3TC, which the GPU reads directly; `0` leaves them to Mesa, which unpacks them to 4–8x the memory, and after many cars and tracks new objects show black |
 | `smoke_size` | `10`–`100` | `100` | size of the tyre smoke puffs in percent; `100` = original. Lower it (e.g. `50`) if heavy smoke drops the frame rate |
 | `smoke_amount` | `10`–`100` | `100` | percent of the smoke puffs emitted; `100` = original. `50` together with `smoke_size=50` keeps the frame rate steady in heavy smoke |
 
@@ -124,6 +132,9 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 | `debug_fps_counter` | `0` / `1` | `0` | show frames per second and the slowest frame (ms) in the top-left corner |
 | `debug_gl_trace` | `0` / `1` | `0` | log where a frame's GPU time goes, per render target, about every 10 s (with `debug_log=1`) |
 | `debug_ui_nav` | `0` / `1` | `0` | log what menu navigation finds on each screen, what it skips and why, and every move (with `debug_log=1`) |
+| `debug_mem` | `0` / `1` | `0` | log where the memory is about every 10 s and after each load, and every GL error when a texture or buffer is created (with `debug_log=1`) |
+| `debug_load` | `0` / `1` | `0` | for every frame of a second or more (a load): the file traffic the engine asked for against what reached the SD card, cache hits, writes, the time since start, and each engine thread's CPU time (with `debug_log=1`) |
+| `debug_audio` | `0` / `1` | `0` | log when the sound goes silent for 3 s or comes back, when the audio output stops, and the game's volume / mute calls (with `debug_log=1`) |
 
 ### Other
 
@@ -181,7 +192,7 @@ Real Drift and all of its files (code, assets, `.so` libraries, APK, OBB) belong
 
 | Project | Authors | Used for |
 |---|---|---|
-| [badpiggies_nx](https://github.com/ChanseyIsTheBest/badpiggies_nx) (commit `7726be3`) | ChanseyIsTheBest | the forked base: Unity/IL2CPP loader, fake JNI, libc/NDK shims, OpenSL ES over SDL2, pointer and touch input, fonts, diagnostics |
+| [badpiggies_nx](https://github.com/ChanseyIsTheBest/badpiggies_nx) (commit `7726be3`) | ChanseyIsTheBest | the forked base: Unity/IL2CPP loader, fake JNI, libc/NDK shims, the OpenSL ES shim (its output now runs over libnx `audout`), pointer and touch input, fonts, diagnostics |
 | [cloverpit_nx](https://github.com/ChanseyIsTheBest/cloverpit_nx) | ChanseyIsTheBest | MIT license of the pointer/cursor module (`nx_pointer`, the GL overlay in `rd_overlay_gl.c`), the same code as in badpiggies_nx |
 | [laytonbmr_nx](https://github.com/NaGaa95/laytonbmr_nx) | naga | the stick cursor and its GL overlay, which badpiggies_nx ported |
 | [colorsheep_nx](https://github.com/ChanseyIsTheBest/colorsheep_nx), [zookeeperdx_nx](https://github.com/ChanseyIsTheBest/zookeeperdx_nx) | ChanseyIsTheBest | the so-loader port lineage badpiggies_nx descends from |
@@ -190,13 +201,20 @@ Real Drift and all of its files (code, assets, `.so` libraries, APK, OBB) belong
 
 **Algorithms:** menu navigation follows the rules of Android's [FocusFinder](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/view/FocusFinder.java) (AOSP, Apache-2.0); the code is our own.
 
+**Libraries included** (in `source/android/third_party/`, used for the texture re-encoding):
+
+| Library | Authors | License |
+|---|---|---|
+| [etcdec](https://github.com/iOrange/etcdec) v0.91 (commit `972875d`) | Sergii "iOrange" Kudlai | MIT or Unlicense |
+| [stb_dxt](https://github.com/nothings/stb) v1.12 (commit `003501f`) | Fabian "ryg" Giesen, Sean Barrett | MIT or public domain |
+
 **Libraries linked into the `.nro`** (from devkitPro, not in this repository):
 
 | Library | License |
 |---|---|
 | [libnx](https://github.com/switchbrew/libnx) ([devkitPro](https://devkitpro.org)) | ISC |
 | [Mesa](https://mesa3d.org) for Switch (GLES/EGL), libdrm_nouveau | MIT |
-| [SDL2](https://libsdl.org) | zlib |
+| [SDL2](https://libsdl.org) (game controllers) | zlib |
 | [libpng](http://www.libpng.org) | libpng license |
 | [zlib](https://zlib.net) | zlib |
 
