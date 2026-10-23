@@ -94,6 +94,10 @@ static const setting SETTINGS[] = {
     "# archive_cache: 1 keeps recently read parts of base.apk and the OBB in memory (64 MB),\n"
     "#   shared by every open of them, so loads read each part from the SD card once; 0 reads\n"
     "#   the card directly (slower loads).\n" },
+  { "fast_boot", T_SWITCH, F(fast_boot),
+    "# fast_boot: 1 starts faster -- Unity's il2cpp data is copied from the APK to the il2cpp\n"
+    "#   folder only when the APK changed (not on every launch), and the blank 2 s Unity splash\n"
+    "#   screen is skipped; 0 = as the original game.\n" },
   { "debug_log", T_SWITCH, F(debug_log),
     "# debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,\n"
     "#   stalls, GC and startup lines. The log is buffered either way.\n" },

@@ -132,6 +132,101 @@ static void test_skip_clear_refuses_other_code(void) {
   CHECK(rd_find_skip_clear(no_call, 9, &from, &to) == RD_SITE_BAD_CHECK);
 }
 
+/* ---- il2cpp copy and splash flag: synthetic fragments (5.0.8 words) at BASE ---- */
+static uint32_t g_big[1024];
+static const char *g_at_1800, *g_at_1900;
+
+static const char *cstr2(void *ctx, uint64_t va) {
+  (void)ctx;
+  return va == 0x1800 ? g_at_1800 : va == 0x1900 ? g_at_1900 : NULL;
+}
+
+static rd_image image2(size_t nwords) {
+  rd_image im = { g_big, BASE, nwords, cstr2, NULL };
+  return im;
+}
+
+static uint32_t bl_to(size_t from, size_t to) {
+  return 0x94000000u | ((uint32_t)(to - from) & 0x03ffffffu);
+}
+
+/* The il2cpp copy call at word 2 (CopyDirectory at word 20, message at 0x1800). */
+static void build_copy(void) {
+  memset(g_big, 0, sizeof g_big);
+  const uint32_t w[] = { 0x910103e0, 0x9111e3e1, 0x320003e2, bl_to(5, 20), 0x370002a0,
+                         0xf944abe8, 0xf9445be9, 0x90000000, 0x91000000 | (0x800u << 10) };
+  memcpy(&g_big[2], w, sizeof w);
+  g_big[20] = 0xa9ba6ffc;
+  g_at_1800 = "  il2cpp failed to extract resources (%s => %s)";
+}
+
+/* The copy call, its target and the padding right after the code are found; the message, the
+ * callee's prologue and room for the veneer in the last page are all required. */
+static void test_il2cpp_copy(void) {
+  build_copy();
+  rd_image im = image2(32);
+  uint64_t call = 0, copy = 0, veneer = 0;
+  CHECK(rd_find_il2cpp_copy(&im, &call, &copy, &veneer) == RD_SITE_OK);
+  CHECK(call == BASE + 4 * 5 && copy == BASE + 4 * 20 && veneer == BASE + 4 * 32);
+  g_at_1800 = "something else";
+  CHECK(rd_find_il2cpp_copy(&im, &call, &copy, &veneer) == RD_SITE_BAD_CHECK);
+  build_copy();
+  g_big[20] = 0xd503201f;
+  CHECK(rd_find_il2cpp_copy(&im, &call, &copy, &veneer) == RD_SITE_BAD_CHECK);
+  build_copy();
+  im = image2(1022);                                  /* code ends 8 bytes before the page */
+  CHECK(rd_find_il2cpp_copy(&im, &call, &copy, &veneer) == RD_SITE_BAD_CHECK);
+  im = image2(32);
+  im.cstr = NULL;
+  CHECK(rd_find_il2cpp_copy(&im, &call, &copy, &veneer) == RD_SITE_BAD_CHECK);
+  memset(g_big, 0, sizeof g_big);
+  im = image2(32);
+  CHECK(rd_find_il2cpp_copy(&im, &call, &copy, &veneer) == RD_SITE_NOT_FOUND);
+  build_copy();
+  memcpy(&g_big[40], &g_big[2], 9 * sizeof g_big[0]);
+  im = image2(64);
+  CHECK(rd_find_il2cpp_copy(&im, &call, &copy, &veneer) == RD_SITE_AMBIGUOUS);
+}
+
+/* SplashSettings::Transfer at word 10 naming the field at +8 (word 14, name at 0x1900), called
+ * by PlayerSettings::Transfer at word 30 with the struct at +0x138. */
+static void build_splash(void) {
+  memset(g_big, 0, sizeof g_big);
+  g_big[10] = 0xd101c3ff;                             /* sub sp, sp, #0x70 */
+  const uint32_t name[] = { 0x90000001, 0x91002283, 0x91240021 };
+  memcpy(&g_big[14], name, sizeof name);
+  const uint32_t call[] = { 0x9104e280, 0xaa1303e1, bl_to(32, 10) };
+  memcpy(&g_big[30], call, sizeof call);
+  g_at_1900 = "m_ShowUnitySplashScreen";
+}
+
+/* The offset is the struct's plus the field's; the name must be the splash flag, its function
+ * must be the callee (no return in between) and each must be unique. */
+static void test_splash_flag(void) {
+  build_splash();
+  rd_image im = image2(64);
+  uint32_t field = 0;
+  CHECK(rd_find_splash_flag(&im, &field) == RD_SITE_OK && field == 0x140);
+  g_at_1900 = "m_ShowUnitySplashLogo";
+  CHECK(rd_find_splash_flag(&im, &field) == RD_SITE_NOT_FOUND);
+  build_splash();
+  memcpy(&g_big[50], &g_big[14], 3 * sizeof g_big[0]);  /* a second reference to the name */
+  g_big[51] = 0x91002283;
+  CHECK(rd_find_splash_flag(&im, &field) == RD_SITE_AMBIGUOUS);
+  build_splash();
+  g_big[12] = 0xd65f03c0;                             /* ret: the callee ends before the name */
+  CHECK(rd_find_splash_flag(&im, &field) == RD_SITE_NOT_FOUND);
+  build_splash();
+  memcpy(&g_big[40], &g_big[30], 3 * sizeof g_big[0]);
+  g_big[42] = bl_to(42, 10);                          /* two callers */
+  CHECK(rd_find_splash_flag(&im, &field) == RD_SITE_AMBIGUOUS);
+  build_splash();
+  g_big[30] = 0x91000280;                             /* add x0, x20, #0: no struct offset */
+  CHECK(rd_find_splash_flag(&im, &field) == RD_SITE_BAD_CHECK);
+  im.cstr = NULL;
+  CHECK(rd_find_splash_flag(&im, &field) == RD_SITE_BAD_CHECK);
+}
+
 int main(void) {
   RUN(test_found);
   RUN(test_blit_type);
@@ -141,5 +236,7 @@ int main(void) {
   RUN(test_wrong_string_rejected);
   RUN(test_branch_must_reach_epilogue);
   RUN(test_ambiguous_and_missing);
+  RUN(test_il2cpp_copy);
+  RUN(test_splash_flag);
   return g_failures != 0;
 }

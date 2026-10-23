@@ -23,6 +23,16 @@ static void test_b_forward_and_backward(void) {
   CHECK(rd_a64_branch_target(0x1000, back) == 0x0ff0);
 }
 
+/* BL encodes like B with the link opcode: the il2cpp-copy patch calls a veneer with it and the
+ * call must decode back to the veneer; out of range is 0. */
+static void test_bl(void) {
+  const uint32_t bl = rd_a64_bl(0x305ae0, 0xe59c20);
+  CHECK(rd_a64_is_bl(bl));
+  CHECK(rd_a64_branch_target(0x305ae0, bl) == 0xe59c20);
+  CHECK(rd_a64_branch_target(0x1000, rd_a64_bl(0x1000, 0x800)) == 0x800);
+  CHECK(rd_a64_bl(0, 1ULL << 27) == 0 && rd_a64_bl(2, 8) == 0);
+}
+
 /* An unaligned target or one beyond the +-128 MB range of B yields 0 instead of a wrong
  * instruction that would jump elsewhere. */
 static void test_range_and_alignment_errors(void) {
@@ -72,6 +82,7 @@ static void test_abs_jump(void) {
 }
 
 int main(void) {
+  RUN(test_bl);
   RUN(test_encodings);
   RUN(test_abs_jump);
   RUN(test_adrp_ldr_add_decode);

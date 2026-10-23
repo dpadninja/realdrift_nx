@@ -1,7 +1,8 @@
 """tools/find_patch_sites: the loader's pattern finders on the real binaries of both releases.
 
 The expected addresses were derived by hand from llvm-objdump (analysis/research/08-device-runs.md
-run 02 / run 08 / run 12 for 5.0.7; analysis/research/10-patch-sites.md for 5.0.8).
+run 02 / run 08 / run 12 for 5.0.7; analysis/research/10-patch-sites.md for 5.0.8; the il2cpp
+copy and the splash flag in analysis/research/26-load-time-and-audio.md).
 
 MIT (see LICENSE).
 """
@@ -22,6 +23,10 @@ EXPECTED = {
         "blit.get_settings": 0x3EB124,
         "blit.get_manager": 0x480220,
         "blit.field": 0x240,
+        "il2cpp_copy.call": 0x302BE0,
+        "il2cpp_copy.copy": 0x4A2740,
+        "il2cpp_copy.veneer": 0xE543C0,
+        "splash.field": 0x140,
         "gc.sig_suspend": 0x1F16A98,
         "gc.sig_restart": 0x1F16A9C,
         "gc.retry_signals": 0x1F56908,
@@ -35,6 +40,10 @@ EXPECTED = {
         "blit.get_settings": 0x3ECDE8,
         "blit.get_manager": 0x480EE4,
         "blit.field": 0x240,
+        "il2cpp_copy.call": 0x305AE0,
+        "il2cpp_copy.copy": 0x4A3404,
+        "il2cpp_copy.veneer": 0xE59C20,
+        "splash.field": 0x140,
         "gc.sig_suspend": 0x1F1C730,
         "gc.sig_restart": 0x1F1C734,
         "gc.retry_signals": 0x1F5C548,

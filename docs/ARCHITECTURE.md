@@ -163,7 +163,8 @@ One line per module; each file's header comment has the details.
 | `rd_ugui.{c,h}` | the clickable uGUI elements on screen and their rectangles, for menu navigation |
 | `rd_sig.{c,h}` | masked AArch64 instruction-pattern search |
 | `rd_patchsites.{c,h}` | the patterns that locate every engine patch site and GC variable |
-| `rd_patches.{c,h}` | apply the libunity patches; the background clock thread (CPU boost, log flush) |
+| `rd_patches.{c,h}` | apply the libunity patches (Choreographer gate, blit type, fast_boot: splash off and the il2cpp copy once); the background clock thread (CPU boost, log flush) |
+| `rd_il2cppcopy.{c,h}` | fast_boot: when Unity's per-launch il2cpp data copy can be skipped (the stamp) |
 | `rd_a64.{c,h}` | AArch64 instruction encode/decode helpers |
 | `rd_gcbridge.{c,h}`, `rd_gcbridge_hook.c` | Boehm GC stop-the-world without POSIX signals: register publishing (pure) and `pthread_kill` for the collector |
 | `unity_imports.{c,h}` | imports specific to the Unity/IL2CPP engine |

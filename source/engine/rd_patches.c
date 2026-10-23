@@ -8,6 +8,9 @@
  * TimeManager clock detour, FrameTimeTracker / physmem / big.LITTLE stubs, forced OpenSL
  * output -- were keyed to Bad Piggies offsets, never applied to Real Drift and were removed.) */
 #include <stdint.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <switch.h>
 #include "so_util.h"
 #include "rd_log.h"
@@ -19,6 +22,8 @@
 #include "rd_a64.h"
 #include "rd_modimage.h"
 #include "rd_patchsites.h"
+#include "rd_game.h"
+#include "rd_il2cppcopy.h"
 
 extern volatile int jni_quit_requested;   /* jni_fake.c */
 extern so_module unity_mod;               /* main.c */
@@ -52,13 +57,21 @@ static int install_choreographer_sdk_gate(uintptr_t ub) {
 #define BLIT_NEVER 1   /* Unity's AndroidBlitType: 0 Always, 1 Never, 2 Auto */
 static void *(*g_get_manager)(int context);
 static uint32_t g_blit_field;
+static uint32_t g_splash_field;   /* fast_boot: m_ShowUnitySplashScreen, 0 = left alone */
 
+/* GetPlayerSettings() with blit type Never and, with fast_boot, the Unity splash off. The
+ * first call comes in frame 0, before the splash starts (frame 1). */
 static void *get_settings_never(void) {
   void *ps = g_get_manager(0);
   int32_t *blit = ps ? (int32_t *)((char *)ps + g_blit_field) : NULL;
   if (blit && *blit != BLIT_NEVER) {
     debugPrintf("[patch] androidBlitType %d -> %d (render straight to the window)\n", *blit, BLIT_NEVER);
     *blit = BLIT_NEVER;
+  }
+  uint8_t *splash = ps && g_splash_field ? (uint8_t *)ps + g_splash_field : NULL;
+  if (splash && *splash == 1) {     /* a bool: anything else means the offset is wrong */
+    debugPrintf("[patch] m_ShowUnitySplashScreen 1 -> 0 (no blank splash)\n");
+    *splash = 0;
   }
   return ps;
 }
@@ -81,9 +94,100 @@ static int install_blit_type_never(uintptr_t ub) {
   return 1;
 }
 
+/* ---- fast_boot: Unity splash off ---------------------------------------------
+ * The game ships a Unity splash with no logo for 2 s: a blank screen while the first scene
+ * loads. Only the field is found here; get_settings_never clears it. */
+static int install_splash_off(uintptr_t ub) {
+  (void)ub;
+  if (!config.fast_boot) return 0;
+  rd_image im;
+  int r = rd_image_from_module(&unity_mod, &im) == 0 ? rd_find_splash_flag(&im, &g_splash_field)
+                                                     : RD_SITE_NOT_FOUND;
+  if (r != RD_SITE_OK) {
+    g_splash_field = 0;
+    debugPrintf("[patch] splash flag: pattern not found (result %d)\n", r);
+    return 0;
+  }
+  debugPrintf("[patch] Unity splash off (PlayerSettings +0x%x)\n", g_splash_field);
+  return 1;
+}
+
+/* ---- fast_boot: il2cpp data copied once (rd_il2cppcopy.h) -------------------------
+ * The call to CopyDirectory(source, destination, replace) is redirected through a veneer in
+ * the padding after libunity's code (a bl reaches it; it jumps on to il2cpp_copy_once). */
+static int (*g_copy_dir)(void *src, void *dst, int replace);
+
+/* The stamp file's contents into buf (n bytes); returns the length, 0 when there is none. */
+static size_t read_stamp(const char *path, char *buf, size_t n) {
+  FILE *f = fopen(path, "rb");
+  if (!f) return 0;
+  const size_t k = fread(buf, 1, n, f);
+  fclose(f);
+  return k;
+}
+
+/* CopyDirectory's replacement. Unity's FileSystemEntry starts with its path. */
+static int il2cpp_copy_once(void *src, void *dst, int replace) {
+  const char *to = dst;
+  if (!rd_il2cppcopy_is_data_dir(to)) return g_copy_dir(src, dst, replace);
+  char stamp[RD_IL2CPPCOPY_STAMP_MAX], file[RD_IL2CPPCOPY_STAMP_MAX], path[RD_PATH_MAX];
+  struct stat st;
+  int len = -1;
+  if (stat(RD_GAME_HOME "/" RD_BASE_APK_NAME, &st) == 0)
+    len = rd_il2cppcopy_stamp(stamp, sizeof stamp, st.st_size, st.st_mtime);
+  if (len > 0) {
+    snprintf(path, sizeof path, "%s/%s", to, RD_IL2CPP_METADATA);
+    const int64_t meta = stat(path, &st) == 0 ? st.st_size : 0;
+    snprintf(path, sizeof path, "%s/%s", to, RD_IL2CPP_STAMP_FILE);
+    const size_t got = read_stamp(path, file, sizeof file);
+    if (rd_il2cppcopy_current(file, got, stamp, meta)) {
+      debugPrintf("[patch] il2cpp data in %s is current: copy skipped\n", to);
+      return 1;
+    }
+    unlink(path);                     /* an interrupted copy must not look complete */
+  }
+  const uint64_t t0 = rd_now_ns();
+  const int ok = g_copy_dir(src, dst, replace);
+  debugPrintf("[patch] il2cpp data copied to %s in %llu ms (ok %d)\n", to,
+              (unsigned long long)((rd_now_ns() - t0) / RD_NS_PER_MS), ok & 1);
+  if ((ok & 1) && len > 0) {
+    FILE *f = fopen(path, "wb");
+    if (f) { fwrite(stamp, 1, (size_t)len, f); fclose(f); }
+  }
+  return ok;
+}
+
+static int install_il2cpp_copy_once(uintptr_t ub) {
+  if (!config.fast_boot) return 0;
+  rd_image im;
+  uint64_t call = 0, copy = 0, veneer = 0;
+  int r = rd_image_from_module(&unity_mod, &im) == 0
+            ? rd_find_il2cpp_copy(&im, &call, &copy, &veneer) : RD_SITE_NOT_FOUND;
+  if (r != RD_SITE_OK) {
+    debugPrintf("[patch] il2cpp copy: pattern not found (result %d)\n", r);
+    return 0;
+  }
+  const uint32_t *pad = (const uint32_t *)(ub + veneer);
+  for (int i = 0; i < RD_A64_ABS_JUMP_WORDS; i++)
+    if (pad[i]) { debugPrintf("[patch] il2cpp copy: padding at +0x%llx in use\n",
+                              (unsigned long long)veneer); return 0; }
+  const uint32_t bl = rd_a64_bl(call, veneer);
+  if (!bl) return 0;
+  g_copy_dir = (int (*)(void *, void *, int))(ub + copy);
+  uint32_t jump[RD_A64_ABS_JUMP_WORDS];
+  rd_a64_abs_jump(jump, (uint64_t)(uintptr_t)&il2cpp_copy_once);
+  if (so_patch_code((void *)(ub + veneer), jump, sizeof jump)) return 0;
+  if (so_patch_code((void *)(ub + call), &bl, sizeof bl)) return 0;
+  debugPrintf("[patch] il2cpp copy @libunity+0x%llx -> copy once (veneer +0x%llx)\n",
+              (unsigned long long)call, (unsigned long long)veneer);
+  return 1;
+}
+
 static const struct { const char *name; int (*install)(uintptr_t unity_base); } ENGINE_PATCHES[] = {
   { "Choreographer SDK gate", install_choreographer_sdk_gate },
   { "Blit type Never", install_blit_type_never },
+  { "Unity splash off", install_splash_off },
+  { "il2cpp data copied once", install_il2cpp_copy_once },
 };
 
 int rd_install_engine_patches(uintptr_t unity_base, int *total) {

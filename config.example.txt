@@ -51,6 +51,10 @@ texture_transcode=1
 #   shared by every open of them, so loads read each part from the SD card once; 0 reads
 #   the card directly (slower loads).
 archive_cache=1
+# fast_boot: 1 starts faster -- Unity's il2cpp data is copied from the APK to the il2cpp
+#   folder only when the APK changed (not on every launch), and the blank 2 s Unity splash
+#   screen is skipped; 0 = as the original game.
+fast_boot=1
 # debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,
 #   stalls, GC and startup lines. The log is buffered either way.
 debug_log=0
