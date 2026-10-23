@@ -41,7 +41,8 @@ coverage:
 	mkdir -p $(HOST_BUILD)/coverage/c
 	RD_COVERAGE=1 uv run pytest -q --cov=tools --cov-report=term \
 	    --cov-report=html:$(HOST_BUILD)/coverage/python --cov-fail-under=$(COV_MIN_PY)
-	uv run gcovr --root . --object-directory $(HOST_BUILD)/cov --filter source/ --print-summary \
+	uv run gcovr --root . --object-directory $(HOST_BUILD)/cov --filter source/ \
+	    --exclude source/android/etcdec.h --exclude source/android/stb_dxt.h --print-summary \
 	    --html-details $(HOST_BUILD)/coverage/c/index.html --fail-under-line $(COV_MIN_C)
 else
 ifeq ($(strip $(DEVKITPRO)),)
@@ -76,6 +77,8 @@ ASFLAGS  := -g $(ARCH)
 LDFLAGS   = -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 # mesa's display/GPU waits, timed in source/platform/rd_gpuwait.c
 LDFLAGS  += -Wl,--wrap=nwindowDequeueBuffer -Wl,--wrap=nvFenceWait -Wl,--wrap=nwindowSetSwapInterval
+# debug_mem: failures of the allocations under mesa, logged in source/android/rd_memwatch.c
+LDFLAGS  += -Wl,--wrap=memalign -Wl,--wrap=nvMapCreate -Wl,--wrap=nvAddressSpaceMap
 
 # mesa GLES3 + EGL + nouveau (force the GLES path); SDL2 for window/HID/audio; zlib.
 LIBS := -lSDL2 -lGLESv2 -lEGL -lglapi -ldrm_nouveau -lpng -lz -lnx -lm

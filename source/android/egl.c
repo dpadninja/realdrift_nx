@@ -17,6 +17,8 @@
 #include "android_native_unity.h"
 #include "rd_perfstat.h"
 #include "rd_gltrace_gl.h"
+#include "rd_memwatch.h"
+#include "rd_etc2bc_gl.h"
 
 // ---------------------------------------------------------------------------
 // EGL surface-size fixup
@@ -86,6 +88,7 @@ EGLBoolean egl_SwapBuffers_log(EGLDisplay d, EGLSurface s) {
     if (++traced % RD_GLTRACE_PERIOD_FRAMES == 0) rd_gltrace_arm("every 10 s");
     rd_gltrace_frame_end();
   }
+  if (config.debug_mem) rd_memwatch_probe_once();   /* what an ETC2 texture costs */
   if (config.debug_fps_counter) fps_overlay_draw();
   nxp_draw();   /* on-screen cursor overlay; saves/restores all GL state */
   rd_menu_draw();   /* menu navigation focus frame */
@@ -129,18 +132,26 @@ static void timed_glFinish(void) { GL_TIMED(glFinish()); }
 
 void *egl_wrap_gl(const char *name, void *real) {
   void *w = config.debug_gl_trace && real ? rd_gltrace_wrap(name, real) : NULL;
-  return w ? w : real;
+  if (!w && config.debug_mem && real) w = rd_memwatch_wrap(name, real);
+  void *inner = w ? w : real;
+  /* ETC2 stored as S3TC (rd_etc2bc_gl.h), on top of the check so it sees what mesa gets */
+  void *t = config.texture_transcode && inner ? rd_etc2bc_wrap(name, inner) : NULL;
+  return t ? t : inner;
 }
 
-void *egl_GetProcAddress_timed(const char *name) {
-  void *real = (void *)eglGetProcAddress(name);
-  if (!real || !name) return real;
-  void *traced = egl_wrap_gl(name, real);   /* the frame trace (rd_gltrace_gl.h) */
-  if (traced != real) return traced;
+/* The timed version of GL function `name` (remembering `real`), else `real`. */
+static void *timed_gl(const char *name, void *real) {
 #define TIMED(fn) if (!strcmp(name, #fn)) { real_##fn = real; return (void *)&timed_##fn; }
   TIMED(glBufferSubData) TIMED(glMapBufferRange) TIMED(glUnmapBuffer) TIMED(glClientWaitSync)
 #undef TIMED
   if (!strcmp(name, "glBufferData")) return (void *)&timed_glBufferData;
   if (!strcmp(name, "glFinish"))     return (void *)&timed_glFinish;
   return real;
+}
+
+void *egl_GetProcAddress_timed(const char *name) {
+  void *real = (void *)eglGetProcAddress(name);
+  if (!real || !name) return real;
+  /* the frame trace (rd_gltrace_gl.h) or the allocation check (rd_memwatch.h) on top */
+  return egl_wrap_gl(name, timed_gl(name, real));
 }

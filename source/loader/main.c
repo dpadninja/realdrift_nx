@@ -43,6 +43,7 @@ volatile int      g_rd_in_frame = 0;
 #include "rd_perfstat.h"
 #include "rd_gcbridge.h"
 #include "mem_layout.h"
+#include "rd_memwatch.h"
 
 so_module main_mod, unity_mod, il2cpp_mod;
 
@@ -360,7 +361,9 @@ static void run_main_loop(void) {
     rd_menu_frame();                                       /* controller menu navigation */
 
     {
-      long _ms = (long)((rd_now_ns() - t0) / RD_NS_PER_MS);
+      const uint64_t _ns = rd_now_ns() - t0;
+      long _ms = (long)(_ns / RD_NS_PER_MS);
+      if (config.debug_mem) rd_memwatch_frame((uint32_t)frame, _ns);   /* [mem] lines */
       if (_ms >= RD_SLOW_FRAME_MS) {
         debugPrintf("[perf] frame %d took %ldms  open=%u sd=%u mmap=%u gc=%u  touch=%d  "
                     "read=%lluKB/%llums swap=%llums gl=%llums deq=%llums fence=%llums\n",

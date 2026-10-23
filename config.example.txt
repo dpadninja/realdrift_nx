@@ -43,6 +43,10 @@ boost_loading=1
 smoke_size=100
 # smoke_amount: percent of the smoke puffs that are emitted, 10 .. 100 (try 50).
 smoke_amount=100
+# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads
+#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after
+#   many cars and tracks new textures stop fitting and show black. Loads take a bit longer.
+texture_transcode=1
 # debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,
 #   stalls, GC and startup lines. The log is buffered either way.
 debug_log=0
@@ -55,3 +59,6 @@ debug_gl_trace=0
 # debug_ui_nav: 1 logs the elements menu navigation finds on each new screen ([uinav]
 #   lines, with debug_log = 1): names, parents, rectangles.
 debug_ui_nav=0
+# debug_mem: 1 logs where the memory is about every 10 s and after each load, and every
+#   GL error when a texture or buffer is created ([mem] lines, with debug_log = 1).
+debug_mem=0

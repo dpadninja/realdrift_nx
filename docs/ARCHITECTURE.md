@@ -138,6 +138,10 @@ One line per module; each file's header comment has the details.
 | `opensles_mixer.c` | the SDL2 audio device, the player registry and the software mixer |
 | `opensles_internal.h` | OpenSL ES types, vtables and the shim's objects (internal) |
 | `egl.{c,h}` | EGL/GLES wrappers: surface size and lifetime, `eglSwapBuffers` with overlays, GL wait timing |
+| `rd_etc2bc.{c,h}` | ETC1/ETC2 blocks re-encoded as S3TC (BC1 / BC3), the only user of the vendored codecs |
+| `rd_etc2bc_gl.{c,h}` | texture_transcode: ETC2 texture storage and uploads turned into S3TC |
+| `etcdec.h`, `stb_dxt.h` | vendored ETC/EAC decoder (iOrange/etcdec) and DXT encoder (nothings/stb) |
+| `rd_memwatch.{c,h}` | debug_mem: `[mem]` lines and `glGetError` after GL calls that allocate |
 | `android_log.{c,h}` | liblog and `__assert2` into `debug.log` |
 | `rd_zip.{c,h}` | read single entries of `base.apk` (stored or deflated) for the AssetManager |
 | `rd_meta.{c,h}` | `ApplicationInfo.metaData` values from the manifest |
@@ -175,6 +179,8 @@ One line per module; each file's header comment has the details.
 | `rd_overlay.{c,h}`, `rd_overlay_gl.c` | 2D drawing on top of the finished frame (cursor, FPS counter) |
 | `rd_fps.{c,h}` | the debug FPS counter: counting and the built-in pixel font |
 | `rd_gpuwait.{c,h}` | time mesa waits for the display and the GPU; real clock rates in the log |
+| `rd_jobs.{c,h}` | worker threads on cores 1 and 2, which the engine leaves idle |
+| `rd_memstat.{c,h}` | the debug_mem report: memory snapshot, its log line, when to take one |
 | `rd_perf.{c,h}` | render resolution choice and CPU boost while loading |
 
 ### game

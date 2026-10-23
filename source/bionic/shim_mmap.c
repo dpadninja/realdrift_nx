@@ -37,6 +37,16 @@ static int   g_fb_n = 0;
 static size_t g_fb_bytes = 0;
 static Mutex g_fb_lock;
 
+void mmap_get_usage(mmap_usage *out) {
+  mutexLock(&g_mmap_lock);
+  out->arena_used = mmap_arena_used_locked(&out->arena_size);
+  out->oc_committed = oc_committed_locked(&out->oc_pool);
+  mutexUnlock(&g_mmap_lock);
+  mutexLock(&g_fb_lock);
+  out->fallback = g_fb_bytes;
+  mutexUnlock(&g_fb_lock);
+}
+
 /* When the arena is full: a memalign'd block (256 MB-aligned for big anonymous maps, which
  * Unity's pools need), filled like an arena map and remembered so munmap can free it. NULL if
  * the heap is exhausted. */

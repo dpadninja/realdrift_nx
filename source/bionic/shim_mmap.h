@@ -35,6 +35,8 @@ void  mmap_arena_init_locked(void);
 void *mmap_arena_alloc_locked(size_t len, size_t *got);
 /* munmap of an arena range: releases exactly those pages (takes g_mmap_lock itself). */
 void  mmap_arena_free(void *addr, size_t len);
+/* Bytes reserved in the arena; *size = the arena's size (0 before first use). */
+size_t mmap_arena_used_locked(size_t *size);
 
 /* ---- overcommit window (shim_mmap_oc.c) ----------------------------------------------- */
 
@@ -50,5 +52,7 @@ void  oc_commit_locked(void *addr, size_t len);
 /* munmap of a window range: only uncommitted pages are released (committed ones stay mapped,
  * a small bounded leak, so a later reservation cannot collide with a live alias). */
 void  oc_free_locked(void *addr, size_t len);
+/* Committed bytes of the window; *pool = the commit pool's size. */
+size_t oc_committed_locked(size_t *pool);
 
 #endif

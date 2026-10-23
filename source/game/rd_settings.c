@@ -86,6 +86,10 @@ static const setting SETTINGS[] = {
     "# smoke_size: size of the smoke puffs in percent, %d .. %d (try 50).\n" },
   { "smoke_amount", T_SMOKE, F(smoke_amount),
     "# smoke_amount: percent of the smoke puffs that are emitted, %d .. %d (try 50).\n" },
+  { "texture_transcode", T_SWITCH, F(texture_transcode),
+    "# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads\n"
+    "#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after\n"
+    "#   many cars and tracks new textures stop fitting and show black. Loads take a bit longer.\n" },
   { "debug_log", T_SWITCH, F(debug_log),
     "# debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,\n"
     "#   stalls, GC and startup lines. The log is buffered either way.\n" },
@@ -98,6 +102,9 @@ static const setting SETTINGS[] = {
   { "debug_ui_nav", T_SWITCH, F(debug_ui_nav),
     "# debug_ui_nav: 1 logs the elements menu navigation finds on each new screen ([uinav]\n"
     "#   lines, with debug_log = 1): names, parents, rectangles.\n" },
+  { "debug_mem", T_SWITCH, F(debug_mem),
+    "# debug_mem: 1 logs where the memory is about every 10 s and after each load, and every\n"
+    "#   GL error when a texture or buffer is created ([mem] lines, with debug_log = 1).\n" },
 };
 #define NSETTINGS ((int)(sizeof SETTINGS / sizeof SETTINGS[0]))
 

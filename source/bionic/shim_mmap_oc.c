@@ -167,3 +167,8 @@ void oc_free_locked(void *addr, size_t len) {
   for (size_t i = 0; i < cnt; i++)
     if (!oc_committed[first + i]) oc_used[first + i] = 0;
 }
+
+size_t oc_committed_locked(size_t *pool) {
+  *pool = oc_pool_pages * MMAP_PAGE;
+  return oc_live_pages * MMAP_PAGE;
+}

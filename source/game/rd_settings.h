@@ -55,6 +55,8 @@ typedef struct {
   int         debug_fps_counter;     /* 1: FPS overlay in the top-left corner (rd_fps.h) */
   int         debug_gl_trace;        /* 1: GPU time per render target of a frame (rd_gltrace.h) */
   int         debug_ui_nav;          /* 1: log the navigation targets of each screen (rd_menu.h) */
+  int         texture_transcode;     /* 1: ETC2 textures stored as S3TC (rd_etc2bc_gl.h) */
+  int         debug_mem;             /* 1: memory report and GL allocation errors (rd_memwatch.h) */
 } rd_settings;
 
 #define RD_SETTINGS_DEFAULT {                                         \
@@ -81,6 +83,8 @@ typedef struct {
   .debug_fps_counter = 0,                                             \
   .debug_gl_trace = 0,                                                \
   .debug_ui_nav = 0,                                                  \
+  .texture_transcode = 1,                                             \
+  .debug_mem = 0,                                                     \
 }
 
 /* Parses a button list. Returns 0 and *out on success, -1 on an unknown name. */

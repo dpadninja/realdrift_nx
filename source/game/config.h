@@ -16,14 +16,19 @@
 /* ---- memory layout (main.c __libnx_initheap, libc_shim.c mmap) -------------------------
  * Inherited from the so-loader lineage. Unity reserves aligned pools by over-mmapping and
  * trimming head/tail; anon mmaps come from an aligned arena with a per-page bitmap, so a
- * sub-range munmap frees only the trimmed pages. */
+ * sub-range munmap frees only the trimmed pages.
+ * Unity 2018.4 makes no such big reservations: in every console run the arena held ~50 MB
+ * and the overcommit window committed nothing, while the engine's and mesa's mallocs (meshes,
+ * textures) filled the newlib heap until textures failed to allocate and sampled black
+ * (analysis/research/25). So both stay small and the rest goes to newlib; maps that do not
+ * fit the arena fall back to newlib (shim_mmap.c mmap_fallback). */
 #define MMAP_ARENA_ALIGN            ((size_t)64 * 1024 * 1024)
-#define MMAP_ARENA_RESERVE          ((size_t)1792 * 1024 * 1024)  /* heap-backed cap (28 x 64 MB) */
+#define MMAP_ARENA_RESERVE          ((size_t)256 * 1024 * 1024)   /* heap-backed cap (4 x 64 MB) */
 #define MMAP_ARENA_FALLBACK_BYTES   ((size_t)768 * 1024 * 1024)   /* if the reserve cannot be had */
 
 /* Stack-region overcommit arena (libc_shim.c, main.c). */
 #define OC_WINDOW_BYTES     ((size_t)1536 * 1024 * 1024)
-#define OC_POOL_BYTES       ((size_t) 384 * 1024 * 1024)
+#define OC_POOL_BYTES       ((size_t)  64 * 1024 * 1024)   /* taken from newlib at boot */
 
 /* ---- logging -------------------------------------------------------------------------- */
 /* debug.log on the SD card (RD_LOG_PATH). On while the port is being brought up. */

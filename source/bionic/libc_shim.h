@@ -215,6 +215,15 @@ int madvise_fake(void *addr, size_t len, int advice);
  * newlib heap exists. Returns 1 if armed, 0 if mmap stays heap-backed. */
 int  oc_arena_init(void *window, size_t window_bytes, void *pool, size_t pool_bytes);
 
+/* How full the mmap pools are, in bytes (debug_mem, rd_memwatch.h). */
+typedef struct {
+  size_t arena_used, arena_size;      /* page arena: reserved / total */
+  size_t oc_committed, oc_pool;       /* overcommit window: committed pages / pool */
+  size_t fallback;                    /* maps served by memalign after the arena filled */
+} mmap_usage;
+/* Fills *out. Any thread (takes the mmap locks). */
+void mmap_get_usage(mmap_usage *out);
+
 /* ---- shim_dl.c --------------------------------------------------------------------------- */
 
 /* dlopen returns a dummy handle; dlsym looks up exports of the loaded modules, then our
