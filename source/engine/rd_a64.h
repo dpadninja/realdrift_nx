@@ -10,6 +10,9 @@
  * (0 is never a valid B encoding, so callers can treat it as an error). */
 uint32_t rd_a64_b(uint64_t from, uint64_t to);
 
+/* `bl to` placed at `from`; 0 like rd_a64_b when misaligned or out of range. */
+uint32_t rd_a64_bl(uint64_t from, uint64_t to);
+
 /* An absolute jump to `to` from anywhere (beyond B's +-128MB): `ldr x16, #8; br x16` and the
  * 64-bit address, 4 words into out (16 bytes; x16 is the AAPCS64 intra-call scratch register). */
 #define RD_A64_ABS_JUMP_WORDS 4

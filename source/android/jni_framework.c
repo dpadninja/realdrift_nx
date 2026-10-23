@@ -65,7 +65,7 @@ static int g_last_output_prop = 0;   /* set by field_object from the static-fiel
  * reaches us the SAMPLE_RATE/FRAMES_PER_BUFFER branches below select directly; the call_n hedge
  * is a fallback for the keyless pattern. We report RD_AUDIO_REPORTED_RATE /
  * RD_AUDIO_FRAMES_PER_BUFFER (opensles.h), values proven in an earlier FMOD port. The reported
- * rate is effectively cosmetic: opensles.c opens the SDL device at the Switch's native 48000
+ * rate is effectively cosmetic: the sound output (rd_audioout.h) runs at the Switch's native 48000
  * and resamples every player, so the game's mixer rate is resampled regardless. FRAMES_PER_BUFFER
  * must stay small and nonzero: 0/"" fails OpenSL init with error 60. FMOD picks OpenSL ES
  * because hasSystemFeature("android.hardware.audio.low_latency") is true (rd_features.h). */

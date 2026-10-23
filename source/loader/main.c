@@ -43,6 +43,8 @@ volatile int      g_rd_in_frame = 0;
 #include "rd_perfstat.h"
 #include "rd_gcbridge.h"
 #include "mem_layout.h"
+#include "rd_memwatch.h"
+#include "rd_loadprof_hook.h"
 
 so_module main_mod, unity_mod, il2cpp_mod;
 
@@ -347,6 +349,7 @@ static void run_main_loop(void) {
      * hitches will show its own cause here (sd=1 -> an SD commit, mmap=N -> heap growth or a
      * file map, gc=N -> a stop-the-world, open=N -> a burst of file opens). Costs one
      * clock_gettime pair per frame and prints nothing on a healthy frame. */
+    if (config.debug_load) rd_loadprof_begin();            /* [load] lines */
     const uint64_t t0 = rd_now_ns();
     unsigned _o0 = nx_stat_open, _c0 = nx_stat_commit, _m0 = nx_stat_mmap, _g0 = nx_stat_gcstop;
 
@@ -360,7 +363,10 @@ static void run_main_loop(void) {
     rd_menu_frame();                                       /* controller menu navigation */
 
     {
-      long _ms = (long)((rd_now_ns() - t0) / RD_NS_PER_MS);
+      const uint64_t _ns = rd_now_ns() - t0;
+      long _ms = (long)(_ns / RD_NS_PER_MS);
+      if (config.debug_mem) rd_memwatch_frame((uint32_t)frame, _ns);   /* [mem] lines */
+      if (config.debug_load) rd_loadprof_end(_ns);
       if (_ms >= RD_SLOW_FRAME_MS) {
         debugPrintf("[perf] frame %d took %ldms  open=%u sd=%u mmap=%u gc=%u  touch=%d  "
                     "read=%lluKB/%llums swap=%llums gl=%llums deq=%llums fence=%llums\n",
@@ -383,6 +389,7 @@ static void run_main_loop(void) {
       rd_sleek_try_install();
       rd_menu_try_install();
     }
+    if (config.debug_audio && (frame % RD_AUDIO_WATCH_FRAMES) == 0) opensles_audio_watch();
     frame++;
     if ((frame % RD_SD_FLUSH_FRAMES) == 0) nx_sd_flush();   /* commit pending saves */
     /* FRAME LIMITER (~60fps). No real display vsync -> pace to 16.6ms so we don't
@@ -396,11 +403,16 @@ static void run_main_loop(void) {
 
 int main(int argc, char *argv[]) {
   (void)argc; (void)argv;
+  nx_stat_start_ns = rd_now_ns();                          /* [load] "at" times */
   socketInitializeDefault();
   debugPrintf(RD_LOG_TAG_BANNER " realdrift_nx start (Real Drift " RD_GAME_VERSION_NAME ", Unity " RD_UNITY_VERSION ") ===\n");
 
   boot_enter_game_folder();
   boot_read_config();
+  if (config.boost_loading) {                          /* modules, init, JNI: CPU bound */
+    cpu_boost(1);
+    debugPrintf("[perf] CPU boost ON (boot)\n");
+  }
   check_syscalls();
   debugPrintf("[boot] syscalls ok\n");
   mem_log_boot();
@@ -408,7 +420,7 @@ int main(int argc, char *argv[]) {
   boot_pick_resolution();
 
   SDL_SetMainReady();
-  if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0)
+  if (SDL_Init(SDL_INIT_GAMECONTROLLER)   /* sound: rd_audioout */ < 0)
     debugPrintf("SDL_Init failed: %s\n", SDL_GetError());
 
   check_data();
@@ -440,7 +452,7 @@ int main(int argc, char *argv[]) {
   debugPrintf("[boot] il2cpp API: %d function(s) missing\n", il2cpp_missing);
 
   /* Controller driving + race UI (rd_drive_hook.c) are installed lazily in the loop. */
-  rd_start_clock_thread();
+  rd_start_clock_thread(config.boost_loading);
   debugPrintf("[boot] GC off + clock thread started; entering render loop\n");
 
   diag_thread_register(NULL, 0);

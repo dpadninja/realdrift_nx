@@ -68,7 +68,7 @@ through the documented entry points of the upper layer's headers.
 |---|---|---|
 | main | libnx | boot, the main loop, Unity's main thread (all C# and GL calls) |
 | engine threads | Unity through `pthread_create` (bionic shim) | job workers, loading, FMOD mixer |
-| SDL audio | SDL2 | OpenSL ES buffer-queue callbacks (`android/opensles.c`) |
+| audio output | `platform/rd_audioout.c` (core 2) | the OpenSL ES mixer and buffer-queue callbacks (`android/opensles_mixer.c`) |
 | clock | `engine/rd_patches.c` | CPU boost while loading, `debug.log` flushes |
 | watchdog | `loader/diag.c` | dumps every thread's state when frames stop |
 
@@ -101,6 +101,7 @@ One line per module; each file's header comment has the details.
 | `error.{c,h}` | fatal error screen |
 | `nx_crash_handler.{c,h}` | CPU exception handler: registers and backtrace into the log |
 | `diag.{c,h}` | thread registry and stall watchdog: dumps every thread when frames stop |
+| `rd_loadprof_hook.{c,h}` | debug_load: samples file counters and thread CPU around long frames |
 
 ### bionic
 
@@ -112,8 +113,11 @@ One line per module; each file's header comment has the details.
 | `shim_libc.c` | fortify wrappers, system properties, futex/syscall, sysconf, locale, network/process stubs |
 | `shim_fs.{c,h}` | open/read/write/close/stat/rename/readdir; `shim_fs.h` is the internal interface of the three fs files |
 | `shim_fs_path.c` | path rewrites: APK asset root, case-sensitivity probe, `mkdir -p`, synthetic `/proc` and `/sys` |
-| `shim_fs_cache.c` | per-fd state: read-ahead windows, synthetic inodes, open-fd cache for `.so` files, SD commit after writes |
-| `shim_stdio.c` | `fopen` and the fake `stdin`/`stdout`/`stderr` streams |
+| `shim_fs_cache.c` | per-fd state: the archive block cache for `base.apk` / OBB fds, read-ahead windows, synthetic inodes, open-fd cache for `.so` files, SD commit after writes |
+| `rd_sdcommit.{c,h}` | which written files commit the SD card on close (not Unity's per-launch il2cpp copy) |
+| `rd_readlog.{c,h}` | archive_cache: the launch prefetch -- the first launch's small archive reads, saved once and served from memory later |
+| `rd_archcache.{c,h}` | archive_cache: the block pool (LRU) shared by every open of `base.apk` / the OBB |
+| `shim_stdio.c` | `fopen` (archive FILEs read through the block cache) and the fake `stdin`/`stdout`/`stderr` streams |
 | `shim_mmap.{c,h}` | `mmap`/`munmap`/`mprotect`/`madvise`, memalign fallback, read-only file-map cache; `shim_mmap.h` is internal |
 | `shim_mmap_arena.c` | the page arena on the newlib heap |
 | `shim_mmap_oc.c` | the stack-region overcommit window for Unity's huge `PROT_NONE` reservations |
@@ -136,8 +140,14 @@ One line per module; each file's header comment has the details.
 | `android_native_unity.{c,h}` | NDK: `ANativeWindow` over the Switch window, `ALooper`, sensors, input |
 | `opensles.{c,h}` | the OpenSL ES subset FMOD uses: interfaces, objects, engine, `slCreateEngine` |
 | `opensles_mixer.c` | the SDL2 audio device, the player registry and the software mixer |
+| `rd_audiowatch.{c,h}` | debug_audio: notices silences of the output and their end |
 | `opensles_internal.h` | OpenSL ES types, vtables and the shim's objects (internal) |
 | `egl.{c,h}` | EGL/GLES wrappers: surface size and lifetime, `eglSwapBuffers` with overlays, GL wait timing |
+| `rd_etc2bc.{c,h}` | ETC1/ETC2 blocks re-encoded as S3TC (BC1 / BC3), the only user of the vendored codecs |
+| `rd_slvolume.{c,h}` | OpenSL volume level and mute as the mixer's gain |
+| `rd_etc2bc_gl.{c,h}` | texture_transcode: ETC2 texture storage and uploads turned into S3TC |
+| `third_party/etcdec.h`, `third_party/stb_dxt.h` | vendored ETC/EAC decoder (iOrange/etcdec) and DXT encoder (nothings/stb) |
+| `rd_memwatch.{c,h}` | debug_mem: `[mem]` lines and `glGetError` after GL calls that allocate |
 | `android_log.{c,h}` | liblog and `__assert2` into `debug.log` |
 | `rd_zip.{c,h}` | read single entries of `base.apk` (stored or deflated) for the AssetManager |
 | `rd_meta.{c,h}` | `ApplicationInfo.metaData` values from the manifest |
@@ -154,7 +164,8 @@ One line per module; each file's header comment has the details.
 | `rd_ugui.{c,h}` | the clickable uGUI elements on screen and their rectangles, for menu navigation |
 | `rd_sig.{c,h}` | masked AArch64 instruction-pattern search |
 | `rd_patchsites.{c,h}` | the patterns that locate every engine patch site and GC variable |
-| `rd_patches.{c,h}` | apply the libunity patches; the background clock thread (CPU boost, log flush) |
+| `rd_patches.{c,h}` | apply the libunity patches (Choreographer gate, blit type, fast_boot: splash off and the il2cpp copy once); the background clock thread (CPU boost, log flush) |
+| `rd_il2cppcopy.{c,h}` | fast_boot: when Unity's per-launch il2cpp data copy can be skipped (the stamp) |
 | `rd_a64.{c,h}` | AArch64 instruction encode/decode helpers |
 | `rd_gcbridge.{c,h}`, `rd_gcbridge_hook.c` | Boehm GC stop-the-world without POSIX signals: register publishing (pure) and `pthread_kill` for the collector |
 | `unity_imports.{c,h}` | imports specific to the Unity/IL2CPP engine |
@@ -175,6 +186,11 @@ One line per module; each file's header comment has the details.
 | `rd_overlay.{c,h}`, `rd_overlay_gl.c` | 2D drawing on top of the finished frame (cursor, FPS counter) |
 | `rd_fps.{c,h}` | the debug FPS counter: counting and the built-in pixel font |
 | `rd_gpuwait.{c,h}` | time mesa waits for the display and the GPU; real clock rates in the log |
+| `rd_sdstat.c` | debug_load: FS file opens and reads under newlib (what reaches the SD card) |
+| `rd_loadprof.{c,h}` | debug_load: the `[load]` lines (file traffic, CPU per thread) |
+| `rd_jobs.{c,h}` | worker threads on cores 1 and 2, which the engine leaves idle |
+| `rd_audioout.{c,h}` | the sound output: libnx audout fed by our thread (in place of SDL's Switch audio, which could hang) |
+| `rd_memstat.{c,h}` | the debug_mem report: memory snapshot, its log line, when to take one |
 | `rd_perf.{c,h}` | render resolution choice and CPU boost while loading |
 
 ### game

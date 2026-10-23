@@ -1,12 +1,17 @@
 /* rd_a64.c -- see rd_a64.h. MIT (see LICENSE). */
 #include "rd_a64.h"
 
-uint32_t rd_a64_b(uint64_t from, uint64_t to) {
+/* B / BL with opcode `op`: the 26-bit word offset from `from` to `to`, or 0. */
+static uint32_t branch26(uint32_t op, uint64_t from, uint64_t to) {
   int64_t d = (int64_t)(to - from);
   if ((from | to) & 3) return 0;
   if (d < -(1LL << 27) || d >= (1LL << 27)) return 0;
-  return 0x14000000u | ((uint32_t)(d >> 2) & 0x03ffffffu);
+  return op | ((uint32_t)(d >> 2) & 0x03ffffffu);
 }
+
+uint32_t rd_a64_b(uint64_t from, uint64_t to) { return branch26(0x14000000u, from, to); }
+
+uint32_t rd_a64_bl(uint64_t from, uint64_t to) { return branch26(RD_A64_BL_OPCODE, from, to); }
 
 void rd_a64_abs_jump(uint32_t out[RD_A64_ABS_JUMP_WORDS], uint64_t to) {
   out[0] = RD_A64_LDR_X16_8;

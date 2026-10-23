@@ -29,6 +29,7 @@
 
 #include "util.h"
 #include "libc_shim.h"
+#include "shim_fs.h"         /* pread of the game archives */
 #include "opensles.h"
 #include "imports.h"
 #include "egl.h"
@@ -76,9 +77,10 @@ static int truncate_stub(const char *path, long len) { (void)path; (void)len; re
 static int ftruncate_stub(int fd, long len) { return ftruncate(fd, (off_t)len); }
 static int fsync_stub(int fd) { int r = fsync(fd); fsdevCommitDevice("sdmc"); return r; }
 static int dup2_stub(int a, int b) { (void)a; return b; }
-/* pread over lseek + read: seeks, reads until n bytes or EOF (fsdev can short-read), and
- * restores the file position. */
+/* pread: the game archives from the block cache; otherwise over lseek + read: seeks, reads
+ * until n bytes or EOF (fsdev can short-read), and restores the file position. */
 static long pread_impl(int fd, void *buf, size_t n, long off) {
+  if (arch_has(fd)) return arch_pread(fd, buf, n, off);
   long cur = lseek(fd, 0, SEEK_CUR);
   if (cur < 0) return -1;
   if (lseek(fd, off, SEEK_SET) < 0) return -1;

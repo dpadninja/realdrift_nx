@@ -101,6 +101,18 @@ def test_only_source_headers_get_the_function_rule(tmp_path):
     assert check_file(h) == []
 
 
+def test_vendored_headers_only_need_a_license(tmp_path):
+    """A header under third_party/ keeps its upstream documentation: undocumented functions
+    are fine there, a missing license is still reported.
+    """
+    h = tmp_path / "source" / "android" / "third_party" / "lib.h"
+    h.parent.mkdir(parents=True)
+    h.write_text("/* lib.h -- vendored. MIT. */\nint lib_f(void);\n")
+    assert check_file(h) == []
+    h.write_text("/* lib.h */\nint lib_f(void);\n")
+    assert [p.message for p in check_file(h)] != []
+
+
 def test_main_reports_and_fails(tmp_path, capsys):
     """The command line prints each problem and exits 1."""
     bad = tmp_path / "bad.py"

@@ -42,5 +42,13 @@
 #define RD_PREFS_FILE          "prefs.kv"     /* PlayerPrefs store (unity_jni.c) */
 #define RD_LOG_FILE            "debug.log"
 #define RD_LOG_PATH            RD_GAME_HOME "/" RD_LOG_FILE
+/* Unity copies its il2cpp data (global-metadata.dat, mono etc/) here from the APK on every
+ * launch, deleting the old copy first (libunity, after loading libil2cpp). */
+#define RD_IL2CPP_DATA_DIR     "il2cpp"
+#define RD_IL2CPP_METADATA     "Metadata/global-metadata.dat"   /* in RD_IL2CPP_DATA_DIR */
+/* fast_boot: written into RD_IL2CPP_DATA_DIR after a complete copy (rd_il2cppcopy.h). */
+#define RD_IL2CPP_STAMP_FILE   ".realdrift_nx-copied"
+/* archive_cache: the launch prefetch of small archive reads (rd_readlog.h), written once. */
+#define RD_READLOG_FILE        ".realdrift_nx-reads"
 
 #endif

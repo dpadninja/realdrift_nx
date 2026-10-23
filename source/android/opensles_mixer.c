@@ -1,6 +1,6 @@
-/* opensles_mixer.c -- the audio output behind the OpenSL ES shim: one SDL2 device at the
- * device rate; every playing player is resampled, gain-scaled and summed into it in the SDL
- * audio callback, which also fires each player's buffer-queue callback as Android would.
+/* opensles_mixer.c -- the audio output behind the OpenSL ES shim: one rd_audioout stream at
+ * the device rate; every playing player is resampled, gain-scaled and summed into it in the
+ * output callback, which also fires each player's buffer-queue callback as Android would.
  *
  * Split out of opensles.c, forked from badpiggies_nx by ChanseyIsTheBest
  * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
@@ -10,10 +10,14 @@
 #include "opensles.h"
 #include "util.h"
 #include "opensles_internal.h"
+#include "config.h"   /* debug_audio */
+#include "rd_audiowatch.h"
+#include "rd_audioout.h"
+#include "rd_slvolume.h"
 
-// --- global SDL device + player registry ------------------------------------
+// --- global output + player registry -----------------------------------------
 
-SDL_AudioDeviceID g_dev = 0;
+int g_dev = 0;                    /* 1 once rd_audioout runs */
 static int g_dev_rate = 44100;
 Player *g_players[MAX_PLAYERS];
 int g_player_count = 0;
@@ -54,7 +58,7 @@ static void mix_player(Player *p, int32_t *acc, int frames) {
   if (dry) { if (p->drained < (1 << 20)) p->drained++; return; }
   p->drained = 0;
 
-  const float g = p->gain;
+  const float g = rd_slvolume_out(p->gain, p->muted);
   const int stereo = (p->channels >= 2);
   const int sbytes = p->sbytes > 0 ? p->sbytes : 2;    // bytes per sample
   const int is_float = p->is_float;
@@ -76,8 +80,10 @@ static void mix_player(Player *p, int32_t *acc, int frames) {
           p->q_head = (p->q_head + 1) % BQ_SLOTS;
         }
         SDL_UnlockMutex(p->lock);
-        if (!have)
+        if (!have) {
+          p->underruns++;
           return; // underrun: rest of the block stays silent
+        }
         p->cur = b.data;
         p->cur_size = b.size;
       }
@@ -89,6 +95,7 @@ static void mix_player(Player *p, int32_t *acc, int frames) {
       if (p->cur_fpos < 0.0) p->cur_fpos = 0.0;
       p->cur = NULL;
       if (p->cb) {
+        p->callbacks++;
         static int once = 0;
         if (!once) { once = 1; debugPrintf("[fmod] OpenSL buffer-queue callback firing -> FMOD mixer is producing PCM\n"); }
         p->cb(&p->bq_vt, p->cb_ctx);
@@ -119,14 +126,34 @@ static void mix_player(Player *p, int32_t *acc, int frames) {
   }
 }
 
-/* SDL audio thread: mixes every playing player into the device buffer (fixed-point, clipped)
+/* debug_audio: output callbacks so far (opensles_audio_watch checks that it keeps growing). */
+static volatile uint32_t g_device_blocks;
+
+/* debug_audio: one line per player -- state, gain, queue and its counters. Caller holds
+ * g_reg_lock. */
+static void log_players_locked(void) {
+  for (int i = 0; i < g_player_count; i++) {
+    Player *p = g_players[i];
+    if (!p) continue;
+    SDL_LockMutex(p->lock);
+    const int queued = (p->q_tail - p->q_head + BQ_SLOTS) % BQ_SLOTS;
+    debugPrintf("[audio]   player %d %p: in_use %d playing %d gain %.3f muted %d queued %d cur %d "
+                "cb %d | enqueued %u callbacks %u underruns %u drained %d\n",
+                i, (void *)p, p->in_use, p->playing, (double)p->gain, p->muted, queued,
+                p->cur != NULL, p->cb != NULL, (unsigned)p->enqueued, (unsigned)p->callbacks,
+                (unsigned)p->underruns, p->drained);
+    SDL_UnlockMutex(p->lock);
+  }
+}
+
+/* Output thread (rd_audioout): mixes every playing player into the device buffer (fixed-point, clipped)
  * and fires their buffer-queue callbacks, with its own bionic TLS so FMOD's callback finds its
  * stack guard. */
-static void SDLCALL audio_callback(void *ud, Uint8 *stream, int len) {
+static void audio_callback(void *ud, uint8_t *stream, int len) {
   (void)ud;
 
   // The engine's completion callback (fired from here via mix_player) reads its
-  // stack-guard from tpidr_el0+0x28; SDL's audio thread never set that up. Give
+  // stack-guard from tpidr_el0+0x28; the output thread never set that up. Give
   // this thread its OWN bionic TLS block (single audio thread, so static is fine
   // and persists for its lifetime).
   static uint8_t audio_tls[BIONIC_TLS_SIZE] __attribute__((aligned(16)));
@@ -143,6 +170,7 @@ static void SDLCALL audio_callback(void *ud, Uint8 *stream, int len) {
     if (g_players[i] && g_players[i]->in_use)
       mix_player(g_players[i], acc, frames);
   SDL_UnlockMutex(g_reg_lock);
+  __atomic_add_fetch(&g_device_blocks, 1, __ATOMIC_RELAXED);
 
 
   int16_t *out = (int16_t *)stream;
@@ -159,32 +187,48 @@ static void SDLCALL audio_callback(void *ud, Uint8 *stream, int len) {
     static int once = 0;
     if (!once) { once = 1; debugPrintf("[fmod] OpenSL: first non-silent audio to device (peak=%d) -- SOUND IS ON\n", peak); }
   }
+  if (config.debug_audio) {
+    static rd_audiowatch watch;
+    double secs;
+    const int ev = rd_audiowatch_block(&watch, frames, peak, g_dev_rate, &secs);
+    if (ev != RD_AW_NONE) {
+      debugPrintf(ev == RD_AW_SILENT ? "[audio] output silent for %.1f s; players:\n"
+                                     : "[audio] sound back after %.1f s of silence; players:\n", secs);
+      SDL_LockMutex(g_reg_lock);
+      log_players_locked();
+      SDL_UnlockMutex(g_reg_lock);
+    }
+  }
+}
+
+void opensles_audio_watch(void) {
+  static uint32_t last;
+  static int stopped;
+  const uint32_t now = __atomic_load_n(&g_device_blocks, __ATOMIC_RELAXED);
+  if (now == last && !stopped && g_dev) {
+    stopped = 1;
+    debugPrintf("[audio] the audio output callback stopped (%u blocks so far); players:\n", (unsigned)now);
+    SDL_LockMutex(g_reg_lock);
+    log_players_locked();
+    SDL_UnlockMutex(g_reg_lock);
+  } else if (now != last && stopped) {
+    stopped = 0;
+    debugPrintf("[audio] the audio output callback runs again\n");
+  }
+  last = now;
 }
 
 void ensure_device(int rate) {
-  (void)rate; // players run at mixed rates (22050/44100); open at the Switch's
-              // native 48000 and resample each player in mix_player instead of
-              // letting the first player pin the device rate.
+  (void)rate; // players run at mixed rates (22050/44100); the output runs at the Switch's
+              // native 48000 and mix_player resamples each player instead of letting the
+              // first player pin the device rate.
   if (!g_reg_lock)
     g_reg_lock = SDL_CreateMutex();
   if (g_dev)
     return;
-  if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
-    debugPrintf("opensles: SDL audio init failed: %s\n", SDL_GetError());
+  const int have = rd_audioout_open(audio_callback, NULL);
+  if (!have)
     return;
-  }
-  SDL_AudioSpec want, have;
-  SDL_zero(want);
-  want.freq = RD_AUDIO_DEVICE_RATE;
-  want.format = AUDIO_S16SYS;
-  want.channels = 2;
-  want.samples = 1024;
-  want.callback = audio_callback;
-  g_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-  if (!g_dev) {
-    debugPrintf("opensles: SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
-    return;
-  }
-  g_dev_rate = have.freq;
-  SDL_PauseAudioDevice(g_dev, 0);
+  g_dev_rate = have;
+  g_dev = 1;
 }

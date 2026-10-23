@@ -43,6 +43,18 @@ boost_loading=1
 smoke_size=100
 # smoke_amount: percent of the smoke puffs that are emitted, 10 .. 100 (try 50).
 smoke_amount=100
+# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads
+#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after
+#   many cars and tracks new textures stop fitting and show black. Loads take a bit longer.
+texture_transcode=1
+# archive_cache: 1 keeps recently read parts of base.apk and the OBB in memory (64 MB),
+#   shared by every open of them, so loads read each part from the SD card once; 0 reads
+#   the card directly (slower loads).
+archive_cache=1
+# fast_boot: 1 starts faster -- Unity's il2cpp data is copied from the APK to the il2cpp
+#   folder only when the APK changed (not on every launch), and the blank 2 s Unity splash
+#   screen is skipped; 0 = as the original game.
+fast_boot=1
 # debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,
 #   stalls, GC and startup lines. The log is buffered either way.
 debug_log=0
@@ -55,3 +67,13 @@ debug_gl_trace=0
 # debug_ui_nav: 1 logs the elements menu navigation finds on each new screen ([uinav]
 #   lines, with debug_log = 1): names, parents, rectangles.
 debug_ui_nav=0
+# debug_mem: 1 logs where the memory is about every 10 s and after each load, and every
+#   GL error when a texture or buffer is created ([mem] lines, with debug_log = 1).
+debug_mem=0
+# debug_load: 1 logs, for every frame of a second or more (a load), the file traffic the
+#   engine asked for and what reached the SD card, and each engine thread's CPU time
+#   ([load] lines, with debug_log = 1).
+debug_load=0
+# debug_audio: 1 logs when the sound goes silent for 3 s or comes back, when the audio
+#   callback stops, and the engine's volume / mute calls ([audio] lines, with debug_log = 1).
+debug_audio=0

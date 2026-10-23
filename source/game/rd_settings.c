@@ -86,6 +86,18 @@ static const setting SETTINGS[] = {
     "# smoke_size: size of the smoke puffs in percent, %d .. %d (try 50).\n" },
   { "smoke_amount", T_SMOKE, F(smoke_amount),
     "# smoke_amount: percent of the smoke puffs that are emitted, %d .. %d (try 50).\n" },
+  { "texture_transcode", T_SWITCH, F(texture_transcode),
+    "# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads\n"
+    "#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after\n"
+    "#   many cars and tracks new textures stop fitting and show black. Loads take a bit longer.\n" },
+  { "archive_cache", T_SWITCH, F(archive_cache),
+    "# archive_cache: 1 keeps recently read parts of base.apk and the OBB in memory (64 MB),\n"
+    "#   shared by every open of them, so loads read each part from the SD card once; 0 reads\n"
+    "#   the card directly (slower loads).\n" },
+  { "fast_boot", T_SWITCH, F(fast_boot),
+    "# fast_boot: 1 starts faster -- Unity's il2cpp data is copied from the APK to the il2cpp\n"
+    "#   folder only when the APK changed (not on every launch), and the blank 2 s Unity splash\n"
+    "#   screen is skipped; 0 = as the original game.\n" },
   { "debug_log", T_SWITCH, F(debug_log),
     "# debug_log: 1 = full debug.log (send it when reporting problems), 0 = only crashes,\n"
     "#   stalls, GC and startup lines. The log is buffered either way.\n" },
@@ -98,6 +110,16 @@ static const setting SETTINGS[] = {
   { "debug_ui_nav", T_SWITCH, F(debug_ui_nav),
     "# debug_ui_nav: 1 logs the elements menu navigation finds on each new screen ([uinav]\n"
     "#   lines, with debug_log = 1): names, parents, rectangles.\n" },
+  { "debug_mem", T_SWITCH, F(debug_mem),
+    "# debug_mem: 1 logs where the memory is about every 10 s and after each load, and every\n"
+    "#   GL error when a texture or buffer is created ([mem] lines, with debug_log = 1).\n" },
+  { "debug_load", T_SWITCH, F(debug_load),
+    "# debug_load: 1 logs, for every frame of a second or more (a load), the file traffic the\n"
+    "#   engine asked for and what reached the SD card, and each engine thread's CPU time\n"
+    "#   ([load] lines, with debug_log = 1).\n" },
+  { "debug_audio", T_SWITCH, F(debug_audio),
+    "# debug_audio: 1 logs when the sound goes silent for 3 s or comes back, when the audio\n"
+    "#   callback stops, and the engine's volume / mute calls ([audio] lines, with debug_log = 1).\n" },
 };
 #define NSETTINGS ((int)(sizeof SETTINGS / sizeof SETTINGS[0]))
 

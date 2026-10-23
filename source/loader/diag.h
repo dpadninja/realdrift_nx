@@ -17,6 +17,8 @@
 #ifndef DIAG_H
 #define DIAG_H
 
+#include "rd_loadprof.h"   /* rd_loadprof_thread */
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -58,6 +60,10 @@ void diag_frame(int frame);
 
 /* Spawn the watchdog. Idempotent. Call once after boot, before the loop. */
 void diag_watchdog_start(void);
+
+/* debug_load (rd_loadprof.h): fills out[0..max) with every registered engine thread's id, name
+ * and CPU time so far (svcGetInfo ThreadTickCount); returns how many. Any thread. */
+int diag_thread_cpu(rd_loadprof_thread *out, int max);
 
 /* Horizon handle of the registered thread `want` (lock-free), or 0. */
 #include <pthread.h>

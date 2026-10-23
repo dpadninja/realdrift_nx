@@ -105,6 +105,102 @@ int rd_find_blit_type(const rd_image *im, uint64_t *get_settings, uint64_t *get_
   return RD_SITE_OK;
 }
 
+/* ---------------------------------------------------------------- libunity: il2cpp copy */
+static const rd_sigw IL2CPP_COPY[] = {
+  RD_SIG_ADD(0, 31),             /*  0 add  x0, sp, #<source entry>    */
+  RD_SIG_ADD(1, 31),             /*  1 add  x1, sp, #<dest entry>      */
+  RD_SIG_X(0x320003e2),          /*  2 orr  w2, wzr, #0x1 (replace)    */
+  RD_SIG_BL,                     /*  3 bl   CopyDirectory              */
+  { 0x37000000u, 0xfff8001fu },  /*  4 tbnz w0, #0, <ok>               */
+  RD_SIG_LDRX(8, 31),            /*  5 ldr  x8, [sp, #...]             */
+  RD_SIG_LDRX(9, 31),            /*  6 ldr  x9, [sp, #...]             */
+  RD_SIG_ADRP(0),                /*  7 adrp x0, "il2cpp failed to extract resources"  */
+  RD_SIG_ADD(0, 0),              /*  8 add  x0, x0, #...               */
+};
+static const char IL2CPP_COPY_MSG[] = "  il2cpp failed to extract resources";
+#define COPY_DIR_PROLOGUE 0xa9ba6ffcu   /* stp x28, x27, [sp, #-0x60]! */
+#define PAGE_BYTES 0x1000u
+
+int rd_find_il2cpp_copy(const rd_image *im, uint64_t *call, uint64_t *copy, uint64_t *veneer) {
+  size_t i = 0;
+  int n = rd_sig_scan(im->code, im->nwords, IL2CPP_COPY, NPAT(IL2CPP_COPY), &i);
+  if (n == 0) return RD_SITE_NOT_FOUND;
+  if (n > 1) return RD_SITE_AMBIGUOUS;
+  if (!im->cstr) return RD_SITE_BAD_CHECK;
+  const char *s = im->cstr(im->ctx, pair_addr(im, i + 7, i + 8));
+  if (!s || strncmp(s, IL2CPP_COPY_MSG, sizeof IL2CPP_COPY_MSG - 1)) return RD_SITE_BAD_CHECK;
+  const uint64_t fn = rd_a64_branch_target(va_of(im, i + 3), im->code[i + 3]);
+  const size_t f = (size_t)((fn - im->vaddr) / 4);
+  if (fn < im->vaddr || f >= im->nwords || im->code[f] != COPY_DIR_PROLOGUE) return RD_SITE_BAD_CHECK;
+  const uint64_t end = im->vaddr + 4ull * im->nwords;
+  const uint64_t v = (end + 15) & ~15ull;
+  if (v + 4ull * RD_A64_ABS_JUMP_WORDS > ((end + PAGE_BYTES - 1) & ~(uint64_t)(PAGE_BYTES - 1)))
+    return RD_SITE_BAD_CHECK;                        /* no room left in the last code page */
+  *call = va_of(im, i + 3);
+  *copy = fn;
+  *veneer = v;
+  return RD_SITE_OK;
+}
+
+/* ---------------------------------------------------------------- libunity: splash flag */
+static const rd_sigw SPLASH_NAME[] = {
+  RD_SIG_ADRP(1),                /*  0 adrp x1, "m_ShowUnitySplashScreen" */
+  RD_SIG_ADD(3, 20),             /*  1 add  x3, x20, #<field>          */
+  RD_SIG_ADD(1, 1),              /*  2 add  x1, x1, #...               */
+};
+static const rd_sigw SPLASH_CALL[] = {
+  RD_SIG_ADD(0, 20),             /*  0 add  x0, x20, #<splash settings> */
+  RD_SIG_X(0xaa1303e1),          /*  1 mov  x1, x19  (transfer)        */
+  RD_SIG_BL,                     /*  2 bl   SplashSettings::Transfer   */
+};
+static const char SPLASH_FIELD[] = "m_ShowUnitySplashScreen";
+#define SPLASH_TRANSFER_MAX 0x100u   /* bytes from the function's start to the name */
+
+/* Index of the next match of pat at or after `from`, or nwords. */
+static size_t next_match(const rd_image *im, const rd_sigw *pat, size_t plen, size_t from) {
+  size_t k = 0;
+  if (from >= im->nwords || !rd_sig_scan(im->code + from, im->nwords - from, pat, plen, &k))
+    return im->nwords;
+  return from + k;
+}
+
+/* imm of `add xd, xn, #imm` (0 if the word is not one). */
+static uint32_t add_imm(uint32_t insn) {
+  unsigned rd, rn;
+  uint32_t imm = 0;
+  return rd_a64_add_x_imm(insn, &rd, &rn, &imm) ? imm : 0;
+}
+
+int rd_find_splash_flag(const rd_image *im, uint32_t *field) {
+  if (!im->cstr) return RD_SITE_BAD_CHECK;
+  size_t ref = 0;
+  int refs = 0;
+  for (size_t i = next_match(im, SPLASH_NAME, NPAT(SPLASH_NAME), 0); i < im->nwords;
+       i = next_match(im, SPLASH_NAME, NPAT(SPLASH_NAME), i + 1)) {
+    const char *s = im->cstr(im->ctx, pair_addr(im, i, i + 2));
+    if (s && !strcmp(s, SPLASH_FIELD)) { ref = i; refs++; }
+  }
+  if (refs == 0) return RD_SITE_NOT_FOUND;
+  if (refs > 1) return RD_SITE_AMBIGUOUS;
+  const uint64_t at = va_of(im, ref);
+  size_t call = 0;
+  int calls = 0;
+  for (size_t i = next_match(im, SPLASH_CALL, NPAT(SPLASH_CALL), 0); i < im->nwords;
+       i = next_match(im, SPLASH_CALL, NPAT(SPLASH_CALL), i + 1)) {
+    const uint64_t t = rd_a64_branch_target(va_of(im, i + 2), im->code[i + 2]);
+    if (t > at || at - t >= SPLASH_TRANSFER_MAX) continue;
+    int ret = 0;                                     /* the name must be in that function */
+    for (uint64_t a = t; a < at && !ret; a += 4) ret = im->code[(a - im->vaddr) / 4] == RD_A64_RET;
+    if (!ret) { call = i; calls++; }
+  }
+  if (calls == 0) return RD_SITE_NOT_FOUND;
+  if (calls > 1) return RD_SITE_AMBIGUOUS;
+  const uint32_t base = add_imm(im->code[call]), off = add_imm(im->code[ref + 1]);
+  if (!base || !off) return RD_SITE_BAD_CHECK;
+  *field = base + off;
+  return RD_SITE_OK;
+}
+
 /* ---------------------------------------------------------------- il2cpp: skip a clear */
 static const rd_sigw SET_AND_CLEAR[] = {
   RD_SIG_X(RD_A64_SUB_SP_0X20),  /*  0 sub  sp, sp, #0x20              */

@@ -51,6 +51,27 @@ void ra_detach(int fd);
 /* read() through the window: returns the bytes copied (0 at end of file or on a failed refill). */
 long ra_read(struct RaCache *c, int fd, void *buf, size_t count);
 
+/* ---- archive block cache (shim_fs_cache.c over rd_archcache.h) ----------------------- */
+
+/* 1 if read-only opens of `path` go through the archive cache: archive_cache is on and the
+ * path is base.apk or an OBB (by extension). */
+int arch_path(const char *path);
+/* Serves fd, just opened read-only on `path` (`size` bytes), from the cache at position 0;
+ * the fd's own file position is then only scratch. No-op if the file table is full. */
+void arch_attach(int fd, const char *path, long size);
+/* Forgets fd (on close). */
+void arch_detach(int fd);
+/* 1 if fd is served from the cache. */
+int arch_has(int fd);
+/* read() at fd's position, which it advances: the bytes copied, 0 at the end, -1 on error.
+ * With `ahead` (stdio refills), or when the read continues the previous one on fd, missing
+ * data is read to the end of its cache block. */
+long arch_read(int fd, void *buf, size_t n, int ahead);
+/* pread(): like arch_read without `ahead` at `off`, the position untouched. */
+long arch_pread(int fd, void *buf, size_t n, long off);
+/* lseek() of fd's position: the new position, or -1 (errno EINVAL) if it would be negative. */
+long arch_seek(int fd, long off, int whence);
+
 /* ---- synthetic inodes ---------------------------------------------------------------- */
 
 /* fsdev reports st_ino 0 for every file; il2cpp's file sharing table needs distinct inodes. */
@@ -78,9 +99,10 @@ int ofdcache_held(int fd);
 
 /* ---- SD-card commit after writing ---------------------------------------------------- */
 
-/* Remembers that fd was opened for writing (and marks the card dirty). */
-void mark_write_fd(int fd);
-/* On close: commits the SD card if fd was written, so a save is durable at once. */
+/* Remembers that fd was opened for writing on `path` (and marks the card dirty). */
+void mark_write_fd(int fd, const char *path);
+/* On close: commits the SD card if fd was written, so a save is durable at once (files
+ * rd_sdcommit_on_close excludes wait for nx_sd_flush). */
 void commit_write_fd(int fd);
 
 #endif

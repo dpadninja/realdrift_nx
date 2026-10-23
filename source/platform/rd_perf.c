@@ -7,6 +7,11 @@ void rd_pick_resolution(int setting, int docked, int *w, int *h) {
   *h = big ? RD_DOCKED_H : RD_HANDHELD_H;
 }
 
+void rd_boost_start(rd_boost *b, uint64_t now_ns, uint64_t tail_ns) {
+  b->on = 1;
+  b->until_ns = now_ns + tail_ns;
+}
+
 int rd_boost_update(rd_boost *b, uint64_t now_ns, int in_frame, uint64_t frame_start_ns,
                     uint64_t threshold_ns, uint64_t tail_ns) {
   /* now_ns is read before the frame's start: a frame that began in between starts "after" now

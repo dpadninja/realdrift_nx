@@ -44,7 +44,9 @@ static void test_defaults_put_gears_on_dpad(void) {
   CHECK(s.debug_log == RD_LOG_MINIMAL && s.debug_fps_counter == 0);
   CHECK(s.menu_navigation == 1 && s.ui_select == RD_BTN_A && s.ui_back == RD_BTN_B);
   CHECK(s.ui_prev == RD_BTN_L && s.ui_next == RD_BTN_R);
-  CHECK(s.debug_ui_nav == 0);
+  CHECK(s.debug_ui_nav == 0 && s.debug_mem == 0 && s.texture_transcode == 1
+        && s.archive_cache == 1 && s.fast_boot == 1);
+  CHECK(s.debug_load == 0 && s.debug_audio == 0);
 }
 
 /* index of `key` in config.txt order */
@@ -95,7 +97,7 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "bind_ui_back", "B,Y") == idx("bind_ui_back") &&
         s.ui_back == (RD_BTN_B | RD_BTN_Y));
   CHECK(rd_settings_set(&s, "bind_ui_next", "ZR") == idx("bind_ui_next") && s.ui_next == RD_BTN_ZR);
-  CHECK(rd_settings_count() == 25 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_count() == 31 && idx("bind_throttle") == 0);
 }
 
 /* config.txt written with non-default values reads back identically, and a file with missing
@@ -118,6 +120,10 @@ static void test_write_then_read_roundtrip(const char *dir) {
   in.menu_navigation = 0;
   in.ui_select = RD_BTN_X;
   in.debug_ui_nav = 1;
+  in.debug_mem = 1;
+  in.texture_transcode = 0;
+  in.debug_load = 1;
+  in.debug_audio = 1;
   FILE *f = fopen(path, "w"); rd_settings_write(&in, f); fclose(f);
 
   rd_settings out = RD_SETTINGS_DEFAULT;

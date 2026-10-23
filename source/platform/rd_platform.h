@@ -31,12 +31,26 @@ static inline uint64_t rd_now_ns(void) {
 #define RD_GLTRACE_FRAMES       60    /* debug_gl_trace: frames averaged by one capture    */
 #define RD_GLTRACE_PERIOD_FRAMES 600  /* debug_gl_trace: one capture ~every 10 s           */
 #define RD_FPS_WINDOW_NS        (RD_NS_PER_S / 2)  /* FPS overlay refresh (rd_fps.h) */
+#define RD_AUDIO_WATCH_FRAMES   60    /* debug_audio: check the audio output callback ~every 1 s */
+#define RD_LOAD_PROFILE_NS      RD_NS_PER_S        /* debug_load: frames this long are profiled */
+#define RD_MEM_LOG_FRAMES       600   /* debug_mem: a [mem] line ~every 10 s (rd_memstat.h) */
+#define RD_MEM_LOAD_NS          RD_NS_PER_S        /* debug_mem: a frame this long is a load */
+#define RD_MEM_GL_LOG_FIRST     20    /* debug_mem: GL errors logged one by one ...        */
+#define RD_MEM_GL_LOG_EVERY     100   /* ... then every 100th                              */
 /* A per-frame hook that ran within this many frames counts as "active" (in a race). */
 #define RD_ACTIVE_WINDOW_FRAMES 10u
 
 /* ---- I/O buffers ----------------------------------------------------------------------- */
 #define RD_LOG_BUFFER_BYTES            (64 * 1024)   /* debug.log, flushed ~1/s (rd_log.h) */
-#define RD_ARCHIVE_STDIO_BUFFER_BYTES  (128 * 1024)  /* fopen of base.apk / the OBB */
+#define RD_ARCHIVE_STDIO_BUFFER_BYTES  (128 * 1024)  /* fopen of base.apk / the OBB, archive_cache=0 */
+#define RD_ARCHIVE_CACHED_STDIO_BYTES  (16 * 1024)   /* the same with archive_cache: refills from RAM */
+#define RD_ARCHIVE_CACHE_BLOCK         (128 * 1024)  /* archive_cache: unit kept (rd_archcache.h) */
+#define RD_ARCHIVE_CACHE_SECTOR        (16 * 1024)   /* archive_cache: smallest SD read */
+#define RD_ARCHIVE_CACHE_BYTES         (64 << 20)    /* archive_cache: blocks kept in memory */
+#define RD_READLOG_RECORD_NS  (10ull * 1000 * 1000 * 1000) /* launch prefetch: reads recorded (rd_readlog.h); boot needs ~6 s */
+#define RD_READLOG_MAX_READ   (64 * 1024)              /* larger reads are not "small" */
+#define RD_READLOG_MAX_RANGES 16384
+#define RD_READLOG_MAX_BYTES  (8 << 20)
 #define RD_PATH_MAX                    768           /* path buffers on the SD card */
 
 /* Unity probes case sensitivity by creating CASESENSITIVETEST<guid> in the data folder;

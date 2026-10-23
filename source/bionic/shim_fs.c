@@ -115,13 +115,16 @@ int open_fake(const char *path, int flags, ...) {
   if (fd >= 0) {
     if (!writing) ofdcache_adopt(path, fd);   /* may hold this handle open for reuse */
     fd_ino_set(fd, path);
-    if (writing) mark_write_fd(fd);
+    if (writing) mark_write_fd(fd, path);
     struct stat _st;
     if (fstat(fd, &_st) == 0) {
       debugPrintf("[io] open(%s,0x%x) -> %d size=%lld\n", path, flags, fd, (long long)_st.st_size);
-      /* Big read-only asset files (data.unity3d ~424MB, sharedassets*.resource)
-       * get a read-ahead cache so Unity's tiny per-field reads hit RAM, not SD. */
-      if (!writing && _st.st_size >= (4 << 20))
+      /* The game archives go through the shared block cache; other big read-only files
+       * (data.unity3d ~424MB, sharedassets*.resource) get a read-ahead window, so Unity's
+       * tiny per-field reads hit RAM, not SD. */
+      if (!writing && arch_path(path))
+        arch_attach(fd, path, (long)_st.st_size);
+      else if (!writing && _st.st_size >= (4 << 20))
         ra_attach(fd, (long)_st.st_size);
     } else {
       debugPrintf("[io] open(%s,0x%x) -> %d size=?\n", path, flags, fd);
@@ -383,15 +386,17 @@ int statfs_fake(const char *path, void *buf) { (void)path; memset(buf, 0, 0x78);
 static long read_fake_inner(int fd, void *buf, size_t count);
 long read_fake(int fd, void *buf, size_t count) {          /* [perf] read= */
   uint64_t t0 = rd_now_ns();
+  __atomic_add_fetch(&nx_stat_read, 1, __ATOMIC_RELAXED);            /* debug_load */
   long r = read_fake_inner(fd, buf, count);
   __atomic_add_fetch(&nx_stat_read_ns, rd_now_ns() - t0, __ATOMIC_RELAXED);
   if (r > 0) __atomic_add_fetch(&nx_stat_read_bytes, (unsigned long long)r, __ATOMIC_RELAXED);
   return r;
 }
-/* read() routing: fake-pipe fds to fakefd.c, read-ahead fds through their window, the rest to
- * newlib. */
+/* read() routing: fake-pipe fds to fakefd.c, archives through the block cache, read-ahead fds
+ * through their window, the rest to newlib. */
 static long read_fake_inner(int fd, void *buf, size_t count) {
   if (fakefd_is_fake(fd)) return fakefd_read(fd, buf, count);
+  if (arch_has(fd)) return arch_read(fd, buf, count, 0);
   { struct RaCache *c = ra_find(fd); if (c) return ra_read(c, fd, buf, count); }
   /* fsdev can return fewer bytes than requested for a large read; il2cpp's
    * global-metadata.dat loader (and others) assume a single read() fills the
@@ -413,13 +418,19 @@ static long read_fake_inner(int fd, void *buf, size_t count) {
 }
 long write_fake(int fd, const void *buf, size_t count) {
   if (fakefd_is_fake(fd)) return fakefd_write(fd, buf, count);
-  return write(fd, buf, count);
+  const uint64_t t0 = rd_now_ns();                                   /* debug_load */
+  const long r = write(fd, buf, count);
+  __atomic_add_fetch(&nx_stat_write, 1, __ATOMIC_RELAXED);
+  __atomic_add_fetch(&nx_stat_write_ns, rd_now_ns() - t0, __ATOMIC_RELAXED);
+  if (r > 0) __atomic_add_fetch(&nx_stat_write_bytes, (unsigned long long)r, __ATOMIC_RELAXED);
+  return r;
 }
 int close_fake(int fd) {
   /* Descriptor we are deliberately holding open for reuse (see OPEN-FD CACHE): swallow the
    * close. Keep g_fd_ino intact -- the mapping cache keys off it on the next open. */
   if (ofdcache_held(fd)) return 0;
   ra_detach(fd);
+  arch_detach(fd);
   fd_ino_clear(fd);
   if (fakefd_is_fake(fd)) return fakefd_close(fd);
   int r = close(fd);

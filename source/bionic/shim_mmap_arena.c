@@ -127,6 +127,13 @@ void mmap_arena_free(void *addr, size_t len) {
   mutexUnlock(&g_mmap_lock);
 }
 
+size_t mmap_arena_used_locked(size_t *size) {
+  size_t used = 0;
+  for (size_t i = 0; i < mmap_pages; i++) used += mmap_used[i];
+  *size = mmap_usable;
+  return used * MMAP_PAGE;
+}
+
 // Stopgap: when the 256MB-block arena is exhausted by Unity's 9 pools, small
 // (sub-threshold) il2cpp/GC mmaps still need to land somewhere. Serve them from
 // newlib's free heap via memalign and track each so munmap can free it. This is

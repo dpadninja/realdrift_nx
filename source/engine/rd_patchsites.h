@@ -41,6 +41,19 @@ int rd_find_choreo_gate(const rd_image *im, uint64_t *gate, uint64_t *skip);
 int rd_find_blit_type(const rd_image *im, uint64_t *get_settings, uint64_t *get_manager,
                       uint32_t *field);
 
+/* libunity: the per-launch copy of the il2cpp data, `add x0,sp,#src; add x1,sp,#dst;
+ * orr w2,wzr,#1; bl CopyDirectory; tbnz w0,#0,<ok>`, then the "il2cpp failed to extract
+ * resources" message; CopyDirectory starts `stp x28,x27,[sp,#-0x60]!`. *call = the bl,
+ * *copy = CopyDirectory, *veneer = 16 bytes of padding after the code segment, in its last
+ * page (for an absolute jump the bl can reach). */
+int rd_find_il2cpp_copy(const rd_image *im, uint64_t *call, uint64_t *copy, uint64_t *veneer);
+
+/* libunity: the offset of m_ShowUnitySplashScreen in the PlayerSettings object. The splash
+ * settings' Transfer names it (`adrp x1; add x3,x20,#f; add x1,"m_ShowUnitySplashScreen"`),
+ * and PlayerSettings' Transfer calls that function as `add x0,x20,#base; mov x1,x19; bl`:
+ * *field = base + f. Each must be the only one. */
+int rd_find_splash_flag(const rd_image *im, uint32_t *field);
+
 /* An il2cpp method shaped like SleekRenderPostProcess.SetActiveRenderTextureAndClear: a
  * 0x20-byte frame, `bl` (RenderTexture.active = target), then a GL.Clear, then the epilogue
  * `ldp x29,x30,[sp,#0x10]; add sp,sp,#0x20; ret` within n words. *after_set = index of the word
