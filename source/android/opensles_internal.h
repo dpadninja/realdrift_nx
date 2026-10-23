@@ -194,6 +194,10 @@ typedef struct Player {
   int playing;
   int drained;   // consecutive callbacks this playing player produced no audio
   float gain; // linear, from SetVolumeLevel (millibels)
+  int muted;  // SetMute: silent while set, gain kept for when it is cleared
+  // debug_audio counters (opensles_mixer.c reports them): buffers enqueued by the engine,
+  // completion callbacks fired, mixes that found the queue empty
+  uint32_t enqueued, callbacks, underruns;
 
   slBufferQueueCallback cb;
   void *cb_ctx;

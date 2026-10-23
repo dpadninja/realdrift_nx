@@ -101,6 +101,7 @@ One line per module; each file's header comment has the details.
 | `error.{c,h}` | fatal error screen |
 | `nx_crash_handler.{c,h}` | CPU exception handler: registers and backtrace into the log |
 | `diag.{c,h}` | thread registry and stall watchdog: dumps every thread when frames stop |
+| `rd_loadprof_hook.{c,h}` | debug_load: samples file counters and thread CPU around long frames |
 
 ### bionic
 
@@ -136,6 +137,7 @@ One line per module; each file's header comment has the details.
 | `android_native_unity.{c,h}` | NDK: `ANativeWindow` over the Switch window, `ALooper`, sensors, input |
 | `opensles.{c,h}` | the OpenSL ES subset FMOD uses: interfaces, objects, engine, `slCreateEngine` |
 | `opensles_mixer.c` | the SDL2 audio device, the player registry and the software mixer |
+| `rd_audiowatch.{c,h}` | debug_audio: notices silences of the output and their end |
 | `opensles_internal.h` | OpenSL ES types, vtables and the shim's objects (internal) |
 | `egl.{c,h}` | EGL/GLES wrappers: surface size and lifetime, `eglSwapBuffers` with overlays, GL wait timing |
 | `rd_etc2bc.{c,h}` | ETC1/ETC2 blocks re-encoded as S3TC (BC1 / BC3), the only user of the vendored codecs |
@@ -179,6 +181,8 @@ One line per module; each file's header comment has the details.
 | `rd_overlay.{c,h}`, `rd_overlay_gl.c` | 2D drawing on top of the finished frame (cursor, FPS counter) |
 | `rd_fps.{c,h}` | the debug FPS counter: counting and the built-in pixel font |
 | `rd_gpuwait.{c,h}` | time mesa waits for the display and the GPU; real clock rates in the log |
+| `rd_sdstat.c` | debug_load: FS file opens and reads under newlib (what reaches the SD card) |
+| `rd_loadprof.{c,h}` | debug_load: the `[load]` lines (file traffic, CPU per thread) |
 | `rd_jobs.{c,h}` | worker threads on cores 1 and 2, which the engine leaves idle |
 | `rd_memstat.{c,h}` | the debug_mem report: memory snapshot, its log line, when to take one |
 | `rd_perf.{c,h}` | render resolution choice and CPU boost while loading |

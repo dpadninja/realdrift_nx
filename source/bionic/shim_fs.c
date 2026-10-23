@@ -383,6 +383,7 @@ int statfs_fake(const char *path, void *buf) { (void)path; memset(buf, 0, 0x78);
 static long read_fake_inner(int fd, void *buf, size_t count);
 long read_fake(int fd, void *buf, size_t count) {          /* [perf] read= */
   uint64_t t0 = rd_now_ns();
+  __atomic_add_fetch(&nx_stat_read, 1, __ATOMIC_RELAXED);            /* debug_load */
   long r = read_fake_inner(fd, buf, count);
   __atomic_add_fetch(&nx_stat_read_ns, rd_now_ns() - t0, __ATOMIC_RELAXED);
   if (r > 0) __atomic_add_fetch(&nx_stat_read_bytes, (unsigned long long)r, __ATOMIC_RELAXED);

@@ -29,6 +29,10 @@ uint32_t slCreateEngine(void **pEngine, uint32_t numOptions, const void *pEngine
                         uint32_t numInterfaces, const void *pInterfaceIds,
                         const void *pInterfaceRequired);
 
+/* debug_audio, main loop about once a second: logs when the SDL audio callback stopped being
+ * called since the previous check (and when it runs again), with the players' state. */
+void opensles_audio_watch(void);
+
 /* Closes the SDL audio device (at exit). */
 void opensles_shutdown(void);
 

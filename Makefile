@@ -79,6 +79,8 @@ LDFLAGS   = -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir 
 LDFLAGS  += -Wl,--wrap=nwindowDequeueBuffer -Wl,--wrap=nvFenceWait -Wl,--wrap=nwindowSetSwapInterval
 # debug_mem: failures of the allocations under mesa, logged in source/android/rd_memwatch.c
 LDFLAGS  += -Wl,--wrap=memalign -Wl,--wrap=nvMapCreate -Wl,--wrap=nvAddressSpaceMap
+# debug_load: what reaches the SD card, counted in source/platform/rd_sdstat.c
+LDFLAGS  += -Wl,--wrap=fsFsOpenFile -Wl,--wrap=fsFileRead
 
 # mesa GLES3 + EGL + nouveau (force the GLES path); SDL2 for window/HID/audio; zlib.
 LIBS := -lSDL2 -lGLESv2 -lEGL -lglapi -ldrm_nouveau -lpng -lz -lnx -lm

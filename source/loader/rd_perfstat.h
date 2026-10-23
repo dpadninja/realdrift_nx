@@ -13,6 +13,11 @@
 extern unsigned nx_stat_open, nx_stat_commit, nx_stat_mmap, nx_stat_gcstop;
 /* Bytes / time spent in read() + fread() (loading profile). */
 extern volatile unsigned long long nx_stat_read_bytes, nx_stat_read_ns;
+/* debug_load (rd_loadprof.h): the engine's stdio / read calls, and what reached the SD card
+ * (FS file opens and reads, counted in platform/rd_sdstat.c). Atomic. */
+extern volatile unsigned long long nx_stat_fopen, nx_stat_fread, nx_stat_fseek, nx_stat_read;
+extern volatile unsigned long long nx_stat_sd_open, nx_stat_sd_open_ns;
+extern volatile unsigned long long nx_stat_sd_read, nx_stat_sd_read_bytes, nx_stat_sd_read_ns;
 /* Time in eglSwapBuffers, and in GL calls that can wait for the GPU (android/egl). */
 extern volatile unsigned long long nx_stat_swap_ns, nx_stat_glwait_ns;
 /* Time mesa waits for a free window buffer / for GPU fences (platform/rd_gpuwait.c). */

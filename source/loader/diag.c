@@ -300,6 +300,24 @@ Handle diag_handle_for_pthread(pthread_t want) {
   return 0;
 }
 
+int diag_thread_cpu(rd_loadprof_thread *out, int max) {
+  /* ThreadTickCount moved to InfoType 25 in 13.0.0; TickCountInfo_Total = all cores */
+  const u32 info = hosversionAtLeast(13, 0, 0) ? InfoType_ThreadTickCount
+                                               : InfoType_ThreadTickCountDeprecated;
+  int n = 0;
+  for (int i = 0; i < DIAG_MAX_THREADS && n < max; i++) {
+    const DiagThread *t = &g_threads[i];
+    if (!t->in_use || !t->handle) continue;
+    u64 ticks = 0;
+    if (R_FAILED(svcGetInfo(&ticks, info, t->handle, TickCountInfo_Total))) continue;
+    out[n].tid = t->tid;
+    snprintf(out[n].name, sizeof out[n].name, "%s", t->name[0] ? t->name : "?");
+    out[n].cpu_ns = tick_to_ns(ticks);
+    n++;
+  }
+  return n;
+}
+
 /* Pause just long enough to snapshot, RESUME before printing (so the watchdog
  * can't deadlock on a stdio/heap lock the paused thread was holding). */
 static void snapshot_thread(DiagThread *t) {

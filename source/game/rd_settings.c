@@ -105,6 +105,13 @@ static const setting SETTINGS[] = {
   { "debug_mem", T_SWITCH, F(debug_mem),
     "# debug_mem: 1 logs where the memory is about every 10 s and after each load, and every\n"
     "#   GL error when a texture or buffer is created ([mem] lines, with debug_log = 1).\n" },
+  { "debug_load", T_SWITCH, F(debug_load),
+    "# debug_load: 1 logs, for every frame of a second or more (a load), the file traffic the\n"
+    "#   engine asked for and what reached the SD card, and each engine thread's CPU time\n"
+    "#   ([load] lines, with debug_log = 1).\n" },
+  { "debug_audio", T_SWITCH, F(debug_audio),
+    "# debug_audio: 1 logs when the sound goes silent for 3 s or comes back, when the audio\n"
+    "#   callback stops, and the engine's volume / mute calls ([audio] lines, with debug_log = 1).\n" },
 };
 #define NSETTINGS ((int)(sizeof SETTINGS / sizeof SETTINGS[0]))
 

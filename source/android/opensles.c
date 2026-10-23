@@ -18,6 +18,7 @@
 #include "opensles.h"
 #include "util.h"
 #include "opensles_internal.h"
+#include "config.h"   /* debug_audio */
 
 // --- interface-id sentinels -------------------------------------------------
 
@@ -61,6 +62,7 @@ static SLresult bq_Enqueue(void *self, const void *pBuffer, SLuint32 size) {
   p->q[p->q_tail].data = pBuffer;
   p->q[p->q_tail].size = size;
   p->q_tail = next;
+  p->enqueued++;
   SDL_UnlockMutex(p->lock);
   return SL_RESULT_SUCCESS;
 }
@@ -106,8 +108,11 @@ static const SLBufferQueueItf_ bq_vtable = {
 static SLresult play_SetPlayState(void *self, SLuint32 state) {
   Player *p = CONTAINER(self, Player, play_vt);
   SDL_LockMutex(p->lock);
+  const int was = p->playing;
   p->playing = (state == SL_PLAYSTATE_PLAYING);
   SDL_UnlockMutex(p->lock);
+  if (config.debug_audio && was != p->playing)
+    debugPrintf("[audio] player %p: SetPlayState(%u)\n", (void *)p, (unsigned)state);
   if (p->playing) {
     static int once = 0;
     if (!once) { once = 1; debugPrintf("[fmod] OpenSL SetPlayState(PLAYING) -> output running\n"); }
@@ -141,17 +146,28 @@ static SLresult vol_SetVolumeLevel(void *self, SLmillibel level) {
   int mb = (int)level;
   if (mb > 0) mb = 0;
   if (mb < -9600) mb = -9600;
-  p->gain = mb_to_linear(mb);
+  const float g = mb_to_linear(mb);
+  if (config.debug_audio && g != p->gain)
+    debugPrintf("[audio] player %p: SetVolumeLevel(%d mB) -> gain %.3f\n", (void *)p, (int)level, g);
+  p->gain = g;
   return SL_RESULT_SUCCESS;
 }
 static SLresult vol_GetVolumeLevel(void *self, SLmillibel *p) { (void)self; if (p) *p = 0; return SL_RESULT_SUCCESS; }
 static SLresult vol_GetMaxVolumeLevel(void *self, SLmillibel *p) { (void)self; if (p) *p = 0; return SL_RESULT_SUCCESS; }
+/* Mute keeps the volume level: clearing it brings the old level back (setting the gain to 0
+ * here, as before, left a player silent for good after mute -> unmute). */
 static SLresult vol_SetMute(void *self, SLboolean m) {
   Player *p = CONTAINER(self, Player, vol_vt);
-  if (m) p->gain = 0.0f;
+  if (config.debug_audio && (int)!!m != p->muted)
+    debugPrintf("[audio] player %p: SetMute(%d)\n", (void *)p, (int)!!m);
+  p->muted = !!m;
   return SL_RESULT_SUCCESS;
 }
-static SLresult vol_GetMute(void *self, SLboolean *p) { (void)self; if (p) *p = 0; return SL_RESULT_SUCCESS; }
+static SLresult vol_GetMute(void *self, SLboolean *pm) {
+  Player *p = CONTAINER(self, Player, vol_vt);
+  if (pm) *pm = p->muted ? SL_BOOLEAN_TRUE : SL_BOOLEAN_FALSE;
+  return SL_RESULT_SUCCESS;
+}
 static SLresult vol_enable(void *self, SLboolean e) { (void)self; (void)e; return SL_RESULT_SUCCESS; }
 static SLresult vol_isenabled(void *self, SLboolean *p) { (void)self; if (p) *p = 0; return SL_RESULT_SUCCESS; }
 static SLresult vol_setpos(void *self, SLint32 v) { (void)self; (void)v; return SL_RESULT_SUCCESS; }

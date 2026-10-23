@@ -22,6 +22,7 @@
 // fopen with the port's path redirects (fonts, assets, synthetic /proc) and a large stdio
 // buffer for the game archives.
 FILE *fopen_fake(const char *path, const char *mode) {
+  __atomic_add_fetch(&nx_stat_fopen, 1, __ATOMIC_RELAXED);           /* debug_load */
   path = nx_fonts_resolve(path);   /* Switch system fonts as /system/fonts */
   char _rbuf[512];
   path = asset_redirect(path, _rbuf, sizeof _rbuf);
@@ -89,6 +90,7 @@ size_t fwrite_fake(const void *ptr, size_t size, size_t n, FILE *f) {
 size_t fread_fake(void *ptr, size_t size, size_t n, FILE *f) {
   if (is_fake_file(f)) return 0;
   uint64_t t0 = rd_now_ns();                               /* [perf] read= */
+  __atomic_add_fetch(&nx_stat_fread, 1, __ATOMIC_RELAXED);
   size_t r = fread(ptr, size, n, f);
   __atomic_add_fetch(&nx_stat_read_ns, rd_now_ns() - t0, __ATOMIC_RELAXED);
   __atomic_add_fetch(&nx_stat_read_bytes, (unsigned long long)r * size, __ATOMIC_RELAXED);
@@ -104,7 +106,11 @@ int fclose_fake(FILE *f) { if (is_fake_file(f)) return 0;
 int ferror_fake(FILE *f) { if (is_fake_file(f)) return 0; return ferror(f); }
 int feof_fake(FILE *f) { if (is_fake_file(f)) return 1; return feof(f); }
 int fileno_fake(FILE *f) { if (is_fake_file(f)) return ((const uint8_t *)f - &fake_sF[0][0]) / 0x100; return fileno(f); }
-int fseek_fake(FILE *f, long off, int whence) { if (is_fake_file(f)) return -1; return fseek(f, off, whence); }
+int fseek_fake(FILE *f, long off, int whence) {
+  if (is_fake_file(f)) return -1;
+  __atomic_add_fetch(&nx_stat_fseek, 1, __ATOMIC_RELAXED);            /* debug_load */
+  return fseek(f, off, whence);
+}
 long ftell_fake(FILE *f) { if (is_fake_file(f)) return -1; return ftell(f); }
 int getc_fake(FILE *f) { if (is_fake_file(f)) return -1; return getc(f); }
 int fgetc_fake(FILE *f) { if (is_fake_file(f)) return -1; return fgetc(f); }
