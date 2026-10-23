@@ -140,7 +140,7 @@ One line per module; each file's header comment has the details.
 | `egl.{c,h}` | EGL/GLES wrappers: surface size and lifetime, `eglSwapBuffers` with overlays, GL wait timing |
 | `rd_etc2bc.{c,h}` | ETC1/ETC2 blocks re-encoded as S3TC (BC1 / BC3), the only user of the vendored codecs |
 | `rd_etc2bc_gl.{c,h}` | texture_transcode: ETC2 texture storage and uploads turned into S3TC |
-| `etcdec.h`, `stb_dxt.h` | vendored ETC/EAC decoder (iOrange/etcdec) and DXT encoder (nothings/stb) |
+| `third_party/etcdec.h`, `third_party/stb_dxt.h` | vendored ETC/EAC decoder (iOrange/etcdec) and DXT encoder (nothings/stb) |
 | `rd_memwatch.{c,h}` | debug_mem: `[mem]` lines and `glGetError` after GL calls that allocate |
 | `android_log.{c,h}` | liblog and `__assert2` into `debug.log` |
 | `rd_zip.{c,h}` | read single entries of `base.apk` (stored or deflated) for the AssetManager |

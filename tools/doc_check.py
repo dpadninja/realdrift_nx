@@ -4,7 +4,8 @@
    Makefile, YAML) that states its license ("MIT", "license" or "Copyright").
 2. Every function declared in a header under source/ has a comment right above it. A comment
    may cover a group: declarations that follow it on consecutive lines (no blank line) count
-   as documented.
+   as documented. Vendored libraries (a third_party/ directory) keep their own documentation:
+   only rule 1 applies to them.
 3. Every test function in tests/c/ (test_*) has a comment right above it: the case it checks
    and why. (Python tests: ruff's docstring rules.)
 
@@ -138,7 +139,7 @@ def check_file(path: Path) -> list[Problem]:
     """All documentation problems of one file."""
     text = path.read_text(errors="replace")
     problems = check_license(path, text) if is_code(path) else []
-    if path.suffix == ".h" and "source" in path.parts:
+    if path.suffix == ".h" and "source" in path.parts and "third_party" not in path.parts:
         problems += check_header_functions(path, text)
     if path.suffix == ".c" and path.name.startswith("test_") and "tests" in path.parts:
         problems += check_test_functions(path, text)

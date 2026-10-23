@@ -42,7 +42,7 @@ coverage:
 	RD_COVERAGE=1 uv run pytest -q --cov=tools --cov-report=term \
 	    --cov-report=html:$(HOST_BUILD)/coverage/python --cov-fail-under=$(COV_MIN_PY)
 	uv run gcovr --root . --object-directory $(HOST_BUILD)/cov --filter source/ \
-	    --exclude source/android/etcdec.h --exclude source/android/stb_dxt.h --print-summary \
+	    --exclude source/android/third_party/ --print-summary \
 	    --html-details $(HOST_BUILD)/coverage/c/index.html --fail-under-line $(COV_MIN_C)
 else
 ifeq ($(strip $(DEVKITPRO)),)

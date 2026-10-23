@@ -13,8 +13,8 @@
 #pragma GCC diagnostic ignored "-Wmissing-prototypes"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wsign-compare"
-#include "etcdec.h"
-#include "stb_dxt.h"
+#include "third_party/etcdec.h"
+#include "third_party/stb_dxt.h"
 #pragma GCC diagnostic pop
 
 /* GL format codes (GLES 3.0, OES_compressed_ETC1_RGB8_texture, EXT_texture_compression_s3tc,
