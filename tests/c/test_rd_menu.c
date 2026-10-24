@@ -1,4 +1,4 @@
-/* sources: source/game/rd_menu.c */
+/* sources: source/game/rd_menu.c source/engine/rd_uinav.c */
 /* Host unit test of rd_menu (menu navigation rules). MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
@@ -141,6 +141,101 @@ static void test_prev_next(void) {
   CHECK(rd_menu_find(two, 2, "Top/ButtonArrowLeft") == -1);
 }
 
+#define LIST 0x50                       /* the ScrollRect the cells are in */
+
+/* A card of the track carousel (as logged on the console: 394x506, 422 px apart). */
+static rd_ugui_target card(uintptr_t id, float x) {
+  rd_ugui_target t = target(id, "TrackCellView(Clone)", "Container", x, 174);
+  t.t.r.w = 394;
+  t.t.r.h = 506;
+  t.scroll = LIST;
+  return t;
+}
+
+/* The flat rd_uinav targets of t[0..n). */
+static void flatten(const rd_ugui_target *t, int n, rd_uinav_target *flat) {
+  for (int i = 0; i < n; i++) flat[i] = t[i].t;
+}
+
+/* A horizontal list over the whole screen width, content 4248 px wide, at position x. */
+static rd_ugui_scroll carousel(float x) {
+  return (rd_ugui_scroll){ .horizontal = 1, .x = x, .y = 1,
+                           .view = { 0, 174, 1280, 506 }, .content = { 0, 174, 4248, 506 } };
+}
+
+/* Track selection: right from the last card on screen scrolls the carousel one card (422 px
+ * of a 2968 px range) and moves again afterwards; between cards on screen it only moves; at
+ * the end of the list nothing scrolls and the plain move applies. Up leaves the list
+ * (for the back button), and without a scroll state the move is rd_uinav_step's. */
+static void test_carousel(void) {
+  rd_ugui_target t[] = { target(1, "ButtonBack", "TrackSelectionPanel", 0, 0),
+                         card(2, 28), card(3, 450), card(4, 872) };
+  t[0].t.r.w = t[0].t.r.h = 68;
+  rd_uinav_target flat[4];
+  flatten(t, 4, flat);
+  const rd_ugui_scroll start = carousel(0.0f), end = carousel(1.0f), mid = carousel(0.5f);
+  rd_menu_move mv = rd_menu_plan_move(t, flat, 4, 3, RD_UINAV_RIGHT, &start);
+  CHECK(mv.focus == 3 && mv.scroll && !mv.vertical && mv.again);
+  CHECK(mv.to > 422.0f / 2968.0f - 1e-4f && mv.to < 422.0f / 2968.0f + 1e-4f);
+  mv = rd_menu_plan_move(t, flat, 4, 1, RD_UINAV_RIGHT, &start);
+  CHECK(mv.focus == 2 && !mv.scroll);
+  mv = rd_menu_plan_move(t, flat, 4, 3, RD_UINAV_RIGHT, &end);
+  CHECK(mv.focus == -1 && !mv.scroll);
+  mv = rd_menu_plan_move(t, flat, 4, 1, RD_UINAV_LEFT, &start);   /* the first card, at the start: */
+  CHECK(mv.focus == 0 && !mv.scroll);                              /* out to the back button */
+  mv = rd_menu_plan_move(t, flat, 4, 1, RD_UINAV_LEFT, &mid);
+  CHECK(mv.focus == 1 && mv.scroll && mv.again && mv.to < 0.5f);
+  mv = rd_menu_plan_move(t, flat, 4, 2, RD_UINAV_UP, &mid);       /* the list does not scroll up */
+  CHECK(mv.focus == 0 && !mv.scroll);
+  mv = rd_menu_plan_move(t, flat, 4, 3, RD_UINAV_RIGHT, NULL);
+  CHECK(mv.focus == -1 && !mv.scroll);
+  CHECK(rd_menu_plan_move(t, flat, 4, 0, RD_UINAV_RIGHT, &start).scroll == 0);   /* not in a list */
+}
+
+/* A card that sticks out of the viewport gets the focus and the list scrolls by exactly the
+ * part outside (ensure visible), without a second move. */
+static void test_carousel_partial(void) {
+  rd_ugui_target t[] = { card(1, 450), card(2, 1100) };
+  rd_uinav_target flat[2];
+  flatten(t, 2, flat);
+  const rd_ugui_scroll s = carousel(0.25f);
+  const rd_menu_move mv = rd_menu_plan_move(t, flat, 2, 0, RD_UINAV_RIGHT, &s);
+  const float want = 0.25f + (1100.0f + 394.0f - 1280.0f) / 2968.0f;
+  CHECK(mv.focus == 1 && mv.scroll && !mv.again && mv.to > want - 1e-4f && mv.to < want + 1e-4f);
+}
+
+/* A vertical list (y = 1 at the top): down from the last row shown lowers y by one row,
+ * clamped at 0; up at the top does not scroll. */
+static void test_vertical_list(void) {
+  rd_ugui_target t[3];
+  for (int i = 0; i < 3; i++) {
+    t[i] = target((uintptr_t)(i + 1), "Row", "Content", 0, 100.0f + 100.0f * (float)i);
+    t[i].t.r.h = 90;
+    t[i].scroll = LIST;
+  }
+  rd_uinav_target flat[3];
+  flatten(t, 3, flat);
+  rd_ugui_scroll s = { .vertical = 1, .x = 0, .y = 1, .view = { 0, 100, 100, 300 },
+                       .content = { 0, 100, 100, 1300 } };
+  rd_menu_move mv = rd_menu_plan_move(t, flat, 3, 2, RD_UINAV_DOWN, &s);
+  CHECK(mv.focus == 2 && mv.scroll && mv.vertical && mv.again);
+  CHECK(mv.to > 0.9f - 1e-4f && mv.to < 0.9f + 1e-4f);         /* 100 px of a 1000 px range */
+  CHECK(!rd_menu_plan_move(t, flat, 3, 0, RD_UINAV_UP, &s).scroll);
+  s.y = 0.05f;
+  mv = rd_menu_plan_move(t, flat, 3, 2, RD_UINAV_DOWN, &s);
+  CHECK(mv.scroll && mv.to == 0.0f);
+  s.content.h = 300;                                           /* nothing to scroll */
+  CHECK(!rd_menu_plan_move(t, flat, 3, 2, RD_UINAV_DOWN, &s).scroll);
+}
+
+/* A scene load is over when another scene is active, or after the time limit (a load that
+ * leaves the active scene as it was must not hide the frame for good). */
+static void test_load_over(void) {
+  CHECK(!rd_menu_load_over(5, 5, 1));
+  CHECK(rd_menu_load_over(5, 9, 1));
+  CHECK(rd_menu_load_over(5, 5, RD_MENU_LOAD_MAX_FRAMES));
+}
+
 int main(void) {
   RUN(test_back_names);
   RUN(test_back_target);
@@ -151,5 +246,9 @@ int main(void) {
   RUN(test_slider_delta);
   RUN(test_pause_rule);
   RUN(test_prev_next);
+  RUN(test_carousel);
+  RUN(test_carousel_partial);
+  RUN(test_vertical_list);
+  RUN(test_load_over);
   return g_failures != 0;
 }

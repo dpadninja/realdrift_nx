@@ -47,11 +47,14 @@ static struct {
 typedef struct { void *fn; const void *mi; } method;
 static struct {
   method interactable, target_graphic, canvas, corners, current, input_module, raycast_all,
-         ped_ctor, set_position, s_value, s_set_value, s_min, s_max, s_whole, s_direction;
+         ped_ctor, set_position, s_value, s_set_value, s_min, s_max, s_whole, s_direction,
+         sr_horizontal, sr_vertical, sr_x, sr_set_x, sr_y, sr_set_y, sr_content, sr_viewport,
+         sr_stop;
 } m;
 
 static void *g_selectable_type;              /* System.Type of Selectable */
 static void *g_canvas_type;                  /* System.Type of Canvas */
+static void *g_scroll_type;                  /* System.Type of ScrollRect */
 static void *g_ped_class;
 static uint32_t g_results_off, g_item_go_off;
 static uint32_t g_cached_ptr_off;            /* UnityEngine.Object.m_CachedPtr */
@@ -122,6 +125,16 @@ int rd_ugui_init(void) {
   m.s_max          = find(slider, "get_maxValue", 0, &missing);
   m.s_whole        = find(slider, "get_wholeNumbers", 0, &missing);
   m.s_direction    = find(slider, "get_direction", 0, &missing);
+  void *scroll  = rd_il2cpp_class(api, ASM_UI, NS_UI, "ScrollRect");
+  m.sr_horizontal  = find(scroll, "get_horizontal", 0, &missing);
+  m.sr_vertical    = find(scroll, "get_vertical", 0, &missing);
+  m.sr_x           = find(scroll, "get_horizontalNormalizedPosition", 0, &missing);
+  m.sr_set_x       = find(scroll, "set_horizontalNormalizedPosition", 1, &missing);
+  m.sr_y           = find(scroll, "get_verticalNormalizedPosition", 0, &missing);
+  m.sr_set_y       = find(scroll, "set_verticalNormalizedPosition", 1, &missing);
+  m.sr_content     = find(scroll, "get_content", 0, &missing);
+  m.sr_viewport    = find(scroll, "get_viewport", 0, &missing);
+  m.sr_stop        = find(scroll, "StopMovement", 0, &missing);
   uint32_t go_off = 0;
   if (!module || !rd_il2cpp_field_offset(api, module, FLD_RESULTS, &g_results_off) ||
       !result || !rd_il2cpp_field_offset(api, result, FLD_GO, &go_off) ||
@@ -131,12 +144,13 @@ int rd_ugui_init(void) {
   if (api->class_get_type) {
     g_selectable_type = api->type_get_object(api->class_get_type(selectable));
     if (canvas_cls) g_canvas_type = api->type_get_object(api->class_get_type(canvas_cls));
+    if (scroll) g_scroll_type = api->type_get_object(api->class_get_type(scroll));
   }
   if (vector3) g_corners = api->array_new(vector3, 4);
   if (g_corners) api->gchandle_new(g_corners, 1);
   void *object = rd_il2cpp_class(api, ASM_CORE, NS_UNITY, "Object");
   if (!object || !rd_il2cpp_field_offset(api, object, FLD_CACHED_PTR, &g_cached_ptr_off)) missing++;
-  if (!g_selectable_type || !g_canvas_type || !g_corners || !api->array_length || !api->class_get_name) missing++;
+  if (!g_selectable_type || !g_canvas_type || !g_scroll_type || !g_corners || !api->array_length || !api->class_get_name) missing++;
   g_state = missing ? -1 : 1;
   debugPrintf("[uinav] uGUI %s\n", missing ? "lookups missing -- menu navigation OFF" : "ready");
   return g_state;
@@ -154,17 +168,14 @@ static void copy_name(void *obj, char *buf) {
   buf[n] = '\0';
 }
 
-/* Screen rectangle (top-left origin) of a Selectable; 0 if its canvas is unknown. The canvas
- * comes from the target graphic, else from the nearest Canvas up the hierarchy. */
-static int screen_rect(void *sel, int screen_h, rd_uinav_rect *out) {
-  void *graphic = CALL(m.target_graphic, void *(*)(void *, const void *), sel);
-  void *canvas = graphic ? CALL(m.canvas, void *(*)(void *, const void *), graphic) : NULL;
-  if (!canvas) canvas = ic.in_parent(ic.game_object(sel), g_canvas_type);
+/* Screen rectangle (top-left origin) of a RectTransform drawn by `canvas`; 0 if there is no
+ * canvas or no camera for it. */
+static int rect_on_canvas(void *rect_tr, void *canvas, int screen_h, rd_uinav_rect *out) {
   void *root = canvas ? ic.root_canvas(canvas) : NULL;
   if (!root) return 0;
   void *camera = ic.render_mode(root) == RENDER_OVERLAY ? NULL : ic.world_camera(root);
   if (ic.render_mode(root) != RENDER_OVERLAY && !camera) return 0;
-  CALL(m.corners, void (*)(void *, void *, const void *), ic.transform(sel), g_corners);
+  CALL(m.corners, void (*)(void *, void *, const void *), rect_tr, g_corners);
   const v3 *w = (const v3 *)((char *)g_corners + RD_IL2CPP_ARRAY_DATA);
   float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
   for (int i = 0; i < 4; i++) {
@@ -177,6 +188,15 @@ static int screen_rect(void *sel, int screen_h, rd_uinav_rect *out) {
   }
   *out = (rd_uinav_rect){ x0, (float)screen_h - y1, x1 - x0, y1 - y0 };
   return 1;
+}
+
+/* Screen rectangle of a Selectable; 0 if its canvas is unknown. The canvas comes from the
+ * target graphic, else from the nearest Canvas up the hierarchy. */
+static int screen_rect(void *sel, int screen_h, rd_uinav_rect *out) {
+  void *graphic = CALL(m.target_graphic, void *(*)(void *, const void *), sel);
+  void *canvas = graphic ? CALL(m.canvas, void *(*)(void *, const void *), graphic) : NULL;
+  if (!canvas) canvas = ic.in_parent(ic.game_object(sel), g_canvas_type);
+  return rect_on_canvas(ic.transform(sel), canvas, screen_h, out);
 }
 
 /* The scratch PointerEventData for the current EventSystem, or NULL. */
@@ -281,6 +301,7 @@ int rd_ugui_scan(rd_ugui_target *out, int max, int screen_w, int screen_h,
     copy_name(go, t->name);
     void *ptr = ic.parent(ic.transform(sel));
     copy_name(ptr ? ic.game_object(ptr) : NULL, t->parent);
+    t->scroll = (uintptr_t)ic.in_parent(go, g_scroll_type);
     k++;
   }
   return k;
@@ -301,4 +322,28 @@ void rd_ugui_slider_set(uintptr_t id, float v) {
 
 int rd_ugui_alive(const void *obj) {
   return obj && g_cached_ptr_off && FIELD(obj, g_cached_ptr_off, void *) != NULL;
+}
+
+int rd_ugui_scroll_get(uintptr_t id, int screen_h, rd_ugui_scroll *out) {
+  void *sr = (void *)id;
+  if (!rd_ugui_alive(sr)) return 0;
+  void *canvas = ic.in_parent(ic.game_object(sr), g_canvas_type);
+  void *content = CALL(m.sr_content, void *(*)(void *, const void *), sr);
+  void *view = CALL(m.sr_viewport, void *(*)(void *, const void *), sr);
+  if (!rd_ugui_alive(view)) view = ic.transform(sr);    /* no viewport: the ScrollRect's own */
+  if (!rd_ugui_alive(content) || !rect_on_canvas(view, canvas, screen_h, &out->view) ||
+      !rect_on_canvas(content, canvas, screen_h, &out->content)) return 0;
+  out->horizontal = CALL(m.sr_horizontal, uint8_t (*)(void *, const void *), sr);
+  out->vertical = CALL(m.sr_vertical, uint8_t (*)(void *, const void *), sr);
+  out->x = CALL(m.sr_x, float (*)(void *, const void *), sr);
+  out->y = CALL(m.sr_y, float (*)(void *, const void *), sr);
+  return 1;
+}
+
+void rd_ugui_scroll_set(uintptr_t id, int vertical, float value) {
+  void *sr = (void *)id;
+  if (!rd_ugui_alive(sr)) return;
+  CALL(m.sr_stop, void (*)(void *, const void *), sr);
+  if (vertical) CALL(m.sr_set_y, void (*)(void *, float, const void *), sr, value);
+  else CALL(m.sr_set_x, void (*)(void *, float, const void *), sr, value);
 }

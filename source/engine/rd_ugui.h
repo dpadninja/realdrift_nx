@@ -8,7 +8,9 @@
  * already for a Screen Space - Overlay canvas, through the canvas camera otherwise. Elements
  * covering more than RD_UGUI_MAX_SHARE of the screen are left out: they are touch areas and
  * dialog backdrops (e.g. the main menu's car-rotation button), not something to focus.
- * Knows Unity, not the game. All names are resolved through il2cpp at run time.
+ * Each target names its nearest ScrollRect (a list or carousel), which rd_ugui_scroll_get /
+ * _set read and move: cells outside a scrolled list do not exist (EnhancedScroller recycles
+ * them), so reaching them means scrolling. Knows Unity, not the game. All names are resolved through il2cpp at run time.
  * Main thread, outside the engine's own C# calls (between frames). MIT (see LICENSE). */
 #ifndef RD_UGUI_H
 #define RD_UGUI_H
@@ -28,6 +30,7 @@ typedef struct {
   char parent[RD_UGUI_NAME];         /* the parent GameObject's name ("" at the root) */
   char cls[RD_UGUI_NAME];            /* the component's class (Button, Toggle, Slider, ...) */
   float tap_x, tap_y;                /* where a tap reaches it (screen px, top-left origin) */
+  uintptr_t scroll;                  /* the nearest UnityEngine.UI.ScrollRect above it, or 0 */
 } rd_ugui_target;
 
 /* Told about each Selectable a scan leaves out (debug logging): its name, why, and for
@@ -37,6 +40,15 @@ typedef void (*rd_ugui_reject_fn)(const char *name, const char *why, const char 
 /* A Slider's state. direction is Slider.Direction: 0 left-to-right, 1 right-to-left,
  * 2 bottom-to-top, 3 top-to-bottom. */
 typedef struct { float value, min, max; int whole, direction; } rd_ugui_slider;
+
+/* A ScrollRect's state: the axes it scrolls along, its normalized position as ScrollRect has
+ * it (x: 0 = left end shown, y: 1 = top end shown) and the screen rectangles (px, top-left
+ * origin) of its viewport and of its content. */
+typedef struct {
+  int horizontal, vertical;
+  float x, y;
+  rd_uinav_rect view, content;
+} rd_ugui_scroll;
 
 /* Resolves the classes, methods and icalls once. 1 = ready, 0 = UnityEngine.UI not loaded
  * yet (call again), -1 = something is missing (logged once; navigation stays off). */
@@ -58,5 +70,13 @@ int rd_ugui_alive(const void *obj);
 void rd_ugui_slider_get(uintptr_t id, rd_ugui_slider *out);
 /* Slider.value = v: the slider clamps it and calls the game's onValueChanged, as a drag does. */
 void rd_ugui_slider_set(uintptr_t id, float v);
+
+/* Reads the ScrollRect `id` (rd_ugui_target.scroll of the latest scan) on a screen screen_h
+ * px high. 0 if it is gone or its canvas is unknown (out is then undefined). */
+int rd_ugui_scroll_get(uintptr_t id, int screen_h, rd_ugui_scroll *out);
+/* Moves the ScrollRect `id` to a normalized position on one axis (vertical = 0: x, 1: y) and
+ * stops its inertia, so its own velocity does not carry it further. The list follows as after
+ * a drag (EnhancedScroller fills the cells that come into view). */
+void rd_ugui_scroll_set(uintptr_t id, int vertical, float value);
 
 #endif
