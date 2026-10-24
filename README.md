@@ -13,7 +13,6 @@ It does not emulate a phone and does not reimplement the game. The game's own ar
 Playable: menus, races, sound, controller driving and saving work on hardware.
 
 Known issues:
-- loading still takes a moment: ~5.5 s from start to the garage and 2–3 s per track (the first start after installing, or after replacing the APK, takes ~11 s while Unity copies its data)
 - heavy tire smoke can drop the frame rate (the GPU is the limit); `smoke_size` / `smoke_amount` in `config.txt` make it lighter
 
 Limitations:
