@@ -65,6 +65,11 @@
 /* ---- menu navigation (rd_menu_hook.c; the uGUI names are in engine/rd_ugui.c) -------- */
 #define RD_ICALL_GET_KEY_DOWN     "UnityEngine.Input::GetKeyDownInt"     /* wrapped: Escape */
 #define RD_ICALL_ACTIVE_SELF      "UnityEngine.GameObject::get_activeSelf"
+/* Every SceneManager.LoadScene* ends here; the game's are synchronous (PersistentData.StartRace,
+ * RaceManager.PreLoadScene): the next frame loads for seconds and the last one stays shown. */
+#define RD_ICALL_LOAD_SCENE \
+  "UnityEngine.SceneManagement.SceneManager::LoadSceneAsyncNameIndexInternal_Injected"   /* wrapped */
+#define RD_ICALL_ACTIVE_SCENE     "UnityEngine.SceneManagement.SceneManager::GetActiveScene_Injected"
 /* The loading screen between menu and track: drawn with the legacy GUILayer, invisible to uGUI
  * raycasts, while the menu's buttons still exist behind it. */
 #define RD_CLS_LOADING_SCREEN     "LoadingScreenRandomizer"

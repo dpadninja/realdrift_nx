@@ -3,6 +3,8 @@
 #include <strings.h>
 #include "rd_menu.h"
 
+#define AT_END (1.0f - RD_MENU_SCROLL_EPS)
+
 /* 1 if `word` occurs in `s` ignoring case and is not the start of one of `except`. */
 static int has_word(const char *s, const char *word, const char *const except[]) {
   const size_t wl = strlen(word);
@@ -117,4 +119,75 @@ float rd_menu_edit_move(rd_menu_edit *e, int delta) {
 float rd_menu_edit_end(rd_menu_edit *e, int cancel) {
   e->on = 0;
   return cancel ? e->orig : e->value;
+}
+
+/* Start and length of r along the axis (vertical = 1: y). */
+static float lo_of(const rd_uinav_rect *r, int vertical) { return vertical ? r->y : r->x; }
+static float len_of(const rd_uinav_rect *r, int vertical) { return vertical ? r->h : r->w; }
+
+/* +1 if `dir` moves towards the far end of the axis (right, down), -1 towards the near one. */
+static int sign_of(int dir) { return dir == RD_UINAV_RIGHT || dir == RD_UINAV_DOWN ? 1 : -1; }
+
+/* Normalized position after scrolling the content by px screen pixels (> 0: towards its far
+ * end), clamped to 0..1. ScrollRect's y is 1 at the top, so it falls as the list goes down. */
+static float scrolled(const rd_ugui_scroll *s, int vertical, float px) {
+  const float range = len_of(&s->content, vertical) - len_of(&s->view, vertical);
+  float v = vertical ? s->y - px / range : s->x + px / range;
+  if (v < 0.0f) v = 0.0f;
+  if (v > 1.0f) v = 1.0f;
+  return v;
+}
+
+/* 1 if the list can still scroll towards the side `sign` (+1 far end) of the axis. */
+static int can_scroll(const rd_ugui_scroll *s, int vertical, int sign) {
+  if (len_of(&s->content, vertical) - len_of(&s->view, vertical) <= 1.0f) return 0;
+  const float v = vertical ? 1.0f - s->y : s->x;     /* 0 = near end shown, as for x */
+  return sign > 0 ? v < AT_END : v > RD_MENU_SCROLL_EPS;
+}
+
+/* One cell along the axis: the centre distance from t[from] to the nearest other target of
+ * the same list in its row / column, else t[from]'s own size. */
+static float cell_pitch(const rd_ugui_target *t, int n, int from, int vertical) {
+  const rd_uinav_rect *f = &t[from].t.r;
+  float best = 0.0f;
+  for (int i = 0; i < n; i++) {
+    const rd_uinav_rect *r = &t[i].t.r;
+    if (i == from || t[i].scroll != t[from].scroll) continue;
+    const float across_lo = vertical ? r->x : r->y, across_hi = across_lo + (vertical ? r->w : r->h);
+    const float f_lo = vertical ? f->x : f->y, f_hi = f_lo + (vertical ? f->w : f->h);
+    if (across_hi <= f_lo || across_lo >= f_hi) continue;          /* another row / column */
+    float d = (lo_of(r, vertical) + 0.5f * len_of(r, vertical)) -
+              (lo_of(f, vertical) + 0.5f * len_of(f, vertical));
+    if (d < 0.0f) d = -d;
+    if (d > 1.0f && (best == 0.0f || d < best)) best = d;
+  }
+  return best > 0.0f ? best : len_of(f, vertical);
+}
+
+rd_menu_move rd_menu_plan_move(const rd_ugui_target *t, const rd_uinav_target *flat, int n,
+                               int from, int dir, const rd_ugui_scroll *s) {
+  const int next = rd_uinav_step(flat, n, from, dir);
+  rd_menu_move mv = { .focus = next };
+  const int vertical = dir == RD_UINAV_UP || dir == RD_UINAV_DOWN;
+  if (!s || from < 0 || from >= n || !t[from].scroll || !(vertical ? s->vertical : s->horizontal))
+    return mv;
+  const int sign = sign_of(dir);
+  if (next >= 0 && t[next].scroll == t[from].scroll) {            /* ensure it is visible */
+    const rd_uinav_rect *r = &t[next].t.r;
+    const float view_lo = lo_of(&s->view, vertical), view_hi = view_lo + len_of(&s->view, vertical);
+    const float lo = lo_of(r, vertical), hi = lo + len_of(r, vertical);
+    const float px = hi > view_hi ? hi - view_hi : lo < view_lo ? lo - view_lo : 0.0f;
+    if (px * (float)sign > 0.5f && can_scroll(s, vertical, sign))
+      mv = (rd_menu_move){ next, 1, vertical, scrolled(s, vertical, px), 0 };
+    return mv;
+  }
+  if (can_scroll(s, vertical, sign)) {                            /* scroll one cell first */
+    const float px = (float)sign * cell_pitch(t, n, from, vertical);
+    mv = (rd_menu_move){ from, 1, vertical, scrolled(s, vertical, px), 1 };
+  }
+  return mv;
+}
+
+int rd_menu_load_over(int32_t before, int32_t now, uint32_t frames) {
+  return now != before || frames >= RD_MENU_LOAD_MAX_FRAMES;
 }
