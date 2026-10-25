@@ -11,6 +11,15 @@ static void test_active_only_when_changed(void) {
   CHECK(rd_smoke_active(RD_SMOKE_PERCENT_ORIG, 50));
 }
 
+/* Nothing is emitted while time stands still (pause menu, timeScale 0): those particles would
+ * never age and the engine's particle buffers would grow until the heap breaks. Slow motion
+ * still emits. */
+static void test_emit_allowed(void) {
+  CHECK(!rd_smoke_emit_allowed(0.0f));
+  CHECK(!rd_smoke_emit_allowed(-1.0f));
+  CHECK(rd_smoke_emit_allowed(0.1f) && rd_smoke_emit_allowed(1.0f));
+}
+
 static int kept(int amount, int n) {
   int acc = 0, k = 0;
   for (int i = 0; i < n; i++) k += rd_smoke_keep(&acc, amount);
@@ -53,6 +62,7 @@ static void test_set(void) {
 int main(void) {
   RUN(test_active_only_when_changed);
   RUN(test_keep);
+  RUN(test_emit_allowed);
   RUN(test_scale_size);
   RUN(test_set);
   return g_failures != 0;

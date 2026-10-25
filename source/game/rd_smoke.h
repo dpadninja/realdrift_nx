@@ -6,6 +6,10 @@
  * icall ParticleSystem::Internal_EmitOld(ref Particle). That icall is wrapped (rd_icall.h):
  * for the smoke systems it scales the particle's start size and lets only a share of the
  * particles through. Both knobs at 100 % = the original game (the default).
+ * Whatever the knobs, no particle is emitted while game time stands still (the pause menu sets
+ * Time.timeScale = 0): Wheel.Update keeps emitting smoke with the slip frozen at the pause,
+ * the particles never age, and the engine grows its particle buffers until the heap breaks
+ * (a crash in realloc after a few minutes of pause; analysis/research/27-pause-smoke-crash.md).
  * Pure logic here (host-tested, tests/c/test_rd_smoke.c); the il2cpp glue in rd_smoke_hook.c.
  * MIT (see LICENSE). */
 #ifndef RD_SMOKE_H
@@ -23,6 +27,9 @@ int rd_smoke_active(int size, int amount);
 /* Emit filter: 1 = let this particle through. *acc carries the remainder between calls, so
  * exactly `amount` of every 100 particles pass, spread evenly. */
 int rd_smoke_keep(int *acc, int amount);
+
+/* 1 if a particle may be emitted at this Time.timeScale: not while time stands still. */
+int rd_smoke_emit_allowed(float time_scale);
 
 /* A start size scaled to `percent`. */
 float rd_smoke_scale_size(float size, int percent);
