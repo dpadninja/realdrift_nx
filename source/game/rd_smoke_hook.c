@@ -7,6 +7,8 @@
  * (ParticleTrack, ParticleGrass, ...) are found by their renderer's material,
  * RD_SMOKE_MATERIAL, from the race HUD hook every RD_SMOKE_SCAN_FRAMES -- they are created
  * with the track and per surface. Outside a race the set is empty, so nothing is touched.
+ * Independently of the knobs, nothing is emitted while Time.timeScale is 0 (the pause menu):
+ * see rd_smoke.h.
  * icalls take the managed arguments only, `this` first. */
 #include <stdint.h>
 #include "rd_smoke.h"
@@ -32,10 +34,26 @@ static int g_state;                                      /* 0 = not tried, 1 = r
 static rd_smoke_set g_smoke;                             /* smoke GameObjects of this race */
 static uint32_t g_last_frame, g_last_scan;
 static int g_acc;                                        /* rd_smoke_keep remainder */
+static float (*g_time_scale)(void);                      /* Time.get_timeScale icall */
+static int g_time_scale_tried;
 
-/* Wrapper of ParticleSystem::Internal_EmitOld: in a race, for the smoke systems, drops a share
- * of the particles and scales the size of the rest, then calls the engine. */
+/* 1 if game time runs (Time.timeScale > 0), looked up on the first emit (icalls are all
+ * registered by then); 1 if the icall is missing (logged once), as before. */
+static int time_runs(void) {
+  if (!g_time_scale_tried) {
+    g_time_scale_tried = 1;
+    g_time_scale = g_il2cpp.resolve_icall ? g_il2cpp.resolve_icall(RD_ICALL_TIME_SCALE) : NULL;
+    if (!g_time_scale)
+      debugPrintf("[smoke] icall " RD_ICALL_TIME_SCALE " not found: smoke is emitted on pause\n");
+  }
+  return !g_time_scale || rd_smoke_emit_allowed(g_time_scale());
+}
+
+/* Wrapper of ParticleSystem::Internal_EmitOld: nothing while time stands still; in a race, for
+ * the smoke systems, drops a share of the particles and scales the size of the rest, then calls
+ * the engine. */
 static void ic_emit_old(void *ps, void *particle) {
+  if (!time_runs()) return;
   const int in_race = port_frame_count() - g_last_frame <= RD_ACTIVE_WINDOW_FRAMES;
   if (g_state > 0 && in_race && ps && particle && g_smoke.n &&
       rd_smoke_set_has(&g_smoke, g.game_object(ps))) {

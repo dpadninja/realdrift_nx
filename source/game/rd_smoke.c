@@ -12,6 +12,10 @@ int rd_smoke_keep(int *acc, int amount) {
   return 1;
 }
 
+int rd_smoke_emit_allowed(float time_scale) {
+  return time_scale > 0.0f;
+}
+
 float rd_smoke_scale_size(float size, int percent) {
   return size * (float)percent / (float)RD_SMOKE_PERCENT_ORIG;
 }

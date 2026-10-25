@@ -61,6 +61,7 @@
 #define RD_ICALL_OBJECT_NAME      "UnityEngine.Object::GetName"
 #define RD_ICALL_GAME_OBJECT      "UnityEngine.Component::get_gameObject"
 #define RD_ICALL_SHARED_MATERIAL  "UnityEngine.Renderer::GetSharedMaterial"
+#define RD_ICALL_TIME_SCALE       "UnityEngine.Time::get_timeScale"   /* 0 on the pause menu */
 
 /* ---- menu navigation (rd_menu_hook.c; the uGUI names are in engine/rd_ugui.c) -------- */
 #define RD_ICALL_GET_KEY_DOWN     "UnityEngine.Input::GetKeyDownInt"     /* wrapped: Escape */
