@@ -16,23 +16,14 @@ Known issues:
 - heavy tire smoke can drop the frame rate (the GPU is the limit); `smoke_size` / `smoke_amount` in `config.txt` make it lighter
 
 Limitations:
-- network-related functions are obviously not supported
+- the game runs offline: its online features (coin shop, Google sign-in, cloud save, online leaderboards, Share, links to web pages) are hidden, and the leaderboard button reads STATISTICS and shows this console's records (`offline_ui`)
 
 ## Features
 - **Controller driving.** Physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
-- **Separate clutch** (`Y` by default), which the original game does not have: you can now use the clutch separately (e.g. for low-powered cars).
-- **Pause** on a button (`+` by default).
-- **Touch driving controls hidden** during races (optional).
-- **Controller menu navigation:** a frame marks the selected menu element. The D-pad or the left stick moves it to the neighbour in that direction, as with a TV remote; `A` selects, `B` goes back. `L` / `R` switch the car in the garage, the leaderboard track and the settings and profile tabs. On a slider, `A` starts editing: left / right change the value, `A` keeps it, `B` restores the old one. `A` or `B` skip the track preview before a race. The touchscreen keeps working.
-- **On-screen cursor** instead of the navigation (`menu_navigation=0`): the left stick moves it, `A` taps, `+` toggles it outside a race, `-` toggles gyro pointing; a USB mouse works too.
+- **Controller menu navigation:** a frame marks the selected menu element. The D-pad or the left stick moves it to the neighbor in that direction, as with a TV remote; `A` selects, `B` goes back. `L` / `R` switch the car in the garage, the leaderboard track and the settings and profile tabs. On a slider, `A` starts editing: left / right change the value, `A` keeps it, `B` restores the old one. `A` or `B` skip the track preview before a race. The touchscreen keeps working.
 - **Render resolution:** 720p handheld / 1080p docked by default, or fixed.
-- **Lighter tyre smoke** (optional): smaller and fewer smoke puffs for a steady frame rate.
-- **Faster loading:** recently read parts of the APK and OBB are kept in memory and shared by every open of them, so a part is read from the SD card once (tracks load about twice as fast). The thousands of small reads Unity makes at every start are saved once into `.realdrift_nx-reads` and served from memory on later starts, like an OS launch prefetch. Unity's il2cpp data is copied from the APK only when the APK changed, not on every start, and the game's blank 2-second splash screen is skipped.
-- **No black textures:** the game's ETC2 textures, which the Switch GPU cannot read, are re-encoded to S3TC on load (on the otherwise idle CPU cores). Mesa used to unpack them to 4–8 times the memory, so after many cars and tracks new objects turned black.
-- **Steady sound:** the audio output runs on its own thread over libnx `audout`. SDL's Switch audio could stop for good when a load kept its thread off the CPU, leaving the game silent until restart.
-- **FPS counter** (optional) in the top-left corner.
-- **Saves** are stored on the SD card (`prefs.kv` next to the game).
-- No per-version offsets: engine patch sites are found at runtime by instruction patterns, and game classes are found by name through the IL2CPP API.
+- **Separate clutch** (`Y` by default), which the original game does not have: you can now use the clutch separately (e.g. for low-powered cars).
+- **Lighter tire smoke** (optional): smaller and fewer smoke puffs for a steady frame rate.
 
 ## Supported game version
 
@@ -96,8 +87,8 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 | `bind_gear_up` | `UP` | shift up |
 | `bind_gear_down` | `DOWN` | shift down |
 | `bind_camera` | `NONE` | switch the camera view |
-| `bind_steer_left` | `LEFT` | steer left (when the left stick is centred) |
-| `bind_steer_right` | `RIGHT` | steer right (when the left stick is centred) |
+| `bind_steer_left` | `LEFT` | steer left (when the left stick is centered) |
+| `bind_steer_right` | `RIGHT` | steer right (when the left stick is centered) |
 | `bind_pause` | `PLUS` | pause / resume the race (also closes the pause menu) |
 | `stick_deadzone` | `0.15` | left stick deadzone, `0.0`–`0.9` |
 
@@ -120,7 +111,7 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 | `archive_cache` | `0` / `1` | `1` | keep recently read parts of the APK and OBB in memory (64 MB) and prefetch the small reads made at start; `0` reads the SD card directly (slower loads) |
 | `fast_boot` | `0` / `1` | `1` | copy Unity's il2cpp data from the APK only when the APK changed, and skip the blank Unity splash screen; `0` = as the original game |
 | `texture_transcode` | `0` / `1` | `1` | store the game's ETC2 textures as S3TC, which the GPU reads directly; `0` leaves them to Mesa, which unpacks them to 4–8x the memory, and after many cars and tracks new objects show black |
-| `smoke_size` | `10`–`100` | `100` | size of the tyre smoke puffs in percent; `100` = original. Lower it (e.g. `50`) if heavy smoke drops the frame rate |
+| `smoke_size` | `10`–`100` | `100` | size of the tire smoke puffs in percent; `100` = original. Lower it (e.g. `50`) if heavy smoke drops the frame rate |
 | `smoke_amount` | `10`–`100` | `100` | percent of the smoke puffs emitted; `100` = original. `50` together with `smoke_size=50` keeps the frame rate steady in heavy smoke |
 
 ### Debugging
@@ -140,6 +131,8 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 | Key | Values | Default | Meaning |
 |---|---|---|---|
 | `hide_touch_controls` | `0` / `1` | `1` | hide the on-screen driving buttons in races |
+| `offline_ui` | `0` / `1` | `1` | hide the features that need the internet (see Status) and keep Unity Analytics from queueing its events on the SD card; `0` = as in the game |
+| `country` | two letters / empty | `JP` | the flag used until one is picked in the profile; empty = the game's own choice (Andorra, as its web lookup fails offline) |
 
 When reporting a problem, set `debug_log=1`, reproduce it and attach `sdmc:/switch/realdrift_nx/debug.log`.
 
@@ -169,11 +162,11 @@ These targets need a host C compiler and uv, not devkitPro. Tests that need extr
 | Path | Contents |
 |---|---|
 | `source/` | the loader, one directory per layer: `loader`, `bionic`, `android`, `engine`, `platform`, `game` (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Our modules are `rd_*`. Named values live in one place: `rd_game.h` (game identity and files), `rd_game_symbols.h` (C# names), `rd_platform.h`, `rd_device.h`, `rd_settings.c` (config keys) |
-| `tools/` | `stage_sd.py`, `release.py` (release package), `game.py`, `import_coverage.py`, `jni_natives.py`, `il2cpp_symbolize.py`, `find_patch_sites.c` |
+| `tools/` | `stage_sd.py`, `release.py` (release package), `game.py`, `import_coverage.py`, `jni_natives.py`, `il2cpp_symbolize.py`, `find_patch_sites.c`, `hostc.py`, `doc_check.py`; research tools `il2cpp_dump.py`, `il2cpp_find.py`, `il2cpp_disasm.py`, `unity_ref.py` |
 | `.github/workflows/ci.yml` | on every push / pull request: lint, tests with coverage floors, the Switch build |
 | `.github/workflows/release.yml` | on a `vX.Y.Z` tag: builds the `.nro`, runs the tests, publishes the release zip |
 | `tests/` | pytest suite; `tests/c/` host-side C unit tests |
-| `docs/` | [architecture](docs/ARCHITECTURE.md), [C style](docs/CODING_STYLE.md), [Python style](docs/PYTHON_STYLE.md) |
+| `docs/` | [architecture](docs/ARCHITECTURE.md), [C style](docs/CODING_STYLE.md), [Python style](docs/PYTHON_STYLE.md), [research tools](docs/RESEARCH_TOOLS.md) |
 
 Game files (`original/`, `analysis/`, `sd/`) are git-ignored. Never commit them.
 
