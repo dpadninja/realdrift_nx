@@ -35,10 +35,13 @@ static struct {
   void (*set_enabled)(void *behaviour, uint8_t value);
   void (*get_anchored)(void *rect_transform, rd_vec2 *out);
   void (*set_anchored)(void *rect_transform, const rd_vec2 *value);
+  void (*active_scene)(int32_t *handle);         /* GetActiveScene_Injected(out Scene) */
 } ic;
 static method g_get_text, g_set_text;
 static void *g_input_type, *g_text_type;
 static void *g_label;                            /* RD_OFFLINE_STATISTICS, a managed string */
+static int32_t g_scene;                          /* the active scene's handle */
+static uint32_t g_scene_frame;                   /* when it last changed */
 static uint32_t g_lb_type_off, g_lb_mode_off;    /* PersistentData.leaderboardType / RaceMode */
 
 /* A scene object of one type, looked up again when it is gone. */
@@ -81,6 +84,7 @@ static int install(void) {
   ic.set_enabled   = g_il2cpp.resolve_icall(RD_ICALL_SET_ENABLED);
   ic.get_anchored  = g_il2cpp.resolve_icall(RD_ICALL_GET_ANCHORED);
   ic.set_anchored  = g_il2cpp.resolve_icall(RD_ICALL_SET_ANCHORED);
+  ic.active_scene  = g_il2cpp.resolve_icall(RD_ICALL_ACTIVE_SCENE);
   g_get_text = text_method(RD_MTH_GET_TEXT, 0);
   g_set_text = text_method(RD_MTH_SET_TEXT, 1);
   g_input_type  = type_of(RD_ASM_TMP, RD_NS_TMP, RD_CLS_TMP_INPUT);
@@ -92,7 +96,8 @@ static int install(void) {
   if (g_label) g_il2cpp.gchandle_new(g_label, 1);               /* kept: never collected */
   if (!ic.find_objects || !ic.transform || !ic.find_path || !ic.game_object ||
       !ic.get_component || !ic.active_self || !ic.set_active || !ic.get_enabled ||
-      !ic.set_enabled || !ic.get_anchored || !ic.set_anchored || !g_get_text.fn || !g_set_text.fn ||
+      !ic.set_enabled || !ic.active_scene || !ic.get_anchored || !ic.set_anchored ||
+      !g_get_text.fn || !g_set_text.fn ||
       !g_input_type || !g_text_type || !g_root[RD_OFFLINE_MENU].type ||
       !g_root[RD_OFFLINE_RACE].type || !g_persistent.type || !g_label ||
       !rd_il2cpp_field_offset(&g_il2cpp, pd, RD_FLD_LEADERBOARD_TYPE, &g_lb_type_off) ||
@@ -128,14 +133,13 @@ static void *resolve(int i, void *root_tr) {
   return NULL;
 }
 
-/* f.obj: kept while alive, else looked for again every RD_OFFLINE_FIND_FRAMES. 1 if the
+/* f.obj: kept while alive, else looked for again when rd_offline_find_due says so. 1 if the
  * object was found just now. */
-static int refind(found *f) {
+static int refind(found *f, uint32_t now) {
   if (rd_ugui_alive(f->obj)) return 0;
   f->obj = NULL;
-  const uint32_t now = port_frame_count();
-  if (f->frame && now - f->frame < RD_OFFLINE_FIND_FRAMES) return 0;
-  f->frame = now;
+  if (!rd_offline_find_due(now, g_scene_frame, f->frame)) return 0;
+  f->frame = now ? now : 1;                      /* 0 means "never looked" */
   void *arr = ic.find_objects(f->type);
   f->obj = arr && g_il2cpp.array_length(arr) ? rd_il2cpp_array_at(arr, 0) : NULL;
   return f->obj != NULL;
@@ -189,20 +193,28 @@ static void apply(int i) {
 
 void rd_offline_frame(void) {
   if (!config.offline_ui || g_state < 0) return;
-  if ((port_frame_count() % RD_OFFLINE_FRAMES) != 0) return;
+  const uint32_t now = port_frame_count();
   if (!g_state) {
+    if (now % RD_OFFLINE_FRAMES) return;
     g_state = install();
     if (g_state <= 0) return;
   }
+  int32_t scene = 0;
+  ic.active_scene(&scene);
+  if (scene != g_scene) {
+    g_scene = scene;
+    g_scene_frame = now;
+  }
+  if (!rd_offline_check_due(now, g_scene_frame)) return;
   for (int r = 0; r < RD_OFFLINE_ROOTS; r++) {
-    if (refind(&g_root[r])) resolve_root((rd_offline_root)r);
+    if (refind(&g_root[r], now)) resolve_root((rd_offline_root)r);
     if (!g_root[r].obj) continue;
     for (int i = 0; i < g_n; i++)
       if (g_targets[i].root == (rd_offline_root)r) apply(i);
   }
   /* The online boards cannot load: the statistics screen always shows the device's own,
    * sorted by points (rd_offline.h). Only in the menu: races leave the fields alone. */
-  refind(&g_persistent);
+  refind(&g_persistent, now);
   if (g_persistent.obj && g_root[RD_OFFLINE_MENU].obj) {
     FIELD(g_persistent.obj, g_lb_type_off, int32_t) = RD_LEADERBOARD_LOCAL;
     FIELD(g_persistent.obj, g_lb_mode_off, int32_t) = RD_RACE_MODE_DRIFT;

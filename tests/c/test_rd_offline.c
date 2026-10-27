@@ -77,10 +77,40 @@ static void test_wants(void) {
   CHECK(locked == 1);
 }
 
+/* Outside a scene change the targets are checked every RD_OFFLINE_FRAMES frames and a
+ * missing root (MenuManager in a race) is looked for every RD_OFFLINE_FIND_FRAMES: a
+ * FindObjectsOfType per frame for the whole race would only make garbage. */
+static void test_cadence_settled(void) {
+  const uint32_t scene = 100, now = scene + RD_OFFLINE_FRESH_FRAMES + RD_OFFLINE_FRAMES * 10;
+  int checks = 0;
+  for (uint32_t f = now; f < now + RD_OFFLINE_FRAMES * 4; f++)
+    checks += rd_offline_check_due(f, scene);
+  CHECK(checks == 4);
+  CHECK(!rd_offline_find_due(now, scene, now - 1));
+  CHECK(!rd_offline_find_due(now, scene, now - RD_OFFLINE_FIND_FRAMES + 1));
+  CHECK(rd_offline_find_due(now, scene, now - RD_OFFLINE_FIND_FRAMES));
+}
+
+/* Right after a scene change everything happens every frame, so the menu loaded after a race
+ * never shows "+" long enough to be focused (the log showed it ~8 frames after the load); the
+ * first lookup ever (last = 0) is always due. */
+static void test_cadence_fresh(void) {
+  const uint32_t scene = 1000;
+  for (uint32_t f = scene; f < scene + RD_OFFLINE_FRESH_FRAMES; f++) {
+    CHECK(rd_offline_check_due(f, scene));
+    CHECK(rd_offline_find_due(f, scene, f - 1));
+  }
+  CHECK(!rd_offline_find_due(scene + RD_OFFLINE_FRESH_FRAMES, scene,
+                             scene + RD_OFFLINE_FRESH_FRAMES - 1));
+  CHECK(rd_offline_find_due(5000, 0, 0));
+}
+
 int main(void) {
   RUN(test_table_well_formed);
   RUN(test_covers_online_features);
   RUN(test_wants);
   RUN(test_move);
+  RUN(test_cadence_settled);
+  RUN(test_cadence_fresh);
   return g_failures != 0;
 }

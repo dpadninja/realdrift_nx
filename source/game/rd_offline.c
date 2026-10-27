@@ -42,3 +42,16 @@ const rd_offline_target *rd_offline_targets(int *n) {
 int rd_offline_wants(const rd_offline_target *t, int switch_name) {
   return !t->needs_switch_name || switch_name;
 }
+
+/* 1 while frame `now` is within RD_OFFLINE_FRESH_FRAMES of the last scene change. */
+static int fresh(uint32_t now, uint32_t scene) {
+  return now - scene < RD_OFFLINE_FRESH_FRAMES;
+}
+
+int rd_offline_check_due(uint32_t now, uint32_t scene) {
+  return fresh(now, scene) || now % RD_OFFLINE_FRAMES == 0;
+}
+
+int rd_offline_find_due(uint32_t now, uint32_t scene, uint32_t last) {
+  return !last || fresh(now, scene) || now - last >= RD_OFFLINE_FIND_FRAMES;
+}

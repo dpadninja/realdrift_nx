@@ -16,13 +16,19 @@
  * The targets are paths below the scene's root object (MenuManager or RaceManager), found with
  * Transform.Find, so inactive ones are found too. The game turns some of them on again
  * (ManageSignIn after its sign-in check), so they are checked again every RD_OFFLINE_FRAMES.
+ * Right after a scene change they are looked for and checked every frame for a while: a menu
+ * loaded after a race showed "+" for half a second, long enough for menu navigation to focus
+ * it (debug.log 2026-10-27).
  * Pure logic here (host-tested, tests/c/test_rd_offline.c); the il2cpp glue in rd_offline_hook.c.
  * MIT (see LICENSE). */
 #ifndef RD_OFFLINE_H
 #define RD_OFFLINE_H
 
+#include <stdint.h>
+
 #define RD_OFFLINE_FRAMES        4    /* the targets are checked this often (frames) */
 #define RD_OFFLINE_FIND_FRAMES   30   /* a missing scene root is looked for this often */
+#define RD_OFFLINE_FRESH_FRAMES  90   /* after a scene change: every frame, this long */
 #define RD_OFFLINE_MAX_TARGETS   32   /* the table fits the glue's per-target array */
 #define RD_OFFLINE_STATISTICS    "STATISTICS"   /* the leaderboard button's new label */
 #define RD_OFFLINE_IAP_WIDTH     70.0f /* MainPanel/ButtonIAP's width (canvas units) */
@@ -51,6 +57,13 @@ const rd_offline_target *rd_offline_targets(int *n);
 
 /* 1 if target t applies with the name taken from the Switch profile (switch_name) or not. */
 int rd_offline_wants(const rd_offline_target *t, int switch_name);
+
+/* Frame counters (port_frame_count) for the two cadences below; scene = when the active scene
+ * last changed. 1 if the targets are due to be checked in frame `now`. */
+int rd_offline_check_due(uint32_t now, uint32_t scene);
+/* 1 if a missing scene root is due to be looked for in frame `now`; last = the previous
+ * lookup, 0 = never. */
+int rd_offline_find_due(uint32_t now, uint32_t scene, uint32_t last);
 
 /* ---- glue (rd_offline_hook.c) -------------------------------------------------------- */
 /* Called from the main loop between engine frames (main thread); with offline_ui = 0 it
