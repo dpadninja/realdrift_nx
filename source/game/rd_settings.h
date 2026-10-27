@@ -39,6 +39,7 @@
 
 #define RD_DEADZONE_DEFAULT  0.15f
 #define RD_DEADZONE_MAX      0.9f
+#define RD_COUNTRY_SIZE      3      /* "JP" + terminator (ISO 3166-1 alpha-2) */
 
 typedef struct {
   rd_bindings binds;                 /* driving: buttons per action, steering, deadzone */
@@ -47,6 +48,9 @@ typedef struct {
   int         menu_navigation;       /* 1: focus frame + A/B in the menus, no cursor (rd_menu.h) */
   uint64_t    ui_select, ui_back;    /* menu navigation: tap the focused element / go back */
   uint64_t    ui_prev, ui_next;      /* menu navigation: previous / next car, tab, track */
+  int         offline_ui;            /* 1: online features hidden in the menus (rd_offline.h) */
+  int         switch_name;           /* 1: player name = Switch nickname (rd_player.h) */
+  char        country[RD_COUNTRY_SIZE];   /* default flag, "" = the game's (rd_player.h) */
   int         render_res;            /* RD_RES_AUTO / RD_RES_720 / RD_RES_1080 (rd_perf.h) */
   int         boost_loading;         /* 1: CPU boost while a loading frame runs (rd_perf.h) */
   int         smoke_size;            /* percent of the smoke puffs' size (rd_smoke.h) */
@@ -79,6 +83,9 @@ typedef struct {
   .menu_navigation = 1,                                               \
   .ui_select = RD_BTN_A, .ui_back = RD_BTN_B,                         \
   .ui_prev = RD_BTN_L, .ui_next = RD_BTN_R,                           \
+  .offline_ui = 1,                                                    \
+  .switch_name = 1,                                                   \
+  .country = "JP",                                                    \
   .render_res = RD_RES_AUTO,                                          \
   .boost_loading = 1,                                                 \
   .smoke_size = RD_SMOKE_PERCENT_ORIG,                                \

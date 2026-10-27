@@ -38,7 +38,8 @@ through the documented entry points of the upper layer's headers.
    (`bionic/imports.c`, `engine/unity_imports.c`, `bionic/rd_imports.c`); locate and apply
    engine patches by instruction pattern (`engine/rd_patches.c`, `engine/rd_patchsites.c`).
 5. Run the libraries' init arrays, build the fake JNI world (`android/jni_fake.c`,
-   `android/unity_jni.c`), call `JNI_OnLoad` of libunity and libil2cpp.
+   `android/unity_jni.c`; the player name and flag go into the loaded prefs,
+   `game/rd_player_hook.c`), call `JNI_OnLoad` of libunity and libil2cpp.
 6. Recover the `UnityPlayer` natives by name from libunity's `RegisterNatives` table and drive
    the lifecycle the Java side would: `initJni` → surface → resume → focus.
 7. Main loop: one `nativeRender` per frame, paced to 60 Hz.
@@ -192,6 +193,7 @@ One line per module; each file's header comment has the details.
 | `rd_audioout.{c,h}` | the sound output: libnx audout fed by our thread (in place of SDL's Switch audio, which could hang) |
 | `rd_memstat.{c,h}` | the debug_mem report: memory snapshot, its log line, when to take one |
 | `rd_perf.{c,h}` | render resolution choice and CPU boost while loading |
+| `rd_profile.{c,h}` | the Switch user's profile nickname (account service, at boot) |
 
 ### game
 
@@ -205,6 +207,8 @@ One line per module; each file's header comment has the details.
 | `rd_smoke.{c,h}`, `rd_smoke_hook.c` | lighter tyre smoke through the particle Emit icall |
 | `rd_menu.{c,h}`, `rd_menu_hook.c` | menus on the controller: focus frame, A taps, B goes back (synthetic touch) |
 | `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
+| `rd_offline.{c,h}`, `rd_offline_hook.c` | offline_ui: the menus' online features hidden (shop, Google, cloud, online boards, Share, links) |
+| `rd_player.{c,h}`, `rd_player_hook.c` | player name from the Switch profile and the default flag, written into the prefs at boot |
 
 `main.c` and the import tables (`imports.c`, `unity_imports.c`, `rd_imports.c`) are composition
 points: they may include headers of every layer to wire implementations to the engine.

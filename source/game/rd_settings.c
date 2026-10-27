@@ -21,6 +21,7 @@ typedef enum {
   T_DEADZONE,    /* float, 0 .. RD_DEADZONE_MAX */
   T_SMOKE,       /* int percent, RD_SMOKE_PERCENT_MIN .. RD_SMOKE_PERCENT_ORIG */
   T_RESOLUTION,  /* int, auto | 720 | 1080 */
+  T_COUNTRY,     /* char[RD_COUNTRY_SIZE]: "" or two letters (ISO 3166-1 alpha-2) */
 } type;
 
 /* Range of a numeric type; 1 = float, 2 = int, 0 = not numeric. */
@@ -73,6 +74,18 @@ static const setting SETTINGS[] = {
     "# bind_ui_prev / bind_ui_next: previous / next car in the garage, tab, leaderboard track.\n"
     "#   bind_ui_select and bind_ui_back also skip the track preview before a race.\n" },
   { "bind_ui_next",     T_BUTTONS, F(ui_next),   "" },
+
+  { "offline_ui", T_SWITCH, F(offline_ui),
+    "\n# Offline.\n"
+    "# offline_ui: 1 hides what needs the internet: the coin shop (+), Google sign-in, cloud\n"
+    "#   save / load, online leaderboards (the button reads STATISTICS and shows this\n"
+    "#   console's records), Share and links to web pages. 0 = the menus as in the game.\n" },
+  { "switch_name", T_SWITCH, F(switch_name),
+    "# switch_name: 1 = the player name is the Switch profile's nickname (set at every launch,\n"
+    "#   the name field in the profile is locked); 0 = the name typed in the game.\n" },
+  { "country", T_COUNTRY, F(country),
+    "# country: the flag (two letters, e.g. JP, DE, US) used until one is picked in the\n"
+    "#   profile; empty = the game's own choice (Andorra, as its web lookup fails offline).\n" },
 
   { "render_resolution", T_RESOLUTION, F(render_res),
     "\n# Performance.\n"
@@ -216,6 +229,17 @@ static int parse(const setting *st, const char *value, void *field) {
       else if (!strcmp(v, "1080")) *(int *)field = RD_RES_1080;
       else return -1;
       return 0;
+    case T_COUNTRY: {
+      char *out = field;
+      size_t len = strlen(v);
+      if (len && len != RD_COUNTRY_SIZE - 1) return -1;
+      for (size_t i = 0; i < len; i++) {
+        if (!isalpha((unsigned char)v[i])) return -1;
+        out[i] = (char)toupper((unsigned char)v[i]);
+      }
+      out[len] = '\0';
+      return 0;
+    }
   }
   return -1;
 }
@@ -232,6 +256,7 @@ static void format(const setting *st, const void *field, char *buf, size_t n) {
       snprintf(buf, n, "%s", r == RD_RES_720 ? "720" : r == RD_RES_1080 ? "1080" : "auto");
       break;
     }
+    case T_COUNTRY:  snprintf(buf, n, "%s", (const char *)field); break;
   }
 }
 

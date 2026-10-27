@@ -97,7 +97,7 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "bind_ui_back", "B,Y") == idx("bind_ui_back") &&
         s.ui_back == (RD_BTN_B | RD_BTN_Y));
   CHECK(rd_settings_set(&s, "bind_ui_next", "ZR") == idx("bind_ui_next") && s.ui_next == RD_BTN_ZR);
-  CHECK(rd_settings_count() == 31 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_count() == 34 && idx("bind_throttle") == 0);
 }
 
 /* config.txt written with non-default values reads back identically, and a file with missing
@@ -140,11 +140,28 @@ static void test_write_then_read_roundtrip(const char *dir) {
   CHECK(part.debug_log == 0 && part.binds.action[RD_ACT_CAMERA] == 0);
 }
 
+/* country takes two letters in any case (stored upper case, as the game's flag codes) or
+ * nothing (the game's own choice); anything else keeps the previous value. By default the
+ * online features are hidden, the name comes from the Switch and the default flag is JP. */
+static void test_offline_keys(void) {
+  rd_settings s = RD_SETTINGS_DEFAULT;
+  CHECK(s.offline_ui == 1 && s.switch_name == 1 && !strcmp(s.country, "JP"));
+  CHECK(rd_settings_set(&s, "country", "de") == idx("country") && !strcmp(s.country, "DE"));
+  CHECK(rd_settings_set(&s, "country", " RU ") >= 0 && !strcmp(s.country, "RU"));
+  CHECK(rd_settings_set(&s, "country", "RUS") == -1 && !strcmp(s.country, "RU"));
+  CHECK(rd_settings_set(&s, "country", "R") == -1);
+  CHECK(rd_settings_set(&s, "country", "1A") == -1 && !strcmp(s.country, "RU"));
+  CHECK(rd_settings_set(&s, "country", "") >= 0 && s.country[0] == '\0');
+  CHECK(rd_settings_set(&s, "offline_ui", "0") >= 0 && s.offline_ui == 0);
+  CHECK(rd_settings_set(&s, "switch_name", "0") >= 0 && s.switch_name == 0);
+}
+
 int main(int argc, char **argv) {
   RUN(test_parse_buttons);
   RUN(test_format_roundtrip);
   RUN(test_defaults_put_gears_on_dpad);
   RUN(test_settings_set);
+  RUN(test_offline_keys);
   test_write_then_read_roundtrip(argc > 1 ? argv[1] : ".");
   return g_failures != 0;
 }

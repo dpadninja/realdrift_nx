@@ -22,6 +22,8 @@
 #include "rd_patches.h"
 #include "rd_sleek.h"
 #include "rd_menu.h"
+#include "rd_offline.h"
+#include "rd_player.h"
 #include "libc_shim.h"
 #include "nx_fonts.h"
 #include "util.h"
@@ -248,6 +250,7 @@ static void boot_run_init_arrays(void) {
 static void boot_jni_and_input(void) {
   jni_init();
   unity_environment_init(RD_GAME_HOME);
+  rd_player_boot();                                        /* name / country into the prefs */
   android_native_update_mode();
   android_native_input_init();
   debugPrintf("[boot] jni + env + hid ready\n");
@@ -361,6 +364,7 @@ static void run_main_loop(void) {
     g_rd_in_frame = 0;
     if (!_alive) break;
     rd_menu_frame();                                       /* controller menu navigation */
+    rd_offline_frame();                                    /* online features hidden */
 
     {
       const uint64_t _ns = rd_now_ns() - t0;
@@ -404,7 +408,9 @@ static void run_main_loop(void) {
 int main(int argc, char *argv[]) {
   (void)argc; (void)argv;
   nx_stat_start_ns = rd_now_ns();                          /* [load] "at" times */
-  socketInitializeDefault();
+  /* No socketInitializeDefault(): the port is offline. The game's socket / DNS imports are
+   * stubs that fail (bionic/shim_libc.c) and there is no Java to reach the network through
+   * (analysis/research/32-offline-ui.md); without the BSD service nothing can go online. */
   debugPrintf(RD_LOG_TAG_BANNER " realdrift_nx start (Real Drift " RD_GAME_VERSION_NAME ", Unity " RD_UNITY_VERSION ") ===\n");
 
   boot_enter_game_folder();
@@ -465,7 +471,6 @@ int main(int argc, char *argv[]) {
 
   opensles_shutdown();
   SDL_Quit();
-  socketExit();
 
   debug_log_flush();   /* Buffered debug.log */
   extern void NX_NORETURN __libnx_exit(int rc);
