@@ -79,10 +79,8 @@ static const setting SETTINGS[] = {
     "\n# Offline.\n"
     "# offline_ui: 1 hides what needs the internet: the coin shop (+), Google sign-in, cloud\n"
     "#   save / load, online leaderboards (the button reads STATISTICS and shows this\n"
-    "#   console's records), Share and links to web pages. 0 = the menus as in the game.\n" },
-  { "switch_name", T_SWITCH, F(switch_name),
-    "# switch_name: 1 = the player name is the Switch profile's nickname (set at every launch,\n"
-    "#   the name field in the profile is locked); 0 = the name typed in the game.\n" },
+    "#   console's records), Share and links to web pages, and stops Unity Analytics from\n"
+    "#   queueing its events on the SD card. 0 = as in the game.\n" },
   { "country", T_COUNTRY, F(country),
     "# country: the flag (two letters, e.g. JP, DE, US) used until one is picked in the\n"
     "#   profile; empty = the game's own choice (Andorra, as its web lookup fails offline).\n" },

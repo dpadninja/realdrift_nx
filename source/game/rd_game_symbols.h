@@ -97,22 +97,17 @@
 #define RD_ASM_TMP                "Unity.TextMeshPro"
 #define RD_NS_TMP                 "TMPro"
 #define RD_CLS_TMP_TEXT           "TMP_Text"
-#define RD_CLS_TMP_INPUT          "TMP_InputField"
 #define RD_MTH_GET_TEXT           "get_text"
 #define RD_MTH_SET_TEXT           "set_text"
 #define RD_ICALL_TRANSFORM        "UnityEngine.Component::get_transform"
 #define RD_ICALL_FIND_PATH        "UnityEngine.Transform::FindRelativeTransformWithPath"
 #define RD_ICALL_SET_ACTIVE       "UnityEngine.GameObject::SetActive"
 #define RD_ICALL_GET_COMPONENT    "UnityEngine.GameObject::GetComponent"
-#define RD_ICALL_GET_ENABLED      "UnityEngine.Behaviour::get_enabled"
-#define RD_ICALL_SET_ENABLED      "UnityEngine.Behaviour::set_enabled"
 #define RD_ICALL_GET_ANCHORED     "UnityEngine.RectTransform::get_anchoredPosition_Injected"
 #define RD_ICALL_SET_ANCHORED     "UnityEngine.RectTransform::set_anchoredPosition_Injected"
-/* PlayerPrefs keys: PersistentData.Awake reads playerName (writes "Drifter_<n>" if empty);
- * CountryDetection reads CountryCode (ISO 3166 alpha-2, one of the 189 flags) and, without
+/* PlayerPrefs key: CountryDetection reads CountryCode (ISO 3166 alpha-2, one of the 189 flags) and, without
  * it, MenuManager.Init asks a web service by IP -- offline that fails and the game stores
  * the first country of its list, Andorra. */
-#define RD_PREF_PLAYER_NAME       "playerName"
 #define RD_PREF_COUNTRY           "CountryCode"
 #define RD_COUNTRY_FAILED_LOOKUP  "AD"
 

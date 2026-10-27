@@ -31,14 +31,12 @@ static struct {
   void *(*get_component)(void *go, void *type);
   uint8_t (*active_self)(void *go);
   void (*set_active)(void *go, uint8_t value);
-  uint8_t (*get_enabled)(void *behaviour);
-  void (*set_enabled)(void *behaviour, uint8_t value);
   void (*get_anchored)(void *rect_transform, rd_vec2 *out);
   void (*set_anchored)(void *rect_transform, const rd_vec2 *value);
   void (*active_scene)(int32_t *handle);         /* GetActiveScene_Injected(out Scene) */
 } ic;
 static method g_get_text, g_set_text;
-static void *g_input_type, *g_text_type;
+static void *g_text_type;
 static void *g_label;                            /* RD_OFFLINE_STATISTICS, a managed string */
 static int32_t g_scene;                          /* the active scene's handle */
 static uint32_t g_scene_frame;                   /* when it last changed */
@@ -80,14 +78,11 @@ static int install(void) {
   ic.get_component = g_il2cpp.resolve_icall(RD_ICALL_GET_COMPONENT);
   ic.active_self   = g_il2cpp.resolve_icall(RD_ICALL_ACTIVE_SELF);
   ic.set_active    = g_il2cpp.resolve_icall(RD_ICALL_SET_ACTIVE);
-  ic.get_enabled   = g_il2cpp.resolve_icall(RD_ICALL_GET_ENABLED);
-  ic.set_enabled   = g_il2cpp.resolve_icall(RD_ICALL_SET_ENABLED);
   ic.get_anchored  = g_il2cpp.resolve_icall(RD_ICALL_GET_ANCHORED);
   ic.set_anchored  = g_il2cpp.resolve_icall(RD_ICALL_SET_ANCHORED);
   ic.active_scene  = g_il2cpp.resolve_icall(RD_ICALL_ACTIVE_SCENE);
   g_get_text = text_method(RD_MTH_GET_TEXT, 0);
   g_set_text = text_method(RD_MTH_SET_TEXT, 1);
-  g_input_type  = type_of(RD_ASM_TMP, RD_NS_TMP, RD_CLS_TMP_INPUT);
   g_text_type   = type_of(RD_ASM_TMP, RD_NS_TMP, RD_CLS_TMP_TEXT);
   g_root[RD_OFFLINE_MENU].type = type_of(RD_ASM_GAME, RD_NS_GAME, RD_CLS_MENU_MANAGER);
   g_root[RD_OFFLINE_RACE].type = type_of(RD_ASM_GAME, RD_NS_GAME, RD_CLS_RACE_MANAGER);
@@ -95,10 +90,9 @@ static int install(void) {
   g_label = g_il2cpp.string_new(RD_OFFLINE_STATISTICS);
   if (g_label) g_il2cpp.gchandle_new(g_label, 1);               /* kept: never collected */
   if (!ic.find_objects || !ic.transform || !ic.find_path || !ic.game_object ||
-      !ic.get_component || !ic.active_self || !ic.set_active || !ic.get_enabled ||
-      !ic.set_enabled || !ic.active_scene || !ic.get_anchored || !ic.set_anchored ||
-      !g_get_text.fn || !g_set_text.fn ||
-      !g_input_type || !g_text_type || !g_root[RD_OFFLINE_MENU].type ||
+      !ic.get_component || !ic.active_self || !ic.set_active || !ic.active_scene ||
+      !ic.get_anchored || !ic.set_anchored || !g_get_text.fn || !g_set_text.fn ||
+      !g_text_type || !g_root[RD_OFFLINE_MENU].type ||
       !g_root[RD_OFFLINE_RACE].type || !g_persistent.type || !g_label ||
       !rd_il2cpp_field_offset(&g_il2cpp, pd, RD_FLD_LEADERBOARD_TYPE, &g_lb_type_off) ||
       !rd_il2cpp_field_offset(&g_il2cpp, pd, RD_FLD_LEADERBOARD_MODE, &g_lb_mode_off)) {
@@ -127,7 +121,6 @@ static void *resolve(int i, void *root_tr) {
       g_target_x[i] = at.x + t->dx;
       return tr;                                 /* a uGUI Transform is the RectTransform */
     }
-    case RD_OFFLINE_NO_INPUT:  return ic.get_component(go, g_input_type);
     case RD_OFFLINE_LABEL:     return ic.get_component(go, g_text_type);
   }
   return NULL;
@@ -151,8 +144,6 @@ static void resolve_root(rd_offline_root r) {
   int wanted = 0, got = 0;
   for (int i = 0; i < g_n; i++) {
     if (g_targets[i].root != r) continue;
-    g_target[i] = NULL;
-    if (!rd_offline_wants(&g_targets[i], config.switch_name)) continue;
     g_target[i] = resolve(i, tr);
     wanted++;
     if (g_target[i]) got++;
@@ -179,9 +170,6 @@ static void apply(int i) {
       }
       break;
     }
-    case RD_OFFLINE_NO_INPUT:
-      if (ic.get_enabled(obj)) ic.set_enabled(obj, 0);
-      break;
     case RD_OFFLINE_LABEL: {
       void *now = ((void *(*)(void *, const void *))g_get_text.fn)(obj, g_get_text.mi);
       if (!now || !rd_il2cpp_str_eq(&g_il2cpp, now, RD_OFFLINE_STATISTICS))

@@ -49,7 +49,6 @@ typedef struct {
   uint64_t    ui_select, ui_back;    /* menu navigation: tap the focused element / go back */
   uint64_t    ui_prev, ui_next;      /* menu navigation: previous / next car, tab, track */
   int         offline_ui;            /* 1: online features hidden in the menus (rd_offline.h) */
-  int         switch_name;           /* 1: player name = Switch nickname (rd_player.h) */
   char        country[RD_COUNTRY_SIZE];   /* default flag, "" = the game's (rd_player.h) */
   int         render_res;            /* RD_RES_AUTO / RD_RES_720 / RD_RES_1080 (rd_perf.h) */
   int         boost_loading;         /* 1: CPU boost while a loading frame runs (rd_perf.h) */
@@ -84,7 +83,6 @@ typedef struct {
   .ui_select = RD_BTN_A, .ui_back = RD_BTN_B,                         \
   .ui_prev = RD_BTN_L, .ui_next = RD_BTN_R,                           \
   .offline_ui = 1,                                                    \
-  .switch_name = 1,                                                   \
   .country = "JP",                                                    \
   .render_res = RD_RES_AUTO,                                          \
   .boost_loading = 1,                                                 \

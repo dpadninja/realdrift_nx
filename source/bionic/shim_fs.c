@@ -66,6 +66,7 @@ int open_fake(const char *path, int flags, ...) {
   if (flags & LINUX_O_CREAT) { va_list va; va_start(va, flags); mode = va_arg(va, int); va_end(va); }
   const int cvt = convert_open_flags(flags);
   const int writing = (flags & 3) != 0 || (flags & LINUX_O_CREAT);
+  if (writing && fs_write_refused(path)) return -1;
   if (!writing) {
     // /dev/urandom + /dev/random: Switch has no /dev node, but Mono/.NET (RNG
     // seeds, Guid.NewGuid, hashtable randomization) and asset crypto open these.
@@ -202,6 +203,7 @@ int rename_fake(const char *oldp, const char *newp) {
   char rb1[512], rb2[512];
   oldp = asset_redirect(oldp, rb1, sizeof rb1);
   newp = asset_redirect(newp, rb2, sizeof rb2);
+  if (fs_write_refused(newp)) return -1;
 
   if (rename(oldp, newp) == 0) return 0;          /* 1. destination absent: plain rename */
 

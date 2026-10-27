@@ -24,6 +24,7 @@
 #include "rd_menu.h"
 #include "rd_offline.h"
 #include "rd_player.h"
+#include "rd_fsdeny.h"
 #include "libc_shim.h"
 #include "nx_fonts.h"
 #include "util.h"
@@ -173,6 +174,7 @@ static void boot_enter_game_folder(void) {
 static void boot_read_config(void) {
   const char *cfg = RD_GAME_HOME "/" RD_CONFIG_FILE;
   if (read_config(cfg) != 0) write_config(cfg);
+  rd_fsdeny_set_analytics(config.offline_ui);          /* no Unity Analytics queue on the SD */
 }
 
 /* Render resolution (config.txt render_resolution, rd_perf.h): auto = 720p handheld /

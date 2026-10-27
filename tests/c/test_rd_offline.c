@@ -59,24 +59,6 @@ static void test_move(void) {
   CHECK(moved == 1);
 }
 
-/* The name field is locked only while the name comes from the Switch profile: with
- * switch_name = 0 the player types the name in the game, as before. Everything else applies
- * either way. */
-static void test_wants(void) {
-  int n = 0, locked = 0;
-  const rd_offline_target *t = rd_offline_targets(&n);
-  for (int i = 0; i < n; i++) {
-    CHECK(rd_offline_wants(&t[i], 1));
-    if (t[i].action == RD_OFFLINE_NO_INPUT) {
-      locked++;
-      CHECK(!rd_offline_wants(&t[i], 0));
-    } else {
-      CHECK(rd_offline_wants(&t[i], 0));
-    }
-  }
-  CHECK(locked == 1);
-}
-
 /* Outside a scene change the targets are checked every RD_OFFLINE_FRAMES frames and a
  * missing root (MenuManager in a race) is looked for every RD_OFFLINE_FIND_FRAMES: a
  * FindObjectsOfType per frame for the whole race would only make garbage. */
@@ -108,7 +90,6 @@ static void test_cadence_fresh(void) {
 int main(void) {
   RUN(test_table_well_formed);
   RUN(test_covers_online_features);
-  RUN(test_wants);
   RUN(test_move);
   RUN(test_cadence_settled);
   RUN(test_cadence_fresh);

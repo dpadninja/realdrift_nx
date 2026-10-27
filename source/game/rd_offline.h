@@ -5,8 +5,7 @@
  *   - main menu: the "+" next to the coins (the coin shop, with Facebook / Remove Ads inside);
  *     the player button (name, flag, coins) moves right into its place;
  *   - player profile: Google sign-in, CLOUD TOOLS (cloud save / load), the right half with the
- *     money-box picture that links to the shop (the coin count is in the left half), and the
- *     name field when the name comes from the Switch profile (switch_name, rd_player.h);
+ *     money-box picture that links to the shop (the coin count is in the left half);
  *   - help: PRIVACY (a web page) and the music tab's "buy this track" links;
  *   - leaderboards: renamed STATISTICS, the DEVICE / LOCAL / WORLDWIDE tabs hidden and only the
  *     on-device board shown (PersistentData.leaderboardType kept at local); the DRIFT RACE /
@@ -40,7 +39,6 @@ typedef enum { RD_OFFLINE_MENU, RD_OFFLINE_RACE, RD_OFFLINE_ROOTS } rd_offline_r
 typedef enum {
   RD_OFFLINE_HIDE,         /* GameObject.SetActive(false) */
   RD_OFFLINE_MOVE_X,       /* its RectTransform.anchoredPosition.x moved by dx */
-  RD_OFFLINE_NO_INPUT,     /* its TMP_InputField disabled: the text shows, cannot be edited */
   RD_OFFLINE_LABEL,        /* its TMP_Text says RD_OFFLINE_STATISTICS */
 } rd_offline_action;
 
@@ -48,15 +46,11 @@ typedef struct {
   rd_offline_root   root;
   const char       *path;    /* below the root object, '/'-separated GameObject names */
   rd_offline_action action;
-  int               needs_switch_name;   /* 1: only while the name comes from the Switch */
   float             dx;      /* RD_OFFLINE_MOVE_X: canvas units to the right */
 } rd_offline_target;
 
 /* The table of targets; *n gets its length. Static storage. */
 const rd_offline_target *rd_offline_targets(int *n);
-
-/* 1 if target t applies with the name taken from the Switch profile (switch_name) or not. */
-int rd_offline_wants(const rd_offline_target *t, int switch_name);
 
 /* Frame counters (port_frame_count) for the two cadences below; scene = when the active scene
  * last changed. 1 if the targets are due to be checked in frame `now`. */
