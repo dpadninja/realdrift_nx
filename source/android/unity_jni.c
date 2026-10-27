@@ -491,6 +491,14 @@ void unity_dispatch_void(void *recv, const void *id_, va_list va){ const struct 
   (void)recv;(void)va;
 }
 
+const char *unity_prefs_get_string(const char *key){
+  const KV *kv = key ? kv_get(key) : NULL;
+  return kv && kv->type=='S' ? kv->val : NULL;
+}
+void unity_prefs_put_string(const char *key, const char *val){
+  if (key && key[0] && val) kv_set('S',key,val);
+}
+
 /* ========================================================================== */
 void unity_jni_init(const char *data_root){
   snprintf(g_root,sizeof g_root,"%s",data_root && *data_root ? data_root : RD_GAME_HOME);

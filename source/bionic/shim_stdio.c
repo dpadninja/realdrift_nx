@@ -80,6 +80,7 @@ FILE *fopen_fake(const char *path, const char *mode) {
     return sf;
   }
   const int writing = strpbrk(mode, "wa+") != NULL;
+  if (writing && fs_write_refused(path)) return NULL;
   FILE *f = fopen(path, mode);
   if (!f && writing) {            // save file: create the subdir and retry
     mkdir_parents(path);

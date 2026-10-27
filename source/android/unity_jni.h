@@ -51,6 +51,13 @@ extern void       *jni_make_object(const char *label);
 extern void       *jni_bytearray_data(void *arr, int *len_out);
 extern const char *jni_string_utf(void *jstr);
 
+/* The game's PlayerPrefs strings, for setting them before the engine reads them (after
+ * unity_jni_init). get: the stored string, NULL if the key is missing or not a string; valid
+ * until the key changes. put: stores `val` (copied) under `key`; saved with the next flush.
+ * Main thread. */
+const char *unity_prefs_get_string(const char *key);
+void        unity_prefs_put_string(const char *key, const char *val);
+
 /* SharedPreferences.getFloat -> 1 and *out set if handled (unity_jni.c). */
 int unity_prefs_get_float(const void *id, va_list va, float *out);
 

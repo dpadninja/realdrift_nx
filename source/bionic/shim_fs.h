@@ -26,6 +26,10 @@ const char *asset_redirect(const char *path, char *buf, size_t bufsz);
  * folder. Returns 1 and the path in out (outsz bytes) if that file exists, else 0. */
 int basename_fallback(const char *path, char *out, size_t outsz);
 
+/* 1 if writing at `path` is refused (rd_fsdeny.h): sets errno = EACCES and logs the first
+ * refusal. Callers then fail as for an unwritable file. */
+int fs_write_refused(const char *path);
+
 /* Creates the directory chain of a file path, never the SD root or the game root itself. */
 void mkdir_parents(const char *filepath);
 

@@ -38,7 +38,8 @@ through the documented entry points of the upper layer's headers.
    (`bionic/imports.c`, `engine/unity_imports.c`, `bionic/rd_imports.c`); locate and apply
    engine patches by instruction pattern (`engine/rd_patches.c`, `engine/rd_patchsites.c`).
 5. Run the libraries' init arrays, build the fake JNI world (`android/jni_fake.c`,
-   `android/unity_jni.c`), call `JNI_OnLoad` of libunity and libil2cpp.
+   `android/unity_jni.c`; the default flag goes into the loaded prefs,
+   `game/rd_player_hook.c`), call `JNI_OnLoad` of libunity and libil2cpp.
 6. Recover the `UnityPlayer` natives by name from libunity's `RegisterNatives` table and drive
    the lifecycle the Java side would: `initJni` → surface → resume → focus.
 7. Main loop: one `nativeRender` per frame, paced to 60 Hz.
@@ -114,6 +115,7 @@ One line per module; each file's header comment has the details.
 | `shim_fs.{c,h}` | open/read/write/close/stat/rename/readdir; `shim_fs.h` is the internal interface of the three fs files |
 | `shim_fs_path.c` | path rewrites: APK asset root, case-sensitivity probe, `mkdir -p`, synthetic `/proc` and `/sys` |
 | `shim_fs_cache.c` | per-fd state: the archive block cache for `base.apk` / OBB fds, read-ahead windows, synthetic inodes, open-fd cache for `.so` files, SD commit after writes |
+| `rd_fsdeny.{c,h}` | offline_ui: files refused for writing (Unity Analytics' event queue) |
 | `rd_sdcommit.{c,h}` | which written files commit the SD card on close (not Unity's per-launch il2cpp copy) |
 | `rd_readlog.{c,h}` | archive_cache: the launch prefetch -- the first launch's small archive reads, saved once and served from memory later |
 | `rd_archcache.{c,h}` | archive_cache: the block pool (LRU) shared by every open of `base.apk` / the OBB |
@@ -205,6 +207,8 @@ One line per module; each file's header comment has the details.
 | `rd_smoke.{c,h}`, `rd_smoke_hook.c` | lighter tyre smoke through the particle Emit icall |
 | `rd_menu.{c,h}`, `rd_menu_hook.c` | menus on the controller: focus frame, A taps, B goes back (synthetic touch) |
 | `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
+| `rd_offline.{c,h}`, `rd_offline_hook.c` | offline_ui: the menus' online features hidden (shop, Google, cloud, online boards, Share, links) |
+| `rd_player.{c,h}`, `rd_player_hook.c` | the default flag, written into the prefs at boot |
 
 `main.c` and the import tables (`imports.c`, `unity_imports.c`, `rd_imports.c`) are composition
 points: they may include headers of every layer to wire implementations to the engine.

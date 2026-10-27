@@ -82,6 +82,35 @@
 #define RD_CLS_USEQ               "USSequencer"
 #define RD_MTH_IS_PLAYING         "get_IsPlaying"
 
+/* ---- offline menus: online features hidden (rd_offline.c, rd_offline_hook.c) ---------- */
+#define RD_CLS_MENU_MANAGER       "MenuManager"      /* the menu scene's root GameObject */
+#define RD_CLS_PERSISTENT_DATA    "PersistentData"
+/* PersistentData.leaderboardType (enum LeaderboardType: onlineCountry 0, onlineWorld 1,
+ * local 2); LeaderboardScrollerController.OnEnable loads the board it names. */
+#define RD_FLD_LEADERBOARD_TYPE   "leaderboardType"
+#define RD_LEADERBOARD_LOCAL      2
+/* PersistentData.leaderboardRaceMode (RaceMode: driftRace 0, timeAttackRace 1): the board's
+ * sort. The local scores do not record the mode, so "time attack" only re-sorts the same
+ * runs by their time as a string; the port keeps driftRace (by points). */
+#define RD_FLD_LEADERBOARD_MODE   "leaderboardRaceMode"
+#define RD_RACE_MODE_DRIFT        0
+#define RD_ASM_TMP                "Unity.TextMeshPro"
+#define RD_NS_TMP                 "TMPro"
+#define RD_CLS_TMP_TEXT           "TMP_Text"
+#define RD_MTH_GET_TEXT           "get_text"
+#define RD_MTH_SET_TEXT           "set_text"
+#define RD_ICALL_TRANSFORM        "UnityEngine.Component::get_transform"
+#define RD_ICALL_FIND_PATH        "UnityEngine.Transform::FindRelativeTransformWithPath"
+#define RD_ICALL_SET_ACTIVE       "UnityEngine.GameObject::SetActive"
+#define RD_ICALL_GET_COMPONENT    "UnityEngine.GameObject::GetComponent"
+#define RD_ICALL_GET_ANCHORED     "UnityEngine.RectTransform::get_anchoredPosition_Injected"
+#define RD_ICALL_SET_ANCHORED     "UnityEngine.RectTransform::set_anchoredPosition_Injected"
+/* PlayerPrefs key: CountryDetection reads CountryCode (ISO 3166 alpha-2, one of the 189 flags) and, without
+ * it, MenuManager.Init asks a web service by IP -- offline that fails and the game stores
+ * the first country of its list, Andorra. */
+#define RD_PREF_COUNTRY           "CountryCode"
+#define RD_COUNTRY_FAILED_LOOKUP  "AD"
+
 /* ---- Graphics Enhancements: SleekRender post-process (rd_sleek_hook.c) ---------------- */
 #define RD_ASM_FIRSTPASS          "Assembly-CSharp-firstpass"   /* SleekRender is a plugin */
 #define RD_NS_SLEEK               "SleekRender"

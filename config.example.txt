@@ -31,6 +31,16 @@ bind_ui_back=B
 bind_ui_prev=L
 bind_ui_next=R
 
+# Offline.
+# offline_ui: 1 hides what needs the internet: the coin shop (+), Google sign-in, cloud
+#   save / load, online leaderboards (the button reads STATISTICS and shows this
+#   console's records), Share and links to web pages, and stops Unity Analytics from
+#   queueing its events on the SD card. 0 = as in the game.
+offline_ui=1
+# country: the flag (two letters, e.g. JP, DE, US) used until one is picked in the
+#   profile; empty = the game's own choice (Andorra, as its web lookup fails offline).
+country=JP
+
 # Performance.
 # render_resolution: auto = 720 handheld / 1080 docked (picked at launch), or 720 / 1080.
 #   Handheld shows 720p anyway; rendering 1080p there costs 2.25x pixels (smoke!).

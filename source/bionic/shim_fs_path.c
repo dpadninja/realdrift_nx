@@ -16,6 +16,7 @@
 #include "util.h"
 #include "libc_shim.h"
 #include "shim_fs.h"
+#include "rd_fsdeny.h"
 #include "rd_modimage.h"
 
 
@@ -85,10 +86,19 @@ void mkdir_parents(const char *filepath) {
   mkdir_p_dir(tmp);
 }
 
+int fs_write_refused(const char *path) {
+  if (!rd_fsdeny_write(path)) return 0;
+  static int logged;
+  if (!logged++) debugPrintf("[io] analytics files refused (offline_ui): %s\n", path);
+  errno = EACCES;
+  return 1;
+}
+
 // mkdir wrapper: create the full chain and treat "already exists" as success
 int mkdir_fake(const char *path, unsigned mode) {
   (void)mode;
   if (!path || !*path) { errno = EINVAL; return -1; }
+  if (fs_write_refused(path)) return -1;
   mkdir_p_dir(path);
   int r = safe_mkdir(path);
   if (r != 0 && errno == EEXIST) r = 0;
