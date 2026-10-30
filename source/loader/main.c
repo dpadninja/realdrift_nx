@@ -369,6 +369,7 @@ static void run_main_loop(void) {
     rd_menu_frame();                                       /* controller menu navigation */
     rd_offline_frame();                                    /* online features hidden */
     rd_render_frame();                                     /* min_draw_distance, antialiasing */
+    rd_sleek_frame();                                      /* ge_bloom, ge_vignette */
 
     {
       const uint64_t _ns = rd_now_ns() - t0;

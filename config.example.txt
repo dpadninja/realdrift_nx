@@ -64,6 +64,11 @@ antialiasing=0
 # anisotropic_filtering (experimental): 0 (as the game), 2, 4, 8 or 16. Keeps the road
 #   sharp into the distance instead of blurring at a grazing angle. Nearly free; try 8.
 anisotropic_filtering=0
+# Graphics Enhancements (the game's option) is bloom + vignette; each can be turned off.
+# ge_bloom: 1 = the glow (the game's makes the whole picture hazy), 0 = off.
+ge_bloom=1
+# ge_vignette: 1 = darkened screen corners, 0 = off.
+ge_vignette=1
 # texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads
 #   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after
 #   many cars and tracks new textures stop fitting and show black. Loads take a bit longer.

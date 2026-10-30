@@ -97,7 +97,7 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "bind_ui_back", "B,Y") == idx("bind_ui_back") &&
         s.ui_back == (RD_BTN_B | RD_BTN_Y));
   CHECK(rd_settings_set(&s, "bind_ui_next", "ZR") == idx("bind_ui_next") && s.ui_next == RD_BTN_ZR);
-  CHECK(rd_settings_count() == 36 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_count() == 38 && idx("bind_throttle") == 0);
 }
 
 /* config.txt written with non-default values reads back identically, and a file with missing
@@ -127,6 +127,8 @@ static void test_write_then_read_roundtrip(const char *dir) {
   in.min_draw_distance = 1500;
   in.antialiasing = 4;
   in.anisotropic_filtering = 8;
+  in.ge_bloom = 0;
+  in.ge_vignette = 0;
   FILE *f = fopen(path, "w"); rd_settings_write(&in, f); fclose(f);
 
   rd_settings out = RD_SETTINGS_DEFAULT;
@@ -180,6 +182,10 @@ static void test_render_keys(void) {
   CHECK(rd_settings_set(&s, "anisotropic_filtering", "6") == -1 && s.anisotropic_filtering == 16);
   CHECK(rd_settings_set(&s, "anisotropic_filtering", "32") == -1);
   CHECK(rd_settings_set(&s, "anisotropic_filtering", "0") >= 0 && s.anisotropic_filtering == 0);
+  CHECK(s.ge_bloom == 1 && s.ge_vignette == 1);                  /* the game's effect */
+  CHECK(rd_settings_set(&s, "ge_bloom", "0") == idx("ge_bloom") && s.ge_bloom == 0);
+  CHECK(rd_settings_set(&s, "ge_vignette", "0") == idx("ge_vignette") && s.ge_vignette == 0);
+  CHECK(rd_settings_set(&s, "ge_vignette", "off") == -1 && s.ge_vignette == 0);
 }
 
 int main(int argc, char **argv) {

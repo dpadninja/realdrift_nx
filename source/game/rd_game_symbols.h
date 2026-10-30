@@ -121,5 +121,9 @@
 #define RD_NS_SLEEK               "SleekRender"
 #define RD_CLS_SLEEK_POST         "SleekRenderPostProcess"
 #define RD_MTH_SLEEK_SET_CLEAR    "SetActiveRenderTextureAndClear"   /* static, 1 argument */
+#define RD_FLD_SLEEK_SETTINGS     "settings"                 /* SleekRenderPostProcess -> asset */
+#define RD_CLS_SLEEK_SETTINGS     "SleekRenderSettings"      /* ScriptableObject, read every frame */
+#define RD_FLD_SLEEK_BLOOM        "bloomEnabled"             /* bool */
+#define RD_FLD_SLEEK_VIGNETTE     "vignetteEnabled"          /* bool */
 
 #endif

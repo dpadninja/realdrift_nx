@@ -112,6 +112,11 @@ static const setting SETTINGS[] = {
   { "anisotropic_filtering", T_ANISO, F(anisotropic_filtering),
     "# anisotropic_filtering (experimental): 0 (as the game), 2, 4, 8 or 16. Keeps the road\n"
     "#   sharp into the distance instead of blurring at a grazing angle. Nearly free; try 8.\n" },
+  { "ge_bloom", T_SWITCH, F(ge_bloom),
+    "# Graphics Enhancements (the game's option) is bloom + vignette; each can be turned off.\n"
+    "# ge_bloom: 1 = the glow (the game's makes the whole picture hazy), 0 = off.\n" },
+  { "ge_vignette", T_SWITCH, F(ge_vignette),
+    "# ge_vignette: 1 = darkened screen corners, 0 = off.\n" },
   { "texture_transcode", T_SWITCH, F(texture_transcode),
     "# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads\n"
     "#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after\n"
