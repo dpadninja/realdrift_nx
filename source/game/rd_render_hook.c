@@ -2,13 +2,15 @@
  * MIT (see LICENSE).
  *
  * Runs from the main loop between engine frames, so the icalls never interleave with the
- * game's C#. Every RD_RENDER_FRAMES frames: Camera.main (a fresh reference, never kept, so it
- * is alive), its far plane raised if shorter, and the quality level's antiAliasing set. The
- * main camera of a race is a scene object: each track load brings a new one. Main thread. */
+ * game's C#. Every RD_RENDER_FRAMES frames: the quality level's antiAliasing set, and during a
+ * race (rd_race_active) Camera.main (a fresh reference, never kept, so it is alive) gets its far
+ * plane raised if shorter. Only in races: the menu and garage cameras stop at 50 m on purpose.
+ * The main camera of a race is a scene object: each track load brings a new one. Main thread. */
 #include <stdint.h>
 #include "rd_render.h"
 #include "rd_il2cpp.h"
 #include "rd_quality.h"
+#include "rd_race.h"
 #include "rd_game_symbols.h"
 #include "rd_platform.h"
 #include "config.h"
@@ -35,7 +37,7 @@ static int install(void) {
   return 1;
 }
 
-/* The main camera's far plane raised to draw_distance. */
+/* The race camera's far plane raised to draw_distance. */
 static void apply_far(void) {
   void *cam = ic.camera_main ? ic.camera_main() : NULL;
   if (!cam) return;
@@ -56,5 +58,5 @@ void rd_render_frame(void) {
   }
   if (!g_state && (g_state = install()) <= 0) return;
   if (config.antialiasing) rd_quality_set_aa(config.antialiasing);
-  if (config.draw_distance != RD_DRAW_DISTANCE_GAME) apply_far();
+  if (config.draw_distance != RD_DRAW_DISTANCE_GAME && rd_race_active()) apply_far();
 }

@@ -2,8 +2,9 @@
  *
  * Draw distance: the game has no LODs, terrain, occlusion culling or fog; what is drawn is cut
  * only by the far clip plane of the scene's Main Camera, which the scenes set to 360 m on the
- * two mountain tracks (1.4 km across) and 1000-4000 m elsewhere (analysis/research/34). The
- * main camera's far plane is raised to draw_distance where it is shorter.
+ * two mountain tracks (1.4 km across) and 1000-4000 m elsewhere (analysis/research/34). In
+ * races the main camera's far plane is raised to draw_distance where it is shorter; the menu and
+ * garage cameras (50 m) are left alone.
  * Antialiasing: the current quality level's antiAliasing (rd_quality.h) for the cameras'
  * render targets, and a multisampled window (egl.c) for the frame drawn straight to it.
  *
@@ -23,8 +24,8 @@ int rd_render_aa_valid(int samples);
  * farther, else `cur` (RD_DRAW_DISTANCE_GAME keeps `cur`). */
 float rd_render_far(float cur, int wanted);
 
-/* Main loop, after each engine frame: applies antialiasing once il2cpp is up and the far
- * plane to each new main camera. Does nothing when both settings are off. Main thread. */
+/* Main loop, after each engine frame: applies antialiasing once il2cpp is up and, in races,
+ * the far plane to the main camera. Does nothing when both settings are off. Main thread. */
 void rd_render_frame(void);
 
 #endif

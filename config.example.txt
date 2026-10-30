@@ -53,7 +53,7 @@ boost_loading=1
 smoke_size=100
 # smoke_amount: percent of the smoke puffs that are emitted, 10 .. 100 (try 50).
 smoke_amount=100
-# draw_distance (experimental): metres the camera sees at least, 0 .. 5000; 0 = as
+# draw_distance (experimental): metres the race camera sees at least, 0 .. 5000; 0 = as
 #   the game. Only the two mountain tracks (360 m) are shorter than 1000 m. Their trees
 #   are flat cards (cheap); beyond ~1000 m the edge of the mountain model may show.
 draw_distance=0
