@@ -13,6 +13,8 @@
 #ifndef RD_RENDER_H
 #define RD_RENDER_H
 
+#include <stdint.h>
+
 #define RD_DRAW_DISTANCE_GAME  0      /* config value: the scene's own far plane */
 #define RD_DRAW_DISTANCE_MAX   5000   /* metres; the largest track is 1.4 km across */
 #define RD_RENDER_FRAMES       30     /* frames between checks of the main camera */
@@ -23,6 +25,11 @@ int rd_render_aa_valid(int samples);
 /* The far plane to use for a camera whose far plane is `cur` metres: `wanted` if that is
  * farther, else `cur` (RD_DRAW_DISTANCE_GAME keeps `cur`). */
 float rd_render_far(float cur, int wanted);
+
+/* 1 if the far plane is applied now: a race is active (`race_active`, rd_race_active) and the
+ * active scene changed at frame `scene_frame` more than RD_ACTIVE_WINDOW_FRAMES before `now`,
+ * so the race activity was seen in this scene and is not left over from the last one. */
+int rd_render_far_due(int race_active, uint32_t now, uint32_t scene_frame);
 
 /* Main loop, after each engine frame: applies antialiasing once il2cpp is up and, in races,
  * the far plane to the main camera. Does nothing when both settings are off. Main thread. */

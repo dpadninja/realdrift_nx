@@ -5,7 +5,9 @@
  * game's C#. Every RD_RENDER_FRAMES frames: the quality level's antiAliasing set, and during a
  * race (rd_race_active) Camera.main (a fresh reference, never kept, so it is alive) gets its far
  * plane raised if shorter. Only in races: the menu and garage cameras stop at 50 m on purpose.
- * The main camera of a race is a scene object: each track load brings a new one. Main thread. */
+ * rd_race_active alone is not enough: the garage loads in one long frame right after the race,
+ * so the race's last frames still count as recent there (rd_render_far_due). The main camera
+ * of a race is a scene object: each track load brings a new one. Main thread. */
 #include <stdint.h>
 #include "rd_render.h"
 #include "rd_il2cpp.h"
@@ -21,8 +23,11 @@ static struct {
   void *(*camera_main)(void);
   float (*get_far)(void *camera);
   void (*set_far)(void *camera, float value);
+  void (*active_scene)(int32_t *handle);         /* GetActiveScene_Injected(out Scene) */
 } ic;
 static void *g_logged;                           /* the last camera logged (compared only) */
+static int32_t g_scene;                          /* the active scene's handle */
+static uint32_t g_scene_frame;                   /* when a change of it was seen */
 
 /* Resolves the icalls once the game is loaded. 1 = ready, 0 = not yet, -1 = off. */
 static int install(void) {
@@ -30,7 +35,8 @@ static int install(void) {
   ic.camera_main = g_il2cpp.resolve_icall(RD_ICALL_CAMERA_MAIN);
   ic.get_far     = g_il2cpp.resolve_icall(RD_ICALL_GET_FAR_CLIP);
   ic.set_far     = g_il2cpp.resolve_icall(RD_ICALL_SET_FAR_CLIP);
-  if (!ic.camera_main || !ic.get_far || !ic.set_far) {
+  ic.active_scene = g_il2cpp.resolve_icall(RD_ICALL_ACTIVE_SCENE);
+  if (!ic.camera_main || !ic.get_far || !ic.set_far || !ic.active_scene) {
     debugPrintf("[render] Camera icalls not found: min_draw_distance off\n");
     ic.camera_main = NULL;
   }
@@ -58,5 +64,13 @@ void rd_render_frame(void) {
   }
   if (!g_state && (g_state = install()) <= 0) return;
   if (config.antialiasing) rd_quality_set_aa(config.antialiasing);
-  if (config.min_draw_distance != RD_DRAW_DISTANCE_GAME && rd_race_active()) apply_far();
+  if (config.min_draw_distance == RD_DRAW_DISTANCE_GAME || !ic.camera_main) return;
+  const uint32_t now = port_frame_count();
+  int32_t scene = 0;
+  ic.active_scene(&scene);
+  if (scene != g_scene) {
+    g_scene = scene;
+    g_scene_frame = now;
+  }
+  if (rd_render_far_due(rd_race_active(), now, g_scene_frame)) apply_far();
 }

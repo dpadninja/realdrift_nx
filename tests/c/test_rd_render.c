@@ -2,6 +2,7 @@
 /* Host unit test of rd_render. MIT (see LICENSE). */
 #include "check.h"
 #include "rd_render.h"
+#include "rd_platform.h"
 
 /* The far plane only grows: a longer scene plane is kept, 0 keeps the scene's own. */
 static void test_far_only_grows(void) {
@@ -19,8 +20,19 @@ static void test_aa_values(void) {
         !rd_render_aa_valid(-2));
 }
 
+/* The garage loads in one long frame right after a race, so the race still counts as active
+ * for a few frames there: nothing is applied until the activity outlives the scene change. */
+static void test_far_due_after_scene_change(void) {
+  CHECK(!rd_render_far_due(1, 100, 95));                          /* left over from the race */
+  CHECK(!rd_render_far_due(1, 100 + RD_ACTIVE_WINDOW_FRAMES, 100));
+  CHECK(rd_render_far_due(1, 101 + RD_ACTIVE_WINDOW_FRAMES, 100)); /* seen in this scene */
+  CHECK(!rd_render_far_due(0, 500, 100));                         /* no race: menus */
+  CHECK(rd_render_far_due(1, 5, 0xfffffff0u));                    /* frame counter wrapped */
+}
+
 int main(void) {
   RUN(test_far_only_grows);
   RUN(test_aa_values);
+  RUN(test_far_due_after_scene_change);
   return g_failures != 0;
 }
