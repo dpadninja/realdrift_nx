@@ -233,6 +233,37 @@ int rd_find_skip_clear(const uint32_t *code, size_t n, size_t *after_set, size_t
   return RD_SITE_OK;
 }
 
+/* ---------------------------------------------------------------- libunity: antiAliasing */
+static const rd_sigw QUALITY_AA[] = {
+  RD_SIG_X(0xf81f0ffe),          /*  0 str   x30, [sp, #-0x10]!         */
+  RD_SIG_BL,                     /*  1 bl    GetQualitySettings         */
+  { 0xb9800008u, 0xffc003ffu },  /*  2 ldrsw x8, [x0, #current]         */
+  RD_SIG_LDRX(9, 0),             /*  3 ldr   x9, [x0, #levels]          */
+  { 0x5280000au, 0xffe0001fu },  /*  4 mov   w10, #stride               */
+  RD_SIG_X(0x9b0a2508),          /*  5 madd  x8, x8, x10, x9            */
+  RD_SIG_LDRW(0, 8),             /*  6 ldr   w0, [x8, #antiAliasing]    */
+  RD_SIG_X(0xf84107fe),          /*  7 ldr   x30, [sp], #0x10           */
+  RD_SIG_X(RD_A64_RET),          /*  8 ret                              */
+};
+#define IMM12(insn) (((insn) >> 10) & 0xfffu)
+
+int rd_find_quality_aa(const uint32_t *code, size_t n, rd_quality_aa *out) {
+  size_t i = 0;
+  if (n < NPAT(QUALITY_AA) || rd_sig_scan(code, NPAT(QUALITY_AA), QUALITY_AA, NPAT(QUALITY_AA),
+                                          &i) != 1)
+    return RD_SITE_NOT_FOUND;
+  const uint32_t stride = (code[4] >> 5) & 0xffffu;
+  if (!stride) return RD_SITE_BAD_CHECK;
+  uint32_t aa = 0;
+  rd_a64_ldr_w_uimm(code[6], NULL, &aa);
+  out->call = 1;
+  out->current = 4u * IMM12(code[2]);
+  out->levels = 8u * IMM12(code[3]);
+  out->stride = stride;
+  out->field = aa;
+  return RD_SITE_OK;
+}
+
 /* ---------------------------------------------------------------- libil2cpp: Boehm GC */
 /* GC_suspend_handler_inner, from `bl pthread_self` to `bl sem_post`. */
 static const rd_sigw GC_INNER[] = {

@@ -145,6 +145,7 @@ One line per module; each file's header comment has the details.
 | `rd_audiowatch.{c,h}` | debug_audio: notices silences of the output and their end |
 | `opensles_internal.h` | OpenSL ES types, vtables and the shim's objects (internal) |
 | `egl.{c,h}` | EGL/GLES wrappers: surface size and lifetime, `eglSwapBuffers` with overlays, GL wait timing |
+| `rd_eglcfg.{c,h}` | antialiasing: the engine's `eglChooseConfig` request rewritten for a multisampled window |
 | `rd_etc2bc.{c,h}` | ETC1/ETC2 blocks re-encoded as S3TC (BC1 / BC3), the only user of the vendored codecs |
 | `rd_slvolume.{c,h}` | OpenSL volume level and mute as the mixer's gain |
 | `rd_etc2bc_gl.{c,h}` | texture_transcode: ETC2 texture storage and uploads turned into S3TC |
@@ -165,6 +166,7 @@ One line per module; each file's header comment has the details.
 | `rd_uinav.{c,h}` | focus navigation geometry (pure): direction moves, auto-repeat, refocus |
 | `rd_ugui.{c,h}` | the clickable uGUI elements on screen and their rectangles, for menu navigation |
 | `rd_sig.{c,h}` | masked AArch64 instruction-pattern search |
+| `rd_quality.{c,h}` | QualitySettings.antiAliasing of the current level, located through its getter and written directly |
 | `rd_patchsites.{c,h}` | the patterns that locate every engine patch site and GC variable |
 | `rd_patches.{c,h}` | apply the libunity patches (Choreographer gate, blit type, fast_boot: splash off and the il2cpp copy once); the background clock thread (CPU boost, log flush) |
 | `rd_il2cppcopy.{c,h}` | fast_boot: when Unity's per-launch il2cpp data copy can be skipped (the stamp) |
@@ -207,6 +209,7 @@ One line per module; each file's header comment has the details.
 | `rd_smoke.{c,h}`, `rd_smoke_hook.c` | lighter tyre smoke through the particle Emit icall |
 | `rd_menu.{c,h}`, `rd_menu_hook.c` | menus on the controller: focus frame, A taps, B goes back (synthetic touch) |
 | `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
+| `rd_render.{c,h}`, `rd_render_hook.c` | draw_distance (main camera far plane) and antialiasing (experimental) |
 | `rd_offline.{c,h}`, `rd_offline_hook.c` | offline_ui: the menus' online features hidden (shop, Google, cloud, online boards, Share, links) |
 | `rd_player.{c,h}`, `rd_player_hook.c` | the default flag, written into the prefs at boot |
 

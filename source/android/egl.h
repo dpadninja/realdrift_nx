@@ -12,6 +12,11 @@
 /* eglQuerySurface: mesa reports 0 for EGL_WIDTH/HEIGHT of the window surface; answer the
  * render size instead (the engine would set a 0x0 viewport). */
 EGLBoolean egl_QuerySurface_log(EGLDisplay d, EGLSurface s, EGLint attr, EGLint *val);
+/* eglChooseConfig: with config.txt antialiasing > 0 asks mesa for that many samples (a
+ * multisampled window, resolved at swap) and falls back to the engine's own request if none
+ * exists; logs what was asked and the sample counts returned. */
+EGLBoolean egl_ChooseConfig_msaa(EGLDisplay d, const EGLint *al, EGLConfig *cfg, EGLint size,
+                                 EGLint *num);
 /* eglCreateWindowSurface: remembers the one window surface and re-asserts the window
  * transform after mesa builds its swapchain. */
 EGLSurface egl_CreateWindowSurface_log(EGLDisplay d, EGLConfig cfg, void *win, const EGLint *al);

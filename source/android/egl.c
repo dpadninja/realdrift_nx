@@ -19,6 +19,8 @@
 #include "rd_gltrace_gl.h"
 #include "rd_memwatch.h"
 #include "rd_etc2bc_gl.h"
+#include "rd_eglcfg.h"
+#include "util.h"
 
 // ---------------------------------------------------------------------------
 // EGL surface-size fixup
@@ -36,6 +38,47 @@ EGLBoolean egl_QuerySurface_log(EGLDisplay d, EGLSurface s, EGLint attr, EGLint 
   return r;
 }
 
+// ---------------------------------------------------------------------------
+// config.txt antialiasing: a multisampled window
+// ---------------------------------------------------------------------------
+
+/* Logs the sample count of up to RD_EGL_LOG_CONFIGS of the configs mesa returned. */
+#define RD_EGL_LOG_CONFIGS 4
+static void log_configs(EGLDisplay d, const EGLConfig *cfg, EGLint n) {
+  for (EGLint i = 0; cfg && i < n && i < RD_EGL_LOG_CONFIGS; i++) {
+    EGLint samples = -1, buffers = -1;
+    eglGetConfigAttrib(d, cfg[i], RD_EGL_SAMPLES, &samples);
+    eglGetConfigAttrib(d, cfg[i], RD_EGL_SAMPLE_BUFFERS, &buffers);
+    debugPrintf("[egl]   config %d: samples %d, sample buffers %d\n", (int)i, (int)samples,
+                (int)buffers);
+  }
+}
+
+EGLBoolean egl_ChooseConfig_msaa(EGLDisplay d, const EGLint *al, EGLConfig *cfg, EGLint size,
+                                 EGLint *num) {
+  const int asked = (int)rd_egl_attrib(al, RD_EGL_SAMPLES, 0);
+  if (config.antialiasing > 0) {
+    EGLint ms[RD_EGL_ATTRIBS_MAX];
+    if (rd_egl_attribs_samples(al, ms, RD_EGL_ATTRIBS_MAX, config.antialiasing)) {
+      EGLint n = 0;
+      const EGLBoolean r = eglChooseConfig(d, ms, cfg, size, &n);
+      debugPrintf("[egl] eglChooseConfig: engine asked samples %d, port asks %d -> %d configs\n",
+                  asked, config.antialiasing, r ? (int)n : -1);
+      if (r && n > 0) {
+        log_configs(d, cfg, n);
+        if (num) *num = n;
+        return r;
+      }
+      debugPrintf("[egl] no multisampled window config: antialiasing only in render targets\n");
+    }
+  }
+  const EGLBoolean r = eglChooseConfig(d, al, cfg, size, num);
+  debugPrintf("[egl] eglChooseConfig: samples %d -> %d configs\n", asked,
+              r && num ? (int)*num : -1);
+  if (r && num) log_configs(d, cfg, *num);
+  return r;
+}
+
 // SINGLETON window surface. libnx's one NWindow hosts exactly one swapchain, but Unity
 // creates the window surface then re-creates it on gfx-state recreation; a 2nd
 // eglCreateWindowSurface on the same NWindow corrupts the buffer queue and the present
@@ -46,6 +89,9 @@ extern EGLSurface eglCreateWindowSurface(EGLDisplay, EGLConfig, void *, const EG
 EGLSurface egl_CreateWindowSurface_log(EGLDisplay d, EGLConfig cfg, void *win, const EGLint *al) {
   if (g_win_surface && g_win_native == win) return g_win_surface;
   EGLSurface sfc = eglCreateWindowSurface(d, cfg, win, al);
+  EGLint samples = -1;
+  eglGetConfigAttrib(d, cfg, RD_EGL_SAMPLES, &samples);
+  debugPrintf("[egl] window surface: config samples %d\n", (int)samples);
   if (sfc && sfc != (EGLSurface)0) { g_win_surface = sfc; g_win_native = win; }
   nx_window_reassert();   /* mesa may reset the nwindow crop/transform when it builds its swapchain */
   return sfc;

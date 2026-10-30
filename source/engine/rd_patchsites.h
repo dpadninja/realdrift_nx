@@ -61,6 +61,21 @@ int rd_find_splash_flag(const rd_image *im, uint32_t *field);
  * RD_SITE_* result. */
 int rd_find_skip_clear(const uint32_t *code, size_t n, size_t *after_set, size_t *epilogue);
 
+/* Where QualitySettings.antiAliasing lives, read off the engine's getter. */
+typedef struct {
+  size_t   call;      /* word index of `bl GetQualitySettings` (returns the manager) */
+  uint32_t current;   /* manager + current: int32 index of the current quality level */
+  uint32_t levels;    /* manager + levels: pointer to the array of quality levels */
+  uint32_t stride;    /* bytes per quality level */
+  uint32_t field;     /* level + field: int32 antiAliasing (0, 2, 4, 8) */
+} rd_quality_aa;
+
+/* libunity: the icall QualitySettings::get_antiAliasing (code[0..n), 5.0.7 and 5.0.8 alike):
+ * `str x30,[sp,#-16]!; bl GetQualitySettings; ldrsw x8,[x0,#cur]; ldr x9,[x0,#levels];
+ * mov w10,#stride; madd x8,x8,x10,x9; ldr w0,[x8,#aa]; ldr x30,[sp],#16; ret`. The setter is
+ * not registered in this game, so the port writes the field itself. RD_SITE_* result. */
+int rd_find_quality_aa(const uint32_t *code, size_t n, rd_quality_aa *out);
+
 /* libil2cpp: Boehm GC stop-the-world globals, from GC_suspend_handler_inner, the suspend
  * signal wrapper that calls it, and the restart signal handler. */
 int rd_find_gc_vars(const rd_image *im, rd_gc_vars *out);
