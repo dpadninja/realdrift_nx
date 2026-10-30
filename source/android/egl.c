@@ -40,7 +40,7 @@ EGLBoolean egl_QuerySurface_log(EGLDisplay d, EGLSurface s, EGLint attr, EGLint 
 }
 
 // ---------------------------------------------------------------------------
-// config.txt antialiasing: a multisampled window
+// config.txt ge_antialiasing: a multisampled window
 // ---------------------------------------------------------------------------
 
 /* Logs the sample count of up to RD_EGL_LOG_CONFIGS of the configs mesa returned. */
@@ -58,19 +58,19 @@ static void log_configs(EGLDisplay d, const EGLConfig *cfg, EGLint n) {
 EGLBoolean egl_ChooseConfig_msaa(EGLDisplay d, const EGLint *al, EGLConfig *cfg, EGLint size,
                                  EGLint *num) {
   const int asked = (int)rd_egl_attrib(al, RD_EGL_SAMPLES, 0);
-  if (config.antialiasing > 0) {
+  if (config.ge_antialiasing > 0) {
     EGLint ms[RD_EGL_ATTRIBS_MAX];
-    if (rd_egl_attribs_samples(al, ms, RD_EGL_ATTRIBS_MAX, config.antialiasing)) {
+    if (rd_egl_attribs_samples(al, ms, RD_EGL_ATTRIBS_MAX, config.ge_antialiasing)) {
       EGLint n = 0;
       const EGLBoolean r = eglChooseConfig(d, ms, cfg, size, &n);
       debugPrintf("[egl] eglChooseConfig: engine asked samples %d, port asks %d -> %d configs\n",
-                  asked, config.antialiasing, r ? (int)n : -1);
+                  asked, config.ge_antialiasing, r ? (int)n : -1);
       if (r && n > 0) {
         log_configs(d, cfg, n);
         if (num) *num = n;
         return r;
       }
-      debugPrintf("[egl] no multisampled window config: antialiasing only in render targets\n");
+      debugPrintf("[egl] no multisampled window config: MSAA only with Graphics Enhancements\n");
     }
   }
   const EGLBoolean r = eglChooseConfig(d, al, cfg, size, num);

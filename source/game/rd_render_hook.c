@@ -1,4 +1,4 @@
-/* rd_render_hook.c -- min_draw_distance and antialiasing, il2cpp glue (see rd_render.h).
+/* rd_render_hook.c -- min_draw_distance and ge_antialiasing, il2cpp glue (see rd_render.h).
  * MIT (see LICENSE).
  *
  * Runs from the main loop between engine frames, so the icalls never interleave with the
@@ -58,12 +58,12 @@ static void apply_far(void) {
 
 void rd_render_frame(void) {
   if (g_state < 0 || (port_frame_count() % RD_RENDER_FRAMES)) return;
-  if (config.min_draw_distance == RD_DRAW_DISTANCE_GAME && !config.antialiasing) {
+  if (config.min_draw_distance == RD_DRAW_DISTANCE_GAME && !config.ge_antialiasing) {
     g_state = -1;
     return;
   }
   if (!g_state && (g_state = install()) <= 0) return;
-  if (config.antialiasing) rd_quality_set_aa(config.antialiasing);
+  if (config.ge_antialiasing) rd_quality_set_aa(config.ge_antialiasing);
   if (config.min_draw_distance == RD_DRAW_DISTANCE_GAME || !ic.camera_main) return;
   const uint32_t now = port_frame_count();
   int32_t scene = 0;

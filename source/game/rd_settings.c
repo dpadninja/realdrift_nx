@@ -106,17 +106,20 @@ static const setting SETTINGS[] = {
     "#   %d .. %d; a track that already sees farther keeps its own; 0 = as the game. Only\n"
     "#   the two mountain tracks (360 m) are shorter than 1000 m. Their trees are flat cards\n"
     "#   (cheap); beyond ~1000 m the edge of the mountain model may show.\n" },
-  { "antialiasing", T_AA, F(antialiasing),
-    "# antialiasing (experimental): MSAA samples, 0 (off), 2, 4 or 8. Smooths the edges of\n"
-    "#   the car, the road and the rails, not of foliage. Costs GPU time.\n" },
   { "anisotropic_filtering", T_ANISO, F(anisotropic_filtering),
     "# anisotropic_filtering (experimental): 0 (as the game), 2, 4, 8 or 16. Keeps the road\n"
     "#   sharp into the distance instead of blurring at a grazing angle. Nearly free; try 8.\n" },
   { "ge_bloom", T_SWITCH, F(ge_bloom),
-    "# Graphics Enhancements (the game's option) is bloom + vignette; each can be turned off.\n"
+    "# ge_*: only while Graphics Enhancements (the game's option) is on. It is bloom +\n"
+    "#   vignette, each can be turned off; it also carries ge_antialiasing.\n"
     "# ge_bloom: 1 = the glow (the game's makes the whole picture hazy), 0 = off.\n" },
   { "ge_vignette", T_SWITCH, F(ge_vignette),
     "# ge_vignette: 1 = darkened screen corners, 0 = off.\n" },
+  { "ge_antialiasing", T_AA, F(ge_antialiasing),
+    "# ge_antialiasing (experimental): MSAA samples, 0 (off), 2, 4 or 8: smooth edges of the\n"
+    "#   car, road and rails (not foliage). The effect's picture is multisampled; the screen\n"
+    "#   itself cannot be (mesa), so without Graphics Enhancements nothing changes. 4 costs\n"
+    "#   ~4 ms GPU on Mountain Downhill handheld (too much at stock clocks): try 2.\n" },
   { "texture_transcode", T_SWITCH, F(texture_transcode),
     "# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads\n"
     "#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after\n"

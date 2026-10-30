@@ -125,7 +125,7 @@ static void test_write_then_read_roundtrip(const char *dir) {
   in.debug_load = 1;
   in.debug_audio = 1;
   in.min_draw_distance = 1500;
-  in.antialiasing = 4;
+  in.ge_antialiasing = 4;
   in.anisotropic_filtering = 8;
   in.ge_bloom = 0;
   in.ge_vignette = 0;
@@ -160,22 +160,23 @@ static void test_offline_keys(void) {
   CHECK(rd_settings_set(&s, "offline_ui", "0") >= 0 && s.offline_ui == 0);
 }
 
-/* min_draw_distance takes whole metres in its range, antialiasing and anisotropic_filtering only
- * the levels the engine / GPU accept; all are off by default, so the game looks as shipped. */
+/* min_draw_distance takes whole metres in its range, ge_antialiasing and anisotropic_filtering
+ * only the levels the engine / GPU accept; all are off by default, so the game looks as shipped. */
 static void test_render_keys(void) {
   rd_settings s = RD_SETTINGS_DEFAULT;
-  CHECK(s.min_draw_distance == RD_DRAW_DISTANCE_GAME && s.antialiasing == 0);
+  CHECK(s.min_draw_distance == RD_DRAW_DISTANCE_GAME && s.ge_antialiasing == 0);
   CHECK(rd_settings_set(&s, "min_draw_distance", "1500") == idx("min_draw_distance") &&
         s.min_draw_distance == 1500);
   CHECK(rd_settings_set(&s, "min_draw_distance", "-1") == -1 && s.min_draw_distance == 1500);
   CHECK(rd_settings_set(&s, "min_draw_distance", "5001") == -1);
   CHECK(rd_settings_set(&s, "min_draw_distance", "1.5") == -1);
   CHECK(rd_settings_set(&s, "min_draw_distance", "0") >= 0 && s.min_draw_distance == 0);
-  CHECK(rd_settings_set(&s, "antialiasing", "4") == idx("antialiasing") && s.antialiasing == 4);
-  CHECK(rd_settings_set(&s, "antialiasing", "3") == -1 && s.antialiasing == 4);
-  CHECK(rd_settings_set(&s, "antialiasing", "16") == -1);
-  CHECK(rd_settings_set(&s, "antialiasing", "on") == -1);
-  CHECK(rd_settings_set(&s, "antialiasing", "0") >= 0 && s.antialiasing == 0);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "4") == idx("ge_antialiasing") &&
+        s.ge_antialiasing == 4);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "3") == -1 && s.ge_antialiasing == 4);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "16") == -1);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "on") == -1);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "0") >= 0 && s.ge_antialiasing == 0);
   CHECK(s.anisotropic_filtering == RD_ANISO_OFF);
   CHECK(rd_settings_set(&s, "anisotropic_filtering", "16") == idx("anisotropic_filtering") &&
         s.anisotropic_filtering == 16);

@@ -196,7 +196,7 @@ DynLibFunction unity_dynlib_functions[] = {
   { "div", (uintptr_t)&div },
   { "dladdr", (uintptr_t)&z_stub0 },
   { "dup", (uintptr_t)&z_dup },
-  { "eglChooseConfig", (uintptr_t)&egl_ChooseConfig_msaa },   /* egl.c: antialiasing */
+  { "eglChooseConfig", (uintptr_t)&egl_ChooseConfig_msaa },   /* egl.c: ge_antialiasing */
   { "eglCreatePbufferSurface", (uintptr_t)&eglCreatePbufferSurface },
   { "eglGetCurrentContext", (uintptr_t)&eglGetCurrentContext },
   { "eglGetCurrentSurface", (uintptr_t)&eglGetCurrentSurface },

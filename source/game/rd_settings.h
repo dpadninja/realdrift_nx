@@ -57,7 +57,7 @@ typedef struct {
   int         smoke_size;            /* percent of the smoke puffs' size (rd_smoke.h) */
   int         smoke_amount;          /* percent of the smoke puffs emitted (rd_smoke.h) */
   int         min_draw_distance;     /* metres, RD_DRAW_DISTANCE_GAME = the scene's (rd_render.h) */
-  int         antialiasing;          /* MSAA samples: 0, 2, 4, 8 (rd_render.h) */
+  int         ge_antialiasing;       /* MSAA samples: 0, 2, 4, 8 (rd_render.h) */
   int         anisotropic_filtering; /* RD_ANISO_OFF, 2, 4, 8, 16 (rd_aniso.h) */
   int         ge_bloom;              /* Graphics Enhancements' bloom: 1 = on (rd_sleek.h) */
   int         ge_vignette;           /* Graphics Enhancements' vignette: 1 = on (rd_sleek.h) */
@@ -96,7 +96,7 @@ typedef struct {
   .smoke_size = RD_SMOKE_PERCENT_ORIG,                                \
   .smoke_amount = RD_SMOKE_PERCENT_ORIG,                              \
   .min_draw_distance = RD_DRAW_DISTANCE_GAME,                         \
-  .antialiasing = 0,                                                  \
+  .ge_antialiasing = 0,                                               \
   .anisotropic_filtering = RD_ANISO_OFF,                              \
   .ge_bloom = 1,                                                      \
   .ge_vignette = 1,                                                   \

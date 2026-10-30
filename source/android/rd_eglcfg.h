@@ -1,5 +1,5 @@
-/* rd_eglcfg.h -- EGL attribute lists for config.txt antialiasing: the engine's eglChooseConfig
- * request rewritten to ask for a multisampled window (egl.c). Pure, host-testable
+/* rd_eglcfg.h -- EGL attribute lists for config.txt ge_antialiasing: the engine's
+ * eglChooseConfig request rewritten to ask for a multisampled window (egl.c). Pure, host-testable
  * (tests/c/test_rd_eglcfg.c). MIT (see LICENSE). */
 #ifndef RD_EGLCFG_H
 #define RD_EGLCFG_H
