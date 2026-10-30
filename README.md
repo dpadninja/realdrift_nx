@@ -27,6 +27,7 @@ Limitations:
 - **Render resolution:** 720p handheld / 1080p docked by default, or fixed.
 - **Separate clutch** (`Y` by default), which the original game does not have: you can now use the clutch separately (e.g. for low-powered cars).
 - **Lighter tire smoke** (optional): smaller and fewer smoke puffs for a steady frame rate.
+- **Advanced graphics options** (optional): sharper textures into the distance (anisotropic filtering), a longer view on the mountain tracks, and for the game's Graphics Enhancements: antialiasing (MSAA) and the bloom and vignette switched on or off separately.
 
 ## Supported game version
 
@@ -116,6 +117,21 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 | `texture_transcode` | `0` / `1` | `1` | store the game's ETC2 textures as S3TC, which the GPU reads directly; `0` leaves them to Mesa, which unpacks them to 4–8x the memory, and after many cars and tracks new objects show black |
 | `smoke_size` | `10`–`100` | `100` | size of the tire smoke puffs in percent; `100` = original. Lower it (e.g. `50`) if heavy smoke drops the frame rate |
 | `smoke_amount` | `10`–`100` | `100` | percent of the smoke puffs emitted; `100` = original. `50` together with `smoke_size=50` keeps the frame rate steady in heavy smoke |
+
+### Graphics
+
+| Key | Values | Default | Meaning |
+|---|---|---|---|
+| `anisotropic_filtering` | `0` / `2` / `4` / `8` / `16` | `0` | keeps the road and other textures sharp into the distance instead of blurring at a grazing angle; `0` = as the game. Nearly free; `8` recommended |
+| `min_draw_distance` | `0`–`5000` | `0` | the race camera sees at least this far, in meters; a track that already sees farther keeps its own; `0` = as the game. Only the two mountain tracks (360 m) see less than 1000 m; `1000` costs almost nothing, much farther may show the edge of the mountain model |
+
+The `ge_*` keys work only while the game's own **Graphics Enhancements** option is on; without it they change nothing.
+
+| Key | Values | Default | Meaning |
+|---|---|---|---|
+| `ge_bloom` | `0` / `1` | `1` | the glow; the game's makes the whole picture hazy. `0` = off |
+| `ge_vignette` | `0` / `1` | `1` | darkened screen corners. `0` = off |
+| `ge_antialiasing` | `0` / `2` / `4` / `8` | `0` | MSAA: smooths the edges of the car, road and rails (not foliage). `2` keeps 60 fps handheld on Mountain Downhill; `4` already drops frames there at stock clocks |
 
 ### Debugging
 
