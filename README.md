@@ -24,7 +24,7 @@ Limitations:
 ## Features
 - **Full controller support.**
   - Driving: physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
-  - Separate clutch (`Y` by default), which the original game does not have: you can now use the clutch separately (e.g. for low-powered cars).
+    - Plus a separate clutch (`Y` by default), which the original game does not have: you can work the clutch on its own (e.g. for low-powered cars).
   - Menu navigation: a frame marks the selected menu element. The D-pad or the left stick moves it to the neighbor in that direction, as with a TV remote; `A` selects, `B` goes back. `L` / `R` switch the car in the garage, the leaderboard track and the settings and profile tabs. On a slider, `A` starts editing: left / right change the value, `A` keeps it, `B` restores the old one. `A` or `B` skip the track preview before a race. The touchscreen keeps working.
 - **Advanced graphics options** (all optional, in `config.txt`):
   - Render resolution: 720p handheld / 1080p docked by default, or fixed.
