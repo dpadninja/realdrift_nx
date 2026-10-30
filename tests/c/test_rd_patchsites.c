@@ -132,6 +132,32 @@ static void test_skip_clear_refuses_other_code(void) {
   CHECK(rd_find_skip_clear(no_call, 9, &from, &to) == RD_SITE_BAD_CHECK);
 }
 
+/* QualitySettings::get_antiAliasing, 5.0.8 words (0x2ed034). */
+static const uint32_t GET_AA[] = { 0xf81f0ffe, 0x94057bb0, 0xb9804c08, 0xf9401809, 0x5280140a,
+                                   0x9b0a2508, 0xb9406500, 0xf84107fe, 0xd65f03c0 };
+
+/* The getter yields the manager call and the offsets it reads: current level at 0x4c, levels
+ * at 0x30, 0xa0 bytes per level, antiAliasing at 0x64. */
+static void test_quality_aa(void) {
+  rd_quality_aa q = { 0 };
+  CHECK(rd_find_quality_aa(GET_AA, 9, &q) == RD_SITE_OK);
+  CHECK(q.call == 1 && q.current == 0x4c && q.levels == 0x30 && q.stride == 0xa0 &&
+        q.field == 0x64);
+}
+
+/* Other code, a cut-off body or a zero stride is not taken for the getter. */
+static void test_quality_aa_refuses_other_code(void) {
+  rd_quality_aa q;
+  uint32_t c[9];
+  CHECK(rd_find_quality_aa(GET_AA, 8, &q) == RD_SITE_NOT_FOUND);
+  memcpy(c, GET_AA, sizeof c);
+  c[6] = 0xb9406501;                                /* ldr w1, [x8, #0x64]: not the result */
+  CHECK(rd_find_quality_aa(c, 9, &q) == RD_SITE_NOT_FOUND);
+  memcpy(c, GET_AA, sizeof c);
+  c[4] = 0x5280000a;                                /* mov w10, #0 */
+  CHECK(rd_find_quality_aa(c, 9, &q) == RD_SITE_BAD_CHECK);
+}
+
 /* ---- il2cpp copy and splash flag: synthetic fragments (5.0.8 words) at BASE ---- */
 static uint32_t g_big[1024];
 static const char *g_at_1800, *g_at_1900;
@@ -236,6 +262,8 @@ int main(void) {
   RUN(test_wrong_string_rejected);
   RUN(test_branch_must_reach_epilogue);
   RUN(test_ambiguous_and_missing);
+  RUN(test_quality_aa);
+  RUN(test_quality_aa_refuses_other_code);
   RUN(test_il2cpp_copy);
   RUN(test_splash_flag);
   return g_failures != 0;

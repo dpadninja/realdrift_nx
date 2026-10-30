@@ -22,6 +22,9 @@ typedef enum {
   T_SMOKE,       /* int percent, RD_SMOKE_PERCENT_MIN .. RD_SMOKE_PERCENT_ORIG */
   T_RESOLUTION,  /* int, auto | 720 | 1080 */
   T_COUNTRY,     /* char[RD_COUNTRY_SIZE]: "" or two letters (ISO 3166-1 alpha-2) */
+  T_DISTANCE,    /* int metres, RD_DRAW_DISTANCE_GAME .. RD_DRAW_DISTANCE_MAX */
+  T_AA,          /* int samples, rd_render_aa_valid */
+  T_ANISO,       /* int level, rd_aniso_valid */
 } type;
 
 /* Range of a numeric type; 1 = float, 2 = int, 0 = not numeric. */
@@ -29,6 +32,7 @@ static int range(type t, float *lo, float *hi) {
   switch (t) {
     case T_DEADZONE: *lo = 0.0f; *hi = RD_DEADZONE_MAX; return 1;
     case T_SMOKE:    *lo = RD_SMOKE_PERCENT_MIN; *hi = RD_SMOKE_PERCENT_ORIG; return 2;
+    case T_DISTANCE: *lo = RD_DRAW_DISTANCE_GAME; *hi = RD_DRAW_DISTANCE_MAX; return 2;
     default:             return 0;
   }
 }
@@ -97,6 +101,25 @@ static const setting SETTINGS[] = {
     "# smoke_size: size of the smoke puffs in percent, %d .. %d (try 50).\n" },
   { "smoke_amount", T_SMOKE, F(smoke_amount),
     "# smoke_amount: percent of the smoke puffs that are emitted, %d .. %d (try 50).\n" },
+  { "min_draw_distance", T_DISTANCE, F(min_draw_distance),
+    "# min_draw_distance (experimental): the race camera sees at least this far, in metres,\n"
+    "#   %d .. %d; a track that already sees farther keeps its own; 0 = as the game. Only\n"
+    "#   the two mountain tracks (360 m) are shorter than 1000 m. Their trees are flat cards\n"
+    "#   (cheap); beyond ~1000 m the edge of the mountain model may show.\n" },
+  { "anisotropic_filtering", T_ANISO, F(anisotropic_filtering),
+    "# anisotropic_filtering (experimental): 0 (as the game), 2, 4, 8 or 16. Keeps the road\n"
+    "#   sharp into the distance instead of blurring at a grazing angle. Nearly free; try 8.\n" },
+  { "ge_bloom", T_SWITCH, F(ge_bloom),
+    "# ge_*: only while Graphics Enhancements (the game's option) is on. It is bloom +\n"
+    "#   vignette, each can be turned off; it also carries ge_antialiasing.\n"
+    "# ge_bloom: 1 = the glow (the game's makes the whole picture hazy), 0 = off.\n" },
+  { "ge_vignette", T_SWITCH, F(ge_vignette),
+    "# ge_vignette: 1 = darkened screen corners, 0 = off.\n" },
+  { "ge_antialiasing", T_AA, F(ge_antialiasing),
+    "# ge_antialiasing (experimental): MSAA samples, 0 (off), 2, 4 or 8: smooth edges of the\n"
+    "#   car, road and rails (not foliage). The effect's picture is multisampled; the screen\n"
+    "#   itself cannot be (mesa), so without Graphics Enhancements nothing changes. 4 costs\n"
+    "#   ~4 ms GPU on Mountain Downhill handheld (too much at stock clocks): try 2.\n" },
   { "texture_transcode", T_SWITCH, F(texture_transcode),
     "# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads\n"
     "#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after\n"
@@ -212,12 +235,22 @@ static int parse(const setting *st, const char *value, void *field) {
       *(float *)field = x;
       return 0;
     }
-    case T_SMOKE: {
+    case T_SMOKE:
+    case T_DISTANCE: {
       float lo, hi;
       range(st->type, &lo, &hi);
       char *end;
       long x = strtol(v, &end, 10);
       if (end == v || *end || x < (long)lo || x > (long)hi) return -1;
+      *(int *)field = (int)x;
+      return 0;
+    }
+    case T_AA:
+    case T_ANISO: {
+      char *end;
+      long x = strtol(v, &end, 10);
+      if (end == v || *end ||
+          !(st->type == T_AA ? rd_render_aa_valid((int)x) : rd_aniso_valid((int)x))) return -1;
       *(int *)field = (int)x;
       return 0;
     }
@@ -248,7 +281,10 @@ static void format(const setting *st, const void *field, char *buf, size_t n) {
     case T_BUTTONS:  if (rd_format_buttons(*(const uint64_t *)field, buf, n)) snprintf(buf, n, "NONE"); break;
     case T_SWITCH:   snprintf(buf, n, "%d", *(const int *)field ? 1 : 0); break;
     case T_DEADZONE: snprintf(buf, n, "%.2f", (double)*(const float *)field); break;
-    case T_SMOKE:    snprintf(buf, n, "%d", *(const int *)field); break;
+    case T_SMOKE:
+    case T_DISTANCE:
+    case T_AA:
+    case T_ANISO:    snprintf(buf, n, "%d", *(const int *)field); break;
     case T_RESOLUTION: {
       int r = *(const int *)field;
       snprintf(buf, n, "%s", r == RD_RES_720 ? "720" : r == RD_RES_1080 ? "1080" : "auto");

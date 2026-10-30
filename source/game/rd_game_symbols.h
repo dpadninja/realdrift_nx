@@ -63,6 +63,11 @@
 #define RD_ICALL_SHARED_MATERIAL  "UnityEngine.Renderer::GetSharedMaterial"
 #define RD_ICALL_TIME_SCALE       "UnityEngine.Time::get_timeScale"   /* 0 on the pause menu */
 
+/* ---- draw distance (rd_render_hook.c); all three are registered (the game calls them) -- */
+#define RD_ICALL_CAMERA_MAIN      "UnityEngine.Camera::get_main"
+#define RD_ICALL_GET_FAR_CLIP     "UnityEngine.Camera::get_farClipPlane"
+#define RD_ICALL_SET_FAR_CLIP     "UnityEngine.Camera::set_farClipPlane"
+
 /* ---- menu navigation (rd_menu_hook.c; the uGUI names are in engine/rd_ugui.c) -------- */
 #define RD_ICALL_GET_KEY_DOWN     "UnityEngine.Input::GetKeyDownInt"     /* wrapped: Escape */
 #define RD_ICALL_ACTIVE_SELF      "UnityEngine.GameObject::get_activeSelf"
@@ -116,5 +121,9 @@
 #define RD_NS_SLEEK               "SleekRender"
 #define RD_CLS_SLEEK_POST         "SleekRenderPostProcess"
 #define RD_MTH_SLEEK_SET_CLEAR    "SetActiveRenderTextureAndClear"   /* static, 1 argument */
+#define RD_FLD_SLEEK_SETTINGS     "settings"                 /* SleekRenderPostProcess -> asset */
+#define RD_CLS_SLEEK_SETTINGS     "SleekRenderSettings"      /* ScriptableObject, read every frame */
+#define RD_FLD_SLEEK_BLOOM        "bloomEnabled"             /* bool */
+#define RD_FLD_SLEEK_VIGNETTE     "vignetteEnabled"          /* bool */
 
 #endif

@@ -19,6 +19,8 @@
 #include "rd_perf.h"
 #include "rd_log.h"
 #include "rd_smoke.h"
+#include "rd_render.h"
+#include "rd_aniso.h"
 
 #define RD_BTN_A      (1ull << 0)
 #define RD_BTN_B      (1ull << 1)
@@ -54,6 +56,11 @@ typedef struct {
   int         boost_loading;         /* 1: CPU boost while a loading frame runs (rd_perf.h) */
   int         smoke_size;            /* percent of the smoke puffs' size (rd_smoke.h) */
   int         smoke_amount;          /* percent of the smoke puffs emitted (rd_smoke.h) */
+  int         min_draw_distance;     /* metres, RD_DRAW_DISTANCE_GAME = the scene's (rd_render.h) */
+  int         ge_antialiasing;       /* MSAA samples: 0, 2, 4, 8 (rd_render.h) */
+  int         anisotropic_filtering; /* RD_ANISO_OFF, 2, 4, 8, 16 (rd_aniso.h) */
+  int         ge_bloom;              /* Graphics Enhancements' bloom: 1 = on (rd_sleek.h) */
+  int         ge_vignette;           /* Graphics Enhancements' vignette: 1 = on (rd_sleek.h) */
   int         debug_log;             /* RD_LOG_FULL / RD_LOG_MINIMAL (rd_log.h) */
   int         debug_fps_counter;     /* 1: FPS overlay in the top-left corner (rd_fps.h) */
   int         debug_gl_trace;        /* 1: GPU time per render target of a frame (rd_gltrace.h) */
@@ -88,6 +95,11 @@ typedef struct {
   .boost_loading = 1,                                                 \
   .smoke_size = RD_SMOKE_PERCENT_ORIG,                                \
   .smoke_amount = RD_SMOKE_PERCENT_ORIG,                              \
+  .min_draw_distance = RD_DRAW_DISTANCE_GAME,                         \
+  .ge_antialiasing = 0,                                               \
+  .anisotropic_filtering = RD_ANISO_OFF,                              \
+  .ge_bloom = 1,                                                      \
+  .ge_vignette = 1,                                                   \
   .debug_log = RD_LOG_MINIMAL,                                        \
   .debug_fps_counter = 0,                                             \
   .debug_gl_trace = 0,                                                \

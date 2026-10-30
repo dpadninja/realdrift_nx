@@ -23,6 +23,7 @@
 #include "rd_sleek.h"
 #include "rd_menu.h"
 #include "rd_offline.h"
+#include "rd_render.h"
 #include "rd_player.h"
 #include "rd_fsdeny.h"
 #include "libc_shim.h"
@@ -367,6 +368,8 @@ static void run_main_loop(void) {
     if (!_alive) break;
     rd_menu_frame();                                       /* controller menu navigation */
     rd_offline_frame();                                    /* online features hidden */
+    rd_render_frame();                                     /* min_draw_distance, ge_antialiasing */
+    rd_sleek_frame();                                      /* ge_bloom, ge_vignette */
 
     {
       const uint64_t _ns = rd_now_ns() - t0;

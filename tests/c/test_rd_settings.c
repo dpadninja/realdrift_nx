@@ -1,4 +1,4 @@
-/* sources: source/game/rd_settings.c source/platform/rd_perf.c */
+/* sources: source/game/rd_settings.c source/game/rd_render.c source/android/rd_aniso.c source/platform/rd_perf.c */
 /* Host unit test of rd_settings. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
@@ -97,7 +97,7 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "bind_ui_back", "B,Y") == idx("bind_ui_back") &&
         s.ui_back == (RD_BTN_B | RD_BTN_Y));
   CHECK(rd_settings_set(&s, "bind_ui_next", "ZR") == idx("bind_ui_next") && s.ui_next == RD_BTN_ZR);
-  CHECK(rd_settings_count() == 33 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_count() == 38 && idx("bind_throttle") == 0);
 }
 
 /* config.txt written with non-default values reads back identically, and a file with missing
@@ -124,6 +124,11 @@ static void test_write_then_read_roundtrip(const char *dir) {
   in.texture_transcode = 0;
   in.debug_load = 1;
   in.debug_audio = 1;
+  in.min_draw_distance = 1500;
+  in.ge_antialiasing = 4;
+  in.anisotropic_filtering = 8;
+  in.ge_bloom = 0;
+  in.ge_vignette = 0;
   FILE *f = fopen(path, "w"); rd_settings_write(&in, f); fclose(f);
 
   rd_settings out = RD_SETTINGS_DEFAULT;
@@ -155,12 +160,42 @@ static void test_offline_keys(void) {
   CHECK(rd_settings_set(&s, "offline_ui", "0") >= 0 && s.offline_ui == 0);
 }
 
+/* min_draw_distance takes whole metres in its range, ge_antialiasing and anisotropic_filtering
+ * only the levels the engine / GPU accept; all are off by default, so the game looks as shipped. */
+static void test_render_keys(void) {
+  rd_settings s = RD_SETTINGS_DEFAULT;
+  CHECK(s.min_draw_distance == RD_DRAW_DISTANCE_GAME && s.ge_antialiasing == 0);
+  CHECK(rd_settings_set(&s, "min_draw_distance", "1500") == idx("min_draw_distance") &&
+        s.min_draw_distance == 1500);
+  CHECK(rd_settings_set(&s, "min_draw_distance", "-1") == -1 && s.min_draw_distance == 1500);
+  CHECK(rd_settings_set(&s, "min_draw_distance", "5001") == -1);
+  CHECK(rd_settings_set(&s, "min_draw_distance", "1.5") == -1);
+  CHECK(rd_settings_set(&s, "min_draw_distance", "0") >= 0 && s.min_draw_distance == 0);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "4") == idx("ge_antialiasing") &&
+        s.ge_antialiasing == 4);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "3") == -1 && s.ge_antialiasing == 4);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "16") == -1);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "on") == -1);
+  CHECK(rd_settings_set(&s, "ge_antialiasing", "0") >= 0 && s.ge_antialiasing == 0);
+  CHECK(s.anisotropic_filtering == RD_ANISO_OFF);
+  CHECK(rd_settings_set(&s, "anisotropic_filtering", "16") == idx("anisotropic_filtering") &&
+        s.anisotropic_filtering == 16);
+  CHECK(rd_settings_set(&s, "anisotropic_filtering", "6") == -1 && s.anisotropic_filtering == 16);
+  CHECK(rd_settings_set(&s, "anisotropic_filtering", "32") == -1);
+  CHECK(rd_settings_set(&s, "anisotropic_filtering", "0") >= 0 && s.anisotropic_filtering == 0);
+  CHECK(s.ge_bloom == 1 && s.ge_vignette == 1);                  /* the game's effect */
+  CHECK(rd_settings_set(&s, "ge_bloom", "0") == idx("ge_bloom") && s.ge_bloom == 0);
+  CHECK(rd_settings_set(&s, "ge_vignette", "0") == idx("ge_vignette") && s.ge_vignette == 0);
+  CHECK(rd_settings_set(&s, "ge_vignette", "off") == -1 && s.ge_vignette == 0);
+}
+
 int main(int argc, char **argv) {
   RUN(test_parse_buttons);
   RUN(test_format_roundtrip);
   RUN(test_defaults_put_gears_on_dpad);
   RUN(test_settings_set);
   RUN(test_offline_keys);
+  RUN(test_render_keys);
   test_write_then_read_roundtrip(argc > 1 ? argv[1] : ".");
   return g_failures != 0;
 }
