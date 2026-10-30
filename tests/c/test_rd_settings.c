@@ -1,4 +1,4 @@
-/* sources: source/game/rd_settings.c source/game/rd_render.c source/platform/rd_perf.c */
+/* sources: source/game/rd_settings.c source/game/rd_render.c source/android/rd_aniso.c source/platform/rd_perf.c */
 /* Host unit test of rd_settings. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
@@ -97,7 +97,7 @@ static void test_settings_set(void) {
   CHECK(rd_settings_set(&s, "bind_ui_back", "B,Y") == idx("bind_ui_back") &&
         s.ui_back == (RD_BTN_B | RD_BTN_Y));
   CHECK(rd_settings_set(&s, "bind_ui_next", "ZR") == idx("bind_ui_next") && s.ui_next == RD_BTN_ZR);
-  CHECK(rd_settings_count() == 35 && idx("bind_throttle") == 0);
+  CHECK(rd_settings_count() == 36 && idx("bind_throttle") == 0);
 }
 
 /* config.txt written with non-default values reads back identically, and a file with missing
@@ -126,6 +126,7 @@ static void test_write_then_read_roundtrip(const char *dir) {
   in.debug_audio = 1;
   in.min_draw_distance = 1500;
   in.antialiasing = 4;
+  in.anisotropic_filtering = 8;
   FILE *f = fopen(path, "w"); rd_settings_write(&in, f); fclose(f);
 
   rd_settings out = RD_SETTINGS_DEFAULT;
@@ -157,8 +158,8 @@ static void test_offline_keys(void) {
   CHECK(rd_settings_set(&s, "offline_ui", "0") >= 0 && s.offline_ui == 0);
 }
 
-/* min_draw_distance takes whole metres in its range and antialiasing only the sample counts the
- * engine accepts; both are off by default, so the game looks as shipped unless asked. */
+/* min_draw_distance takes whole metres in its range, antialiasing and anisotropic_filtering only
+ * the levels the engine / GPU accept; all are off by default, so the game looks as shipped. */
 static void test_render_keys(void) {
   rd_settings s = RD_SETTINGS_DEFAULT;
   CHECK(s.min_draw_distance == RD_DRAW_DISTANCE_GAME && s.antialiasing == 0);
@@ -173,6 +174,12 @@ static void test_render_keys(void) {
   CHECK(rd_settings_set(&s, "antialiasing", "16") == -1);
   CHECK(rd_settings_set(&s, "antialiasing", "on") == -1);
   CHECK(rd_settings_set(&s, "antialiasing", "0") >= 0 && s.antialiasing == 0);
+  CHECK(s.anisotropic_filtering == RD_ANISO_OFF);
+  CHECK(rd_settings_set(&s, "anisotropic_filtering", "16") == idx("anisotropic_filtering") &&
+        s.anisotropic_filtering == 16);
+  CHECK(rd_settings_set(&s, "anisotropic_filtering", "6") == -1 && s.anisotropic_filtering == 16);
+  CHECK(rd_settings_set(&s, "anisotropic_filtering", "32") == -1);
+  CHECK(rd_settings_set(&s, "anisotropic_filtering", "0") >= 0 && s.anisotropic_filtering == 0);
 }
 
 int main(int argc, char **argv) {

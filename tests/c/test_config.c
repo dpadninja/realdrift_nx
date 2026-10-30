@@ -1,4 +1,4 @@
-/* sources: source/game/config.c source/game/rd_settings.c source/game/rd_render.c */
+/* sources: source/game/config.c source/game/rd_settings.c source/game/rd_render.c source/android/rd_aniso.c */
 /* Host unit test of config. MIT (see LICENSE). */
 #include <stdio.h>
 #include <stdlib.h>

@@ -31,7 +31,8 @@ void timed_glBufferData(GLenum t, GLsizeiptr n, const void *d, GLenum u);
 /* A GL function the engine gets (from our import table or eglGetProcAddress): with
  * debug_gl_trace its frame-trace wrapper (rd_gltrace_gl.h), with debug_mem its allocation
  * check (rd_memwatch.h), with texture_transcode the ETC2 -> S3TC wrapper on top
- * (rd_etc2bc_gl.h), else `real` itself. */
+ * (rd_etc2bc_gl.h), with anisotropic_filtering the sampling wrapper (rd_aniso_gl.h), else
+ * `real` itself. */
 void *egl_wrap_gl(const char *name, void *real);
 /* eglGetProcAddress for the engine: GL calls that can wait for the GPU come back wrapped so
  * their time is counted (nx_stat_glwait_ns, rd_perfstat.h), and with debug_gl_trace the

@@ -24,6 +24,7 @@ typedef enum {
   T_COUNTRY,     /* char[RD_COUNTRY_SIZE]: "" or two letters (ISO 3166-1 alpha-2) */
   T_DISTANCE,    /* int metres, RD_DRAW_DISTANCE_GAME .. RD_DRAW_DISTANCE_MAX */
   T_AA,          /* int samples, rd_render_aa_valid */
+  T_ANISO,       /* int level, rd_aniso_valid */
 } type;
 
 /* Range of a numeric type; 1 = float, 2 = int, 0 = not numeric. */
@@ -108,6 +109,9 @@ static const setting SETTINGS[] = {
   { "antialiasing", T_AA, F(antialiasing),
     "# antialiasing (experimental): MSAA samples, 0 (off), 2, 4 or 8. Smooths the edges of\n"
     "#   the car, the road and the rails, not of foliage. Costs GPU time.\n" },
+  { "anisotropic_filtering", T_ANISO, F(anisotropic_filtering),
+    "# anisotropic_filtering (experimental): 0 (as the game), 2, 4, 8 or 16. Keeps the road\n"
+    "#   sharp into the distance instead of blurring at a grazing angle. Nearly free; try 8.\n" },
   { "texture_transcode", T_SWITCH, F(texture_transcode),
     "# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads\n"
     "#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after\n"
@@ -233,10 +237,12 @@ static int parse(const setting *st, const char *value, void *field) {
       *(int *)field = (int)x;
       return 0;
     }
-    case T_AA: {
+    case T_AA:
+    case T_ANISO: {
       char *end;
       long x = strtol(v, &end, 10);
-      if (end == v || *end || !rd_render_aa_valid((int)x)) return -1;
+      if (end == v || *end ||
+          !(st->type == T_AA ? rd_render_aa_valid((int)x) : rd_aniso_valid((int)x))) return -1;
       *(int *)field = (int)x;
       return 0;
     }
@@ -269,7 +275,8 @@ static void format(const setting *st, const void *field, char *buf, size_t n) {
     case T_DEADZONE: snprintf(buf, n, "%.2f", (double)*(const float *)field); break;
     case T_SMOKE:
     case T_DISTANCE:
-    case T_AA:       snprintf(buf, n, "%d", *(const int *)field); break;
+    case T_AA:
+    case T_ANISO:    snprintf(buf, n, "%d", *(const int *)field); break;
     case T_RESOLUTION: {
       int r = *(const int *)field;
       snprintf(buf, n, "%s", r == RD_RES_720 ? "720" : r == RD_RES_1080 ? "1080" : "auto");

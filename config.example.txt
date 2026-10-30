@@ -61,6 +61,9 @@ min_draw_distance=0
 # antialiasing (experimental): MSAA samples, 0 (off), 2, 4 or 8. Smooths the edges of
 #   the car, the road and the rails, not of foliage. Costs GPU time.
 antialiasing=0
+# anisotropic_filtering (experimental): 0 (as the game), 2, 4, 8 or 16. Keeps the road
+#   sharp into the distance instead of blurring at a grazing angle. Nearly free; try 8.
+anisotropic_filtering=0
 # texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads
 #   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after
 #   many cars and tracks new textures stop fitting and show black. Loads take a bit longer.

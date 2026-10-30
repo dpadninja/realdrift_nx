@@ -145,6 +145,7 @@ One line per module; each file's header comment has the details.
 | `rd_audiowatch.{c,h}` | debug_audio: notices silences of the output and their end |
 | `opensles_internal.h` | OpenSL ES types, vtables and the shim's objects (internal) |
 | `egl.{c,h}` | EGL/GLES wrappers: surface size and lifetime, `eglSwapBuffers` with overlays, GL wait timing |
+| `rd_aniso.{c,h}`, `rd_aniso_gl.{c,h}` | anisotropic_filtering: anisotropy added to the engine's mipmapped texture and sampler filters |
 | `rd_eglcfg.{c,h}` | antialiasing: the engine's `eglChooseConfig` request rewritten for a multisampled window |
 | `rd_etc2bc.{c,h}` | ETC1/ETC2 blocks re-encoded as S3TC (BC1 / BC3), the only user of the vendored codecs |
 | `rd_slvolume.{c,h}` | OpenSL volume level and mute as the mixer's gain |

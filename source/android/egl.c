@@ -20,6 +20,7 @@
 #include "rd_memwatch.h"
 #include "rd_etc2bc_gl.h"
 #include "rd_eglcfg.h"
+#include "rd_aniso_gl.h"
 #include "util.h"
 
 // ---------------------------------------------------------------------------
@@ -182,6 +183,8 @@ void *egl_wrap_gl(const char *name, void *real) {
   void *inner = w ? w : real;
   /* ETC2 stored as S3TC (rd_etc2bc_gl.h), on top of the check so it sees what mesa gets */
   void *t = config.texture_transcode && inner ? rd_etc2bc_wrap(name, inner) : NULL;
+  /* anisotropic_filtering (rd_aniso_gl.h): other functions than the transcoder's */
+  if (!t && config.anisotropic_filtering && inner) t = rd_aniso_wrap(name, inner);
   return t ? t : inner;
 }
 
