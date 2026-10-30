@@ -22,12 +22,16 @@ Limitations:
 - the game runs offline: its online features (coin shop, Google sign-in, cloud save, online leaderboards, Share, links to web pages) are hidden, and the leaderboard button reads STATISTICS and shows this console's records (`offline_ui`)
 
 ## Features
-- **Controller driving.** Physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
-- **Controller menu navigation:** a frame marks the selected menu element. The D-pad or the left stick moves it to the neighbor in that direction, as with a TV remote; `A` selects, `B` goes back. `L` / `R` switch the car in the garage, the leaderboard track and the settings and profile tabs. On a slider, `A` starts editing: left / right change the value, `A` keeps it, `B` restores the old one. `A` or `B` skip the track preview before a race. The touchscreen keeps working.
-- **Render resolution:** 720p handheld / 1080p docked by default, or fixed.
-- **Separate clutch** (`Y` by default), which the original game does not have: you can now use the clutch separately (e.g. for low-powered cars).
-- **Lighter tire smoke** (optional): smaller and fewer smoke puffs for a steady frame rate.
-- **Advanced graphics options** (optional): sharper textures into the distance (anisotropic filtering), a longer view on the mountain tracks, and for the game's Graphics Enhancements: antialiasing (MSAA) and the bloom and vignette switched on or off separately.
+- **Full controller support.**
+  - Driving: physical buttons are mapped onto the game's own throttle, brake, handbrake, gear and camera controls; analog steering comes from the left stick. Every binding can be changed in `config.txt`.
+  - Separate clutch (`Y` by default), which the original game does not have: you can now use the clutch separately (e.g. for low-powered cars).
+  - Menu navigation: a frame marks the selected menu element. The D-pad or the left stick moves it to the neighbor in that direction, as with a TV remote; `A` selects, `B` goes back. `L` / `R` switch the car in the garage, the leaderboard track and the settings and profile tabs. On a slider, `A` starts editing: left / right change the value, `A` keeps it, `B` restores the old one. `A` or `B` skip the track preview before a race. The touchscreen keeps working.
+- **Advanced graphics options** (all optional, in `config.txt`):
+  - Render resolution: 720p handheld / 1080p docked by default, or fixed.
+  - Anisotropic filtering: the road and other textures stay sharp into the distance.
+  - Longer view distance on the mountain tracks.
+  - Graphics Enhancements (the game's option): bloom and vignette switched on or off separately, and antialiasing (MSAA).
+  - Lighter tire smoke: smaller and fewer smoke puffs for a steady frame rate.
 
 ## Supported game version
 
