@@ -1,4 +1,4 @@
-/* rd_render_hook.c -- draw_distance and antialiasing, il2cpp glue (see rd_render.h).
+/* rd_render_hook.c -- min_draw_distance and antialiasing, il2cpp glue (see rd_render.h).
  * MIT (see LICENSE).
  *
  * Runs from the main loop between engine frames, so the icalls never interleave with the
@@ -31,17 +31,17 @@ static int install(void) {
   ic.get_far     = g_il2cpp.resolve_icall(RD_ICALL_GET_FAR_CLIP);
   ic.set_far     = g_il2cpp.resolve_icall(RD_ICALL_SET_FAR_CLIP);
   if (!ic.camera_main || !ic.get_far || !ic.set_far) {
-    debugPrintf("[render] Camera icalls not found: draw_distance off\n");
+    debugPrintf("[render] Camera icalls not found: min_draw_distance off\n");
     ic.camera_main = NULL;
   }
   return 1;
 }
 
-/* The race camera's far plane raised to draw_distance. */
+/* The race camera's far plane raised to min_draw_distance. */
 static void apply_far(void) {
   void *cam = ic.camera_main ? ic.camera_main() : NULL;
   if (!cam) return;
-  const float cur = ic.get_far(cam), far = rd_render_far(cur, config.draw_distance);
+  const float cur = ic.get_far(cam), far = rd_render_far(cur, config.min_draw_distance);
   if (far == cur) return;
   ic.set_far(cam, far);
   if (cam != g_logged) {
@@ -52,11 +52,11 @@ static void apply_far(void) {
 
 void rd_render_frame(void) {
   if (g_state < 0 || (port_frame_count() % RD_RENDER_FRAMES)) return;
-  if (config.draw_distance == RD_DRAW_DISTANCE_GAME && !config.antialiasing) {
+  if (config.min_draw_distance == RD_DRAW_DISTANCE_GAME && !config.antialiasing) {
     g_state = -1;
     return;
   }
   if (!g_state && (g_state = install()) <= 0) return;
   if (config.antialiasing) rd_quality_set_aa(config.antialiasing);
-  if (config.draw_distance != RD_DRAW_DISTANCE_GAME && rd_race_active()) apply_far();
+  if (config.min_draw_distance != RD_DRAW_DISTANCE_GAME && rd_race_active()) apply_far();
 }

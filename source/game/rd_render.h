@@ -1,10 +1,10 @@
-/* rd_render.h -- config.txt draw_distance and antialiasing (experimental).
+/* rd_render.h -- config.txt min_draw_distance and antialiasing (experimental).
  *
  * Draw distance: the game has no LODs, terrain, occlusion culling or fog; what is drawn is cut
  * only by the far clip plane of the scene's Main Camera, which the scenes set to 360 m on the
  * two mountain tracks (1.4 km across) and 1000-4000 m elsewhere (analysis/research/34). In
- * races the main camera's far plane is raised to draw_distance where it is shorter; the menu and
- * garage cameras (50 m) are left alone.
+ * races min_draw_distance is a floor for the main camera's far plane (a farther one is kept);
+ * the menu and garage cameras (50 m) are left alone.
  * Antialiasing: the current quality level's antiAliasing (rd_quality.h) for the cameras'
  * render targets, and a multisampled window (egl.c) for the frame drawn straight to it.
  *

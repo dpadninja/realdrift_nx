@@ -53,10 +53,11 @@ boost_loading=1
 smoke_size=100
 # smoke_amount: percent of the smoke puffs that are emitted, 10 .. 100 (try 50).
 smoke_amount=100
-# draw_distance (experimental): metres the race camera sees at least, 0 .. 5000; 0 = as
-#   the game. Only the two mountain tracks (360 m) are shorter than 1000 m. Their trees
-#   are flat cards (cheap); beyond ~1000 m the edge of the mountain model may show.
-draw_distance=0
+# min_draw_distance (experimental): the race camera sees at least this far, in metres,
+#   0 .. 5000; a track that already sees farther keeps its own; 0 = as the game. Only
+#   the two mountain tracks (360 m) are shorter than 1000 m. Their trees are flat cards
+#   (cheap); beyond ~1000 m the edge of the mountain model may show.
+min_draw_distance=0
 # antialiasing (experimental): MSAA samples, 0 (off), 2, 4 or 8. Smooths the edges of
 #   the car, the road and the rails, not of foliage. Costs GPU time.
 antialiasing=0

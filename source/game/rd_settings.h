@@ -55,7 +55,7 @@ typedef struct {
   int         boost_loading;         /* 1: CPU boost while a loading frame runs (rd_perf.h) */
   int         smoke_size;            /* percent of the smoke puffs' size (rd_smoke.h) */
   int         smoke_amount;          /* percent of the smoke puffs emitted (rd_smoke.h) */
-  int         draw_distance;         /* metres, RD_DRAW_DISTANCE_GAME = the scene's (rd_render.h) */
+  int         min_draw_distance;     /* metres, RD_DRAW_DISTANCE_GAME = the scene's (rd_render.h) */
   int         antialiasing;          /* MSAA samples: 0, 2, 4, 8 (rd_render.h) */
   int         debug_log;             /* RD_LOG_FULL / RD_LOG_MINIMAL (rd_log.h) */
   int         debug_fps_counter;     /* 1: FPS overlay in the top-left corner (rd_fps.h) */
@@ -91,7 +91,7 @@ typedef struct {
   .boost_loading = 1,                                                 \
   .smoke_size = RD_SMOKE_PERCENT_ORIG,                                \
   .smoke_amount = RD_SMOKE_PERCENT_ORIG,                              \
-  .draw_distance = RD_DRAW_DISTANCE_GAME,                             \
+  .min_draw_distance = RD_DRAW_DISTANCE_GAME,                         \
   .antialiasing = 0,                                                  \
   .debug_log = RD_LOG_MINIMAL,                                        \
   .debug_fps_counter = 0,                                             \

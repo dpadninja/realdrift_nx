@@ -100,10 +100,11 @@ static const setting SETTINGS[] = {
     "# smoke_size: size of the smoke puffs in percent, %d .. %d (try 50).\n" },
   { "smoke_amount", T_SMOKE, F(smoke_amount),
     "# smoke_amount: percent of the smoke puffs that are emitted, %d .. %d (try 50).\n" },
-  { "draw_distance", T_DISTANCE, F(draw_distance),
-    "# draw_distance (experimental): metres the race camera sees at least, %d .. %d; 0 = as\n"
-    "#   the game. Only the two mountain tracks (360 m) are shorter than 1000 m. Their trees\n"
-    "#   are flat cards (cheap); beyond ~1000 m the edge of the mountain model may show.\n" },
+  { "min_draw_distance", T_DISTANCE, F(min_draw_distance),
+    "# min_draw_distance (experimental): the race camera sees at least this far, in metres,\n"
+    "#   %d .. %d; a track that already sees farther keeps its own; 0 = as the game. Only\n"
+    "#   the two mountain tracks (360 m) are shorter than 1000 m. Their trees are flat cards\n"
+    "#   (cheap); beyond ~1000 m the edge of the mountain model may show.\n" },
   { "antialiasing", T_AA, F(antialiasing),
     "# antialiasing (experimental): MSAA samples, 0 (off), 2, 4 or 8. Smooths the edges of\n"
     "#   the car, the road and the rails, not of foliage. Costs GPU time.\n" },
