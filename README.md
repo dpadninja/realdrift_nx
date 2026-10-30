@@ -29,7 +29,7 @@ Limitations:
 - **Advanced graphics options** (all optional, in `config.txt`):
   - Render resolution: 720p handheld / 1080p docked by default, or fixed.
   - Anisotropic filtering: the road and other textures stay sharp into the distance.
-  - Longer view distance on the mountain tracks.
+  - Minimum view distance in races: the game cuts the mountain tracks at 360 m (others at 1000–4000 m).
   - Graphics Enhancements (the game's option): bloom and vignette switched on or off separately, and antialiasing (MSAA).
   - Lighter tire smoke: smaller and fewer smoke puffs for a steady frame rate.
 
