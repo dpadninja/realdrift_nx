@@ -71,6 +71,11 @@ int diag_thread_cpu(rd_loadprof_thread *out, int max);
  * many. Any thread; takes no lock (a thread that registers meanwhile may be missed). */
 int diag_thread_sample(rd_thrstat_thread *out, int max);
 
+/* Logs the calling thread like a stall dump does (caller address, frame-pointer backtrace,
+ * game return addresses on the stack), every line starting with `tag`, under a header naming
+ * `what`. For rd_exitlog.c: the process is about to exit. Takes no locks of its own. */
+void diag_report_self(const char *tag, const char *what);
+
 /* Horizon handle of the registered thread `want` (lock-free), or 0. */
 #include <pthread.h>
 #include <switch.h>

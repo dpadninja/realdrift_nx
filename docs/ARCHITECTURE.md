@@ -103,6 +103,8 @@ One line per module; each file's header comment has the details.
 | `nx_crash_handler.{c,h}` | CPU exception handler: registers and backtrace into the log |
 | `diag.{c,h}` | thread registry and stall watchdog: dumps every thread when frames stop |
 | `rd_wdclock.{c,h}` | the watchdog's time arithmetic: wait lengths, telling a suspended process from a stall |
+| `rd_exitlog.{c,h}` | logs `abort`/`exit`/`_exit`/`raise` (linker wraps, import tables) with a backtrace before the process ends without an error screen |
+| `rd_exitwhy.{c,h}` | naming those calls for the log; only the first exit is reported |
 | `rd_loadprof_hook.{c,h}` | debug_load: samples file counters and thread CPU around long frames |
 | `rd_thrstat_hook.{c,h}` | debug_threads: samples engine threads (priority, cores, CPU), each core's idle time (a sampler thread pinned to each core) and the sync shims' counters every 10 s -> `[thr]` lines |
 

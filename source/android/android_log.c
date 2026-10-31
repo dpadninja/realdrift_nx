@@ -11,6 +11,7 @@
 #include "config.h"
 #include "util.h"
 #include "android_log.h"
+#include "rd_log.h"
 
 // ---------------------------------------------------------------------------
 // liblog
@@ -41,5 +42,5 @@ int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list va)
   return 0;
 }
 void __assert2(const char *file, int line, const char *func, const char *expr) {
-  debugPrintf("assert: %s:%d (%s): %s\n", file, line, func, expr); abort();
+  debugPrintf(RD_LOG_TAG_CRASH " assert: %s:%d (%s): %s\n", file, line, func, expr); abort();
 }

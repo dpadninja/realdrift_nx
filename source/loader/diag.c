@@ -194,9 +194,6 @@ static uint64_t prev_spins[DIAG_MAX_THREADS];
 
 /* Our own NRO code region, resolved once via svcQueryMemory on a local fn. */
 static uint64_t g_nro_base, g_nro_size;
-/* Set per-thread by snapshot_thread: enable the stack scan only for the main /
- * loader threads so the dump stays readable. */
-static int g_scan_stack;
 /* Records the address range of our own .nro (the memory block containing this function) so
  * dumps can name NRO+offset frames. */
 static void nro_range_init(void) {
@@ -224,13 +221,15 @@ static void resolve_addr(char *buf, size_t n, uint64_t addr) {
   }
 }
 
-/* Logs one paused thread's PC, LR (symbolicated), SP, FP and first argument registers. */
-static void dump_thread_context(const char *name, const ThreadContext *ctx) {
+/* Logs one thread's PC, LR (symbolicated), SP, FP and first argument registers, its backtrace
+ * and, if `scan`, the game return addresses on its stack; every line starts with `tag`. */
+static void dump_thread_context(const char *tag, const char *name, const ThreadContext *ctx,
+                                int scan) {
   char a[40], b[40];
   resolve_addr(a, sizeof a, ctx->pc.x);
   resolve_addr(b, sizeof b, ctx->lr);
-  debugPrintf(RD_LOG_TAG_WD "   %s  PC=%s  LR=%s\n", name, a, b);
-  debugPrintf(RD_LOG_TAG_WD "     SP=0x%llx FP=0x%llx X0=0x%llx X1=0x%llx X2=0x%llx\n",
+  debugPrintf("%s   %s  PC=%s  LR=%s\n", tag, name, a, b);
+  debugPrintf("%s     SP=0x%llx FP=0x%llx X0=0x%llx X1=0x%llx X2=0x%llx\n", tag,
               (unsigned long long)ctx->sp, (unsigned long long)ctx->fp,
               (unsigned long long)ctx->cpu_gprs[0].x,
               (unsigned long long)ctx->cpu_gprs[1].x,
@@ -251,7 +250,7 @@ static void dump_thread_context(const char *name, const ThreadContext *ctx) {
     const uint64_t lr     = ((const uint64_t *)(uintptr_t)fp)[1];
     if (!lr) break;
     char s[40]; resolve_addr(s, sizeof s, lr);
-    debugPrintf(RD_LOG_TAG_WD "     bt[%d] %s\n", depth, s);
+    debugPrintf("%s     bt[%d] %s\n", tag, depth, s);
     if (nextfp <= fp) break;   /* fp must climb up the stack */
     fp = nextfp;
   }
@@ -259,8 +258,8 @@ static void dump_thread_context(const char *name, const ThreadContext *ctx) {
    * often dead-ends in our glue. Raw-scan the top of the stack for any slot that
    * points into libunity / libil2cpp code -- those are return addresses the FP
    * walk missed, and they reveal what the thread is actually wedged inside.
-   * Caller gates this (main/loader threads only) to keep the log readable. */
-  if (g_scan_stack && slo) {
+   * Callers ask for it on the main/loader threads only, to keep the log readable. */
+  if (scan && slo) {
     uint64_t sp = ctx->sp & ~7ull;
     if (sp < slo) sp = slo;
     uint64_t top = sp + 0x2000;            /* ~1024 slots is plenty for the active frames */
@@ -285,7 +284,7 @@ static void dump_thread_context(const char *name, const ThreadContext *ctx) {
       int is_blr = (prev & 0xFFFFFC1Fu) == 0xD63F0000u;
       if (!is_bl && !is_blr) continue;
       char s[48]; resolve_addr(s, sizeof s, v);
-      debugPrintf(RD_LOG_TAG_WD "     ret@0x%-4llx %s%s\n", (unsigned long long)(addr - sp), s,
+      debugPrintf("%s     ret@0x%-4llx %s%s\n", tag, (unsigned long long)(addr - sp), s,
                   is_blr ? " (via blr)" : "");
       printed++;
     }
@@ -359,10 +358,9 @@ static void snapshot_thread(DiagThread *t) {
   if (R_FAILED(gr)) { debugPrintf(RD_LOG_TAG_WD "   %-16s (snapshot failed rc=0x%x)\n", t->name, gr); return; }
   /* Scan the stack only for the threads whose wait we actually need to diagnose:
    * the main render/UI thread and the async loaders. */
-  g_scan_stack = (strstr(t->name, "Main") || strstr(t->name, "Preload") ||
-                  strstr(t->name, "AsyncRead") || t->is_main_engine) ? 1 : 0;
-  dump_thread_context(t->name[0] ? t->name : "?", &ctx);
-  g_scan_stack = 0;
+  const int scan = strstr(t->name, "Main") || strstr(t->name, "Preload") ||
+                   strstr(t->name, "AsyncRead") || t->is_main_engine;
+  dump_thread_context(RD_LOG_TAG_WD, t->name[0] ? t->name : "?", &ctx, scan);
 }
 
 /* The stall report: how long frames have not advanced, a table of every registered thread
@@ -454,4 +452,19 @@ void diag_watchdog_start(void) {
                 (unsigned long long)(DIAG_STALL_NS / 1000000000ull));
   else
     debugPrintf(RD_LOG_TAG_WD " watchdog FAILED to start rc=0x%x\n", rc);
+}
+
+void diag_report_self(const char *tag, const char *what) {
+  if (!g_nro_size) nro_range_init();
+  const DiagThread *t = self;   /* no slot_alloc: it locks, and this may run while dying */
+  ThreadContext ctx;
+  memset(&ctx, 0, sizeof ctx);
+  ctx.pc.x = (uint64_t)(uintptr_t)__builtin_return_address(0);
+  ctx.lr = ctx.pc.x;
+  ctx.fp = (uint64_t)(uintptr_t)__builtin_frame_address(0);
+  ctx.sp = ctx.fp;
+  debugPrintf("%s ===== %s on thread %s, frame %d =====\n", tag, what,
+              t && t->name[0] ? t->name : "?", g_frame);
+  dump_thread_context(tag, t && t->name[0] ? t->name : "?", &ctx, 1);
+  debugPrintf("%s ===== end of %s =====\n", tag, what);
 }
