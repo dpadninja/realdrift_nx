@@ -31,7 +31,9 @@ static void snapshot(rd_memstat *s) {
   };
 }
 
-static Mutex g_lock;              /* the previous snapshot and the low mark */
+static Mutex g_lock;              /* the previous snapshots and the low mark */
+static rd_globj g_obj;            /* counted by the wrappers below, any thread (atomics) */
+static rd_globj g_obj_prev;
 static rd_memstat g_prev;
 static int g_have_prev;
 static uint64_t g_low = UINT64_MAX;
@@ -46,8 +48,16 @@ void rd_memwatch_log(const char *why) {
   rd_memstat_format(&s, g_have_prev ? &g_prev : NULL, g_low, line, sizeof line);
   g_prev = s;
   g_have_prev = 1;
+  char objs[256];
+  rd_globj g;
+  uint64_t *dst = (uint64_t *)&g;
+  const uint64_t *src = (const uint64_t *)&g_obj;
+  for (size_t i = 0; i < sizeof g / sizeof *dst; i++) dst[i] = __atomic_load_n(&src[i], __ATOMIC_RELAXED);
+  rd_memstat_format_globj(&g, &g_obj_prev, objs, sizeof objs);
+  g_obj_prev = g;
   mutexUnlock(&g_lock);
   debugPrintf("[mem] (%s) %s\n", why, line);
+  debugPrintf("[mem] %s\n", objs);
   if (config.texture_transcode) {
     uint32_t uploads;
     uint64_t blocks, ns;
@@ -90,6 +100,10 @@ static void (*real_ctex_image_3d)(GLenum, GLint, GLenum, GLsizei, GLsizei, GLsiz
 static void (*real_tex_storage_2d)(GLenum, GLsizei, GLenum, GLsizei, GLsizei);
 static void (*real_tex_storage_3d)(GLenum, GLsizei, GLenum, GLsizei, GLsizei, GLsizei);
 static void (*real_buffer_data)(GLenum, GLsizeiptr, const void *, GLenum);
+static void (*real_gen_textures)(GLsizei, GLuint *);
+static void (*real_delete_textures)(GLsizei, const GLuint *);
+static void (*real_gen_buffers)(GLsizei, GLuint *);
+static void (*real_delete_buffers)(GLsizei, const GLuint *);
 static void (*real_rb_storage)(GLenum, GLenum, GLsizei, GLsizei);
 static void (*real_rb_storage_ms)(GLenum, GLsizei, GLenum, GLsizei, GLsizei);
 
@@ -125,6 +139,26 @@ static void w_buffer_data(GLenum t, GLsizeiptr n, const void *p, GLenum u) {
   real_buffer_data(t, n, p, u);
   check("glBufferData", t, 0, 0, 0, 0, (long)n);
 }
+/* Names made and deleted: a leak of textures or buffers shows as "live" growing. */
+static void count(uint64_t *field, GLsizei n) {
+  if (n > 0) __atomic_add_fetch(field, (uint64_t)n, __ATOMIC_RELAXED);
+}
+static void w_gen_textures(GLsizei n, GLuint *names) {
+  real_gen_textures(n, names);
+  count(&g_obj.tex_made, n);
+}
+static void w_delete_textures(GLsizei n, const GLuint *names) {
+  real_delete_textures(n, names);
+  count(&g_obj.tex_freed, n);
+}
+static void w_gen_buffers(GLsizei n, GLuint *names) {
+  real_gen_buffers(n, names);
+  count(&g_obj.buf_made, n);
+}
+static void w_delete_buffers(GLsizei n, const GLuint *names) {
+  real_delete_buffers(n, names);
+  count(&g_obj.buf_freed, n);
+}
 static void w_rb_storage(GLenum t, GLenum f, GLsizei w, GLsizei h) {
   real_rb_storage(t, f, w, h);
   check("glRenderbufferStorage", t, f, w, h, 1, -1);
@@ -143,6 +177,10 @@ void *rd_memwatch_wrap(const char *name, void *real) {
   WRAP("glTexStorage2D", real_tex_storage_2d, w_tex_storage_2d)
   WRAP("glTexStorage3D", real_tex_storage_3d, w_tex_storage_3d)
   WRAP("glBufferData", real_buffer_data, w_buffer_data)
+  WRAP("glGenTextures", real_gen_textures, w_gen_textures)
+  WRAP("glDeleteTextures", real_delete_textures, w_delete_textures)
+  WRAP("glGenBuffers", real_gen_buffers, w_gen_buffers)
+  WRAP("glDeleteBuffers", real_delete_buffers, w_delete_buffers)
   WRAP("glRenderbufferStorage", real_rb_storage, w_rb_storage)
   WRAP("glRenderbufferStorageMultisample", real_rb_storage_ms, w_rb_storage_ms)
 #undef WRAP
@@ -200,7 +238,8 @@ void rd_memwatch_probe_once(void) {
 /* Linked with -Wl,--wrap (Makefile): libdrm_nouveau takes a buffer's memory with memalign,
  * registers it with nvMapCreate and maps it for the GPU with nvAddressSpaceMap; whichever
  * fails first is what GL reports as GL_OUT_OF_MEMORY. Only failures are logged, and only with
- * debug_mem. */
+ * debug_mem. nvMapCreate and nvMapClose are also counted (always: two atomics) for the live
+ * GPU memory in the "[mem] GL objects" line. */
 
 void *__real_memalign(size_t align, size_t n);
 void *__wrap_memalign(size_t align, size_t n);
@@ -208,6 +247,8 @@ Result __real_nvMapCreate(NvMap *m, void *cpu_addr, u32 size, u32 align, NvKind 
                           bool is_cpu_cacheable);
 Result __wrap_nvMapCreate(NvMap *m, void *cpu_addr, u32 size, u32 align, NvKind kind,
                           bool is_cpu_cacheable);
+void __real_nvMapClose(NvMap *m);
+void __wrap_nvMapClose(NvMap *m);
 Result __real_nvAddressSpaceMap(NvAddressSpace *a, u32 handle, bool cacheable, NvKind kind,
                                 iova_t *iova_out);
 Result __wrap_nvAddressSpaceMap(NvAddressSpace *a, u32 handle, bool cacheable, NvKind kind,
@@ -236,8 +277,21 @@ void *__wrap_memalign(size_t align, size_t n) {
 Result __wrap_nvMapCreate(NvMap *m, void *cpu_addr, u32 size, u32 align, NvKind kind,
                           bool is_cpu_cacheable) {
   const Result rc = __real_nvMapCreate(m, cpu_addr, size, align, kind, is_cpu_cacheable);
-  if (R_FAILED(rc)) failed(1, "nvMapCreate", size, align, rc);
+  if (R_FAILED(rc)) {
+    failed(1, "nvMapCreate", size, align, rc);
+  } else {   /* the GPU memory mesa holds, for the "[mem] GL objects" line */
+    __atomic_add_fetch(&g_obj.maps_made, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&g_obj.map_bytes_made, m->size, __ATOMIC_RELAXED);
+  }
   return rc;
+}
+
+void __wrap_nvMapClose(NvMap *m) {
+  if (m && m->has_init) {
+    __atomic_add_fetch(&g_obj.maps_freed, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&g_obj.map_bytes_freed, m->size, __ATOMIC_RELAXED);
+  }
+  __real_nvMapClose(m);
 }
 
 Result __wrap_nvAddressSpaceMap(NvAddressSpace *a, u32 handle, bool cacheable, NvKind kind,

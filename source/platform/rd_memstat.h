@@ -38,6 +38,21 @@ uint64_t rd_memstat_heap_contig(const rd_memstat *s);
 int rd_memstat_format(const rd_memstat *s, const rd_memstat *prev, uint64_t low, char *buf,
                       size_t n);
 
+/* GL objects and GPU memory counted since start (debug_mem): texture and buffer names the
+ * engine generated and deleted, and the nvmap registrations (every texture and buffer mesa
+ * allocates) created and closed, with their bytes. Live = created - deleted. */
+typedef struct {
+  uint64_t tex_made, tex_freed;     /* glGenTextures / glDeleteTextures names */
+  uint64_t buf_made, buf_freed;     /* glGenBuffers / glDeleteBuffers names */
+  uint64_t maps_made, maps_freed;   /* nvMapCreate (succeeded) / nvMapClose */
+  uint64_t map_bytes_made, map_bytes_freed;
+} rd_globj;
+
+/* The "[mem] GL objects" line (no prefix, no newline): live textures, buffers and nvmap
+ * memory, and what was created and deleted since `prev` (NULL = since start). Returns
+ * snprintf's result. */
+int rd_memstat_format_globj(const rd_globj *g, const rd_globj *prev, char *buf, size_t n);
+
 /* Why a snapshot is due after `frame` (which took frame_ns): "every 10 s" every
  * RD_MEM_LOG_FRAMES, "after a load" when the frame took at least RD_MEM_LOAD_NS (scene loads
  * allocate and free most), else NULL. */

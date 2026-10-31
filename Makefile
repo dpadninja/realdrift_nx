@@ -77,8 +77,8 @@ ASFLAGS  := -g $(ARCH)
 LDFLAGS   = -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 # mesa's display/GPU waits, timed in source/platform/rd_gpuwait.c
 LDFLAGS  += -Wl,--wrap=nwindowDequeueBuffer -Wl,--wrap=nvFenceWait -Wl,--wrap=nwindowSetSwapInterval
-# debug_mem: failures of the allocations under mesa, logged in source/android/rd_memwatch.c
-LDFLAGS  += -Wl,--wrap=memalign -Wl,--wrap=nvMapCreate -Wl,--wrap=nvAddressSpaceMap
+# debug_mem: failures of the allocations under mesa (and nvmap memory alive), source/android/rd_memwatch.c
+LDFLAGS  += -Wl,--wrap=memalign -Wl,--wrap=nvMapCreate -Wl,--wrap=nvAddressSpaceMap -Wl,--wrap=nvMapClose
 # debug_load: what reaches the SD card, counted in source/platform/rd_sdstat.c
 LDFLAGS  += -Wl,--wrap=fsFsOpenFile -Wl,--wrap=fsFileRead
 

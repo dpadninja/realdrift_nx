@@ -145,9 +145,9 @@ static const setting SETTINGS[] = {
     "# debug_ui_nav: 1 logs the elements menu navigation finds on each new screen ([uinav]\n"
     "#   lines, with debug_log = 1): names, parents, rectangles.\n" },
   { "debug_mem", T_SWITCH, F(debug_mem),
-    "# debug_mem: 1 logs where the memory is about every 10 s and after each load, and every\n"
-    "#   GL error with mesa's message and the engine code that raised it ([mem] lines, with\n"
-    "#   debug_log = 1).\n" },
+    "# debug_mem: 1 logs where the memory is about every 10 s and after each load, with the live\n"
+    "#   GL textures, buffers and GPU memory, and every GL error with mesa's message and the\n"
+    "#   engine code that raised it ([mem] lines, with debug_log = 1).\n" },
   { "debug_load", T_SWITCH, F(debug_load),
     "# debug_load: 1 logs, for every frame of a second or more (a load), the file traffic the\n"
     "#   engine asked for and what reached the SD card, and each engine thread's CPU time\n"

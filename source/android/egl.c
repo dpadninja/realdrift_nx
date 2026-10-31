@@ -183,8 +183,10 @@ static void timed_glFinish(void) { GL_TIMED(glFinish()); }
 
 void *egl_wrap_gl(const char *name, void *real) {
   void *w = config.debug_gl_trace && real ? rd_gltrace_wrap(name, real) : NULL;
-  if (!w && config.debug_mem && real) w = rd_memwatch_wrap(name, real);
   void *inner = w ? w : real;
+  /* the allocation check and object counts on top of the trace: both can be on */
+  void *m = config.debug_mem && inner ? rd_memwatch_wrap(name, inner) : NULL;
+  if (m) inner = m;
   /* ETC2 stored as S3TC (rd_etc2bc_gl.h), on top of the check so it sees what mesa gets */
   void *t = config.texture_transcode && inner ? rd_etc2bc_wrap(name, inner) : NULL;
   /* anisotropic_filtering (rd_aniso_gl.h): other functions than the transcoder's */

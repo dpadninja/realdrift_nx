@@ -29,6 +29,26 @@ int rd_memstat_format(const rd_memstat *s, const rd_memstat *prev, uint64_t low,
                   MB(s->oc_pool), MB(s->fallback), MB(s->sys_used), MB(s->sys_total));
 }
 
+int rd_memstat_format_globj(const rd_globj *g, const rd_globj *prev, char *buf, size_t n) {
+  static const rd_globj zero;
+  const rd_globj *p = prev ? prev : &zero;
+  const long long map_delta = ((long long)(g->map_bytes_made - p->map_bytes_made) -
+                               (long long)(g->map_bytes_freed - p->map_bytes_freed)) / (1 << 20);
+  return snprintf(buf, n,
+                  "GL objects: textures %lld live (+%llu -%llu), buffers %lld live (+%llu -%llu) | "
+                  "nvmap %llu MB live (%+lld) in %lld maps (+%llu -%llu)",
+                  (long long)(g->tex_made - g->tex_freed),
+                  (unsigned long long)(g->tex_made - p->tex_made),
+                  (unsigned long long)(g->tex_freed - p->tex_freed),
+                  (long long)(g->buf_made - g->buf_freed),
+                  (unsigned long long)(g->buf_made - p->buf_made),
+                  (unsigned long long)(g->buf_freed - p->buf_freed),
+                  MB(g->map_bytes_made - g->map_bytes_freed), map_delta,
+                  (long long)(g->maps_made - g->maps_freed),
+                  (unsigned long long)(g->maps_made - p->maps_made),
+                  (unsigned long long)(g->maps_freed - p->maps_freed));
+}
+
 const char *rd_memstat_due(uint32_t frame, uint64_t frame_ns) {
   if (frame_ns >= RD_MEM_LOAD_NS) return "after a load";
   if (frame > 0 && frame % RD_MEM_LOG_FRAMES == 0) return "every 10 s";

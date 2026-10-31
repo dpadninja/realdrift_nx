@@ -45,6 +45,25 @@ static void test_format(void) {
   CHECK(strstr(buf, "(+0)") != NULL);
 }
 
+/* The GL objects line shows what is alive (made - freed) and what changed since the previous
+ * line, so a leak reads as "live" growing while things are also deleted. */
+static void test_format_globj(void) {
+  const rd_globj prev = { .tex_made = 1000, .tex_freed = 400, .buf_made = 50, .buf_freed = 10,
+                          .maps_made = 3000, .maps_freed = 1000,
+                          .map_bytes_made = 900 * MiB, .map_bytes_freed = 300 * MiB };
+  rd_globj g = prev;
+  g.tex_made += 30; g.tex_freed += 20;
+  g.maps_made += 40; g.maps_freed += 10;
+  g.map_bytes_made += 50 * MiB; g.map_bytes_freed += 8 * MiB;
+  char buf[256];
+  rd_memstat_format_globj(&g, &prev, buf, sizeof buf);
+  CHECK(strstr(buf, "textures 610 live (+30 -20)") != NULL);
+  CHECK(strstr(buf, "buffers 40 live (+0 -0)") != NULL);
+  CHECK(strstr(buf, "nvmap 642 MB live (+42) in 2030 maps (+40 -10)") != NULL);
+  rd_memstat_format_globj(&g, NULL, buf, sizeof buf);   /* since start */
+  CHECK(strstr(buf, "textures 610 live (+1030 -420)") != NULL);
+}
+
 /* A snapshot every RD_MEM_LOG_FRAMES and after every long (loading) frame, none otherwise and
  * none on frame 0. */
 static void test_due(void) {
@@ -80,6 +99,7 @@ int main(void) {
   RUN(test_heap_avail);
   RUN(test_heap_contig);
   RUN(test_format);
+  RUN(test_format_globj);
   RUN(test_due);
   RUN(test_gl_logged);
   RUN(test_gl_error_name);
