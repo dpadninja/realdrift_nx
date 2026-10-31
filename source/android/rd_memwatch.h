@@ -15,6 +15,14 @@
 #define RD_MEMWATCH_H
 
 #include <stdint.h>
+#include "rd_memstat.h"
+
+/* Fills the managed-heap part of a snapshot (gc_heap, gc_used, gc_state). */
+typedef void (*rd_memwatch_gc_fn)(rd_memstat *s);
+
+/* Main thread, once the il2cpp API is resolved (main.c; the engine layer is above this one):
+ * the function that adds the managed heap to every "[mem]" line. */
+void rd_memwatch_set_gc(rd_memwatch_gc_fn fn);
 
 /* Logs one "[mem] (<why>) ..." line. Any thread. */
 void rd_memwatch_log(const char *why);

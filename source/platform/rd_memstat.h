@@ -20,7 +20,13 @@ typedef struct {
   uint64_t oc_committed, oc_pool;       /* overcommit window: committed pages / pool */
   uint64_t fallback;       /* mmaps served from the newlib heap after the arena filled */
   uint64_t sys_used, sys_total;         /* svcGetInfo Used/TotalMemorySize */
+  uint64_t gc_heap, gc_used;            /* the managed (Boehm) heap and its used part */
+  int      gc_state;                    /* RD_MEM_GC_ON / _OFF, or _UNKNOWN (no il2cpp yet) */
 } rd_memstat;
+
+#define RD_MEM_GC_UNKNOWN 0
+#define RD_MEM_GC_ON      1
+#define RD_MEM_GC_OFF     2
 
 /* Heap bytes malloc can still hand out: the untouched rest plus the freed blocks. Fragments
  * count too, so a large texture may fail before this reaches 0. */
@@ -33,8 +39,8 @@ uint64_t rd_memstat_heap_contig(const rd_memstat *s);
 
 /* The "[mem]" line (no prefix, no newline): in-use heap and its change since `prev` (NULL =
  * none), what is still available and how much of it is one block at the top, the lowest
- * availability seen (`low`), arena, overcommit window, fallback maps and the system's count,
- * in MB. Returns snprintf's result. */
+ * availability seen (`low`), arena, overcommit window, fallback maps, the system's count and,
+ * once known, the managed heap (used/size, collections on or OFF), in MB. Returns snprintf's result. */
 int rd_memstat_format(const rd_memstat *s, const rd_memstat *prev, uint64_t low, char *buf,
                       size_t n);
 

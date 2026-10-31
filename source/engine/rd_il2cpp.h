@@ -30,6 +30,9 @@ typedef struct {
   const char *(*class_get_name)(void *klass);
   void  *(*object_new)(void *klass);                   /* fields zeroed, no constructor run */
   void  *(*object_get_class)(void *obj);
+  int64_t (*gc_get_heap_size)(void);                   /* managed (Boehm) heap, bytes */
+  int64_t (*gc_get_used_size)(void);                   /* of which in use */
+  int    (*gc_is_disabled)(void);                      /* 1 while collections are off */
 } rd_il2cpp_api;
 
 extern rd_il2cpp_api g_il2cpp;

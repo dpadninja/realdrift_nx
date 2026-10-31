@@ -14,6 +14,10 @@
 
 extern char *fake_heap_start, *fake_heap_end;   /* the newlib heap (mem_layout.c) */
 
+static rd_memwatch_gc_fn g_gc;    /* the managed heap, once il2cpp is up */
+
+void rd_memwatch_set_gc(rd_memwatch_gc_fn fn) { g_gc = fn; }
+
 static void snapshot(rd_memstat *s) {
   const struct mallinfo mi = mallinfo();
   mmap_usage mu;
@@ -29,6 +33,7 @@ static void snapshot(rd_memstat *s) {
     .oc_committed = mu.oc_committed, .oc_pool = mu.oc_pool, .fallback = mu.fallback,
     .sys_used = used, .sys_total = total,
   };
+  if (g_gc) g_gc(s);
 }
 
 static Mutex g_lock;              /* the previous snapshots and the low mark */

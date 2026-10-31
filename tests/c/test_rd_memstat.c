@@ -43,6 +43,13 @@ static void test_format(void) {
   CHECK(strstr(buf, "fallback 0 MB") && strstr(buf, "sys 3185/3189 MB"));
   rd_memstat_format(&s, NULL, 0, buf, sizeof buf);
   CHECK(strstr(buf, "(+0)") != NULL);
+  CHECK(strstr(buf, "gc ") == NULL);                    /* il2cpp not up yet */
+  s.gc_heap = 96 * MiB; s.gc_used = 40 * MiB; s.gc_state = RD_MEM_GC_OFF;
+  rd_memstat_format(&s, NULL, 0, buf, sizeof buf);
+  CHECK(strstr(buf, "| gc 40/96 MB OFF") != NULL);
+  s.gc_state = RD_MEM_GC_ON;
+  rd_memstat_format(&s, NULL, 0, buf, sizeof buf);
+  CHECK(strstr(buf, "| gc 40/96 MB on") != NULL);
 }
 
 /* The GL objects line shows what is alive (made - freed) and what changed since the previous

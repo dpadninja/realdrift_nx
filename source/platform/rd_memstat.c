@@ -21,12 +21,16 @@ int rd_memstat_format(const rd_memstat *s, const rd_memstat *prev, uint64_t low,
   /* the change in whole MB, signed; 0 without a previous snapshot */
   const long long delta = prev ? ((long long)s->heap_inuse - (long long)prev->heap_inuse) / (1 << 20)
                                : 0;
-  return snprintf(buf, n,
+  int len = snprintf(buf, n,
                   "heap %llu/%llu MB (%+lld), avail %llu MB (top %llu, low %llu) | arena %llu/%llu MB | "
                   "oc %llu/%llu MB | fallback %llu MB | sys %llu/%llu MB",
                   MB(s->heap_inuse), MB(s->heap_size), delta, MB(rd_memstat_heap_avail(s)),
                   MB(rd_memstat_heap_contig(s)), MB(low), MB(s->arena_used), MB(s->arena_size), MB(s->oc_committed),
                   MB(s->oc_pool), MB(s->fallback), MB(s->sys_used), MB(s->sys_total));
+  if (s->gc_state != RD_MEM_GC_UNKNOWN && len >= 0 && (size_t)len < n)
+    len += snprintf(buf + len, n - (size_t)len, " | gc %llu/%llu MB %s", MB(s->gc_used),
+                    MB(s->gc_heap), s->gc_state == RD_MEM_GC_OFF ? "OFF" : "on");
+  return len;
 }
 
 int rd_memstat_format_globj(const rd_globj *g, const rd_globj *prev, char *buf, size_t n) {
