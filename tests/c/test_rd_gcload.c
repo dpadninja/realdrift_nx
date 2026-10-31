@@ -1,32 +1,51 @@
 /* sources: source/engine/rd_gcload.c */
 /* Host unit test of rd_gcload. MIT (see LICENSE). */
+#include <string.h>
 #include "check.h"
 #include "rd_gcload.h"
-#include "rd_platform.h"
 
-/* A scene load ("Race again" took 0.8-0.95 s, the garage 2-3 s) with the engine's
- * stop-the-world (UnloadUnusedAssets) is a load to collect after. */
-static void test_load_with_stop(void) {
-  CHECK(rd_gcload_due(RD_GC_LOAD_FRAME_NS, 1));
-  CHECK(rd_gcload_due(915 * RD_NS_PER_MS, 6));
-  CHECK(rd_gcload_due(3 * RD_NS_PER_S, 6));
+/* A fake Boehm disable count and a trace of the calls. */
+static int g_disabled;
+static char g_trace[64];
+static int g_collected_while_off;
+static void note(char c) { size_t n = strlen(g_trace); g_trace[n] = c; g_trace[n + 1] = 0; }
+static int f_is_disabled(void) { note('?'); return g_disabled > 0; }
+static void f_enable(void) { note('+'); g_disabled--; }
+static void f_disable(void) { note('-'); g_disabled++; }
+static void f_collect(int gen) { (void)gen; note('C'); if (g_disabled > 0) g_collected_while_off++; }
+static const rd_gc_ops OPS = { f_is_disabled, f_enable, f_disable, f_collect };
+
+static void reset(int disabled) { g_disabled = disabled; g_trace[0] = 0; g_collected_while_off = 0; }
+
+/* The port's own disable (count 1): the GC is turned on for the collection and off again, so
+ * the engine's request is honoured and play stays without automatic collections. */
+static void test_off_by_the_port(void) {
+  reset(1);
+  CHECK(rd_gcload_collect(&OPS, 0) == RD_GC_RAN_TURNED_ON);
+  CHECK(!strcmp(g_trace, "?+?C-"));
+  CHECK(g_disabled == 1 && g_collected_while_off == 0);
 }
 
-/* A short frame never collects, even with a stop (the engine stopped the world in a 100 ms
- * menu frame): a race must not lose frames to the GC. */
-static void test_short_frame(void) {
-  CHECK(!rd_gcload_due(100 * RD_NS_PER_MS, 2));
-  CHECK(!rd_gcload_due(RD_GC_LOAD_FRAME_NS - 1, 6));
+/* GC already on: collect only, the count is not touched. */
+static void test_already_on(void) {
+  reset(0);
+  CHECK(rd_gcload_collect(&OPS, 0) == RD_GC_RAN);
+  CHECK(!strcmp(g_trace, "?C"));
+  CHECK(g_disabled == 0);
 }
 
-/* A long frame without a stop is not a scene load (menu hitches of 0.4-0.5 s read files). */
-static void test_long_frame_without_stop(void) {
-  CHECK(!rd_gcload_due(556 * RD_NS_PER_MS, 0));
+/* Another disable held on top of ours (count 2): one enable is not enough; the request is
+ * passed on as a no-op and reported, and the count is restored -- the port never undoes a
+ * disable it did not make. */
+static void test_held_by_someone_else(void) {
+  reset(2);
+  CHECK(rd_gcload_collect(&OPS, 0) == RD_GC_STILL_OFF);
+  CHECK(g_disabled == 2);
 }
 
 int main(void) {
-  RUN(test_load_with_stop);
-  RUN(test_short_frame);
-  RUN(test_long_frame_without_stop);
+  RUN(test_off_by_the_port);
+  RUN(test_already_on);
+  RUN(test_held_by_someone_else);
   return g_failures != 0;
 }

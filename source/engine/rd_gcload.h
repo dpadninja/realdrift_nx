@@ -1,26 +1,41 @@
-/* rd_gcload.h -- garbage collection on loads only.
+/* rd_gcload.h -- garbage collection where the engine asks for it, never on its own.
  *
  * The loader turns the Boehm GC off before the first frame (main.c: its stop-the-world once
  * hung; rd_gcbridge now stops threads) and nothing turned it back on: the managed heap grew
  * ~18 MB per minute of driving (the race replay recording) and was never collected, through
- * any number of reloads (analysis/research/36). A collection in a race would cost frames, so
- * the GC stays off there and the port collects once after each load: a long frame in which
- * the engine stopped the world (UnloadUnusedAssets, which Unity runs on every scene load and
- * where it would collect on Android). The screen still shows the loading frame meanwhile.
+ * any number of reloads (analysis/research/36). Unity still asks for collections where it
+ * wants one -- UnloadUnusedAssets on every scene load ("Race again" too), the game's
+ * Resources.UnloadUnusedAssets -- by calling il2cpp_gc_collect, which libunity looks up with
+ * dlsym; with the GC off those calls did nothing. shim_dl.c hands libunity a wrapper that
+ * turns the GC on for that one collection and off again. The automatic collections Boehm
+ * would start on its own while allocating stay off, so a race does not lose frames to them.
  *
- * Main thread (the engine's), between frames. The decision is pure (tests/c/test_rd_gcload.c);
- * rd_gcload_after_frame is the il2cpp glue. MIT (see LICENSE). */
+ * The call sequence is pure (tests/c/test_rd_gcload.c); rd_gcload_hook.c is the il2cpp glue.
+ * MIT (see LICENSE). */
 #ifndef RD_GCLOAD_H
 #define RD_GCLOAD_H
 
-#include <stdint.h>
+/* The GC functions one collection needs (il2cpp_gc_*). */
+typedef struct {
+  int  (*is_disabled)(void);
+  void (*enable)(void);
+  void (*disable)(void);
+  void (*collect)(int max_generations);
+} rd_gc_ops;
 
-/* 1 if a frame that took `frame_ns`, during which the engine stopped the world `stops` times
- * (the GC bridge count), is a load to collect after: at least RD_GC_LOAD_FRAME_NS and a stop. */
-int rd_gcload_due(uint64_t frame_ns, unsigned stops);
+/* What rd_gcload_collect did. */
+typedef enum {
+  RD_GC_RAN = 0,          /* the GC was on: collected as asked */
+  RD_GC_RAN_TURNED_ON,    /* it was off: turned on, collected, turned off again */
+  RD_GC_STILL_OFF,        /* still off after one enable (another disable is held): no-op */
+} rd_gc_result;
 
-/* After every frame: when rd_gcload_due, enables the GC, collects, disables it again (only if
- * it was off) and logs "[gc] collected after a load: used A -> B MB of H MB in N ms". */
-void rd_gcload_after_frame(uint64_t frame_ns, unsigned stops);
+/* One collection of up to `max_generations` with the GC on for it: enables it if it is off,
+ * collects, and disables it again only if it was off, so the disable count is unchanged. */
+rd_gc_result rd_gcload_collect(const rd_gc_ops *ops, int max_generations);
+
+/* For dlsym("il2cpp_gc_collect") (shim_dl.c): remembers `real` and returns the wrapper,
+ * which runs rd_gcload_collect on the engine's thread and logs "[gc] collect ...". */
+void *rd_gcload_wrap(void *real);
 
 #endif

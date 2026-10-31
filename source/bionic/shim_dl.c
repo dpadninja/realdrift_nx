@@ -1,6 +1,6 @@
 /* shim_dl.c -- dlopen/dlsym over the modules that are already loaded (there is no real
  * dynamic loading); also where il2cpp_add_internal_call is swapped for the icall override
- * wrapper.
+ * wrapper and il2cpp_gc_collect for the one that runs with the GC on (rd_gcload.h).
  *
  * Split out of libc_shim.c, forked from badpiggies_nx by ChanseyIsTheBest
  * (https://github.com/ChanseyIsTheBest/badpiggies_nx, commit 7726be3); changed for realdrift_nx.
@@ -16,6 +16,7 @@
 #include "rd_smoke.h"          /* rd_smoke_icall_table */
 #include "rd_menu.h"           /* rd_menu_icall_table */
 #include "egl.h"
+#include "rd_gcload.h"          /* rd_gcload_wrap */
 
 
 // ---------------------------------------------------------------------------
@@ -45,6 +46,12 @@ void *dlsym_fake(void *handle, const char *symbol) {
     rd_icall_setup(tables, 3, (rd_add_icall_fn)p);
     debugPrintf("[input] dlsym(il2cpp_add_internal_call) -> icall override wrapper\n");
     return (void *)rd_add_internal_call;
+  }
+  /* The engine's collections (UnloadUnusedAssets on scene loads) run although the loader
+   * keeps the GC off in play (rd_gcload.h). */
+  if (p && !strcmp(symbol, "il2cpp_gc_collect")) {
+    debugPrintf("[gc] dlsym(il2cpp_gc_collect) -> collect with the GC on for it\n");
+    return rd_gcload_wrap(p);
   }
   if (p) return p;
   /* 2) one of our libc/GLES/EGL shims (the engine dlopen()s libGLESv2.so etc.

@@ -175,7 +175,7 @@ One line per module; each file's header comment has the details.
 | `rd_il2cppcopy.{c,h}` | fast_boot: when Unity's per-launch il2cpp data copy can be skipped (the stamp) |
 | `rd_a64.{c,h}` | AArch64 instruction encode/decode helpers |
 | `rd_gcbridge.{c,h}`, `rd_gcbridge_hook.c` | Boehm GC stop-the-world without POSIX signals: register publishing (pure) and `pthread_kill` for the collector |
-| `rd_gcload.{c,h}`, `rd_gcload_hook.c` | the GC stays off in play and collects once after each scene load (a long frame with the engine's stop-the-world) |
+| `rd_gcload.{c,h}`, `rd_gcload_hook.c` | the GC stays off in play; the collections the engine asks for (`il2cpp_gc_collect` via dlsym: UnloadUnusedAssets on scene loads) run with it turned on |
 | `unity_imports.{c,h}` | imports specific to the Unity/IL2CPP engine |
 | `unity_glue.c` | the fake UnityPlayer / Context / Surface objects the engine is driven with |
 | `unity_input_hook.{c,h}` | `UnityEngine.Input` icalls fed from the Switch touch screen and cursor |
