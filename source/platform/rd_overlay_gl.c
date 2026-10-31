@@ -14,7 +14,7 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 #include <stddef.h>
-#include <GLES2/gl2.h>
+#include <GLES3/gl3.h>
 #include "rd_overlay.h"
 #include "util.h"   /* debugPrintf */
 
@@ -129,7 +129,7 @@ static void attrib_restore(GLuint i, const AttribState *a) {
 /* Everything an overlay draw changes, saved by rd_overlay_begin() (render thread only). */
 static struct {
   AttribState a0, a1;
-  GLint prog, buf, bs_rgb, bd_rgb, bs_a, bd_a;
+  GLint vao, prog, buf, bs_rgb, bd_rgb, bs_a, bd_a;
   GLboolean blend, depth, cull, scissor;
 } s_saved;
 
@@ -142,6 +142,12 @@ static const GLenum PRIM[] = {
 int rd_overlay_begin(int screen_w, int screen_h) {
   if (screen_w <= 0 || screen_h <= 0 || !gl_init()) return 0;
 
+  /* Client-side arrays are allowed only with vertex array object 0 (GLES 3.0): with the
+   * engine's VAO still bound every glVertexAttribPointer below failed (GL_INVALID_OPERATION
+   * "non-VBO array", thousands a minute, analysis/research/35) and the draw read the engine's
+   * attributes. The attribute state saved and restored below is VAO 0's own. */
+  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &s_saved.vao);
+  glBindVertexArray(0);
   attrib_save(0, &s_saved.a0);
   attrib_save(1, &s_saved.a1);
   glGetIntegerv(GL_CURRENT_PROGRAM, &s_saved.prog);
@@ -167,11 +173,12 @@ int rd_overlay_begin(int screen_w, int screen_h) {
   return 1;
 }
 
-/* Attributes first (each re-binds its own source buffer), then put the global
- * ARRAY_BUFFER binding back, then the program and the fixed-function bits. */
+/* Attributes first (each re-binds its own source buffer), then the engine's VAO and the
+ * global ARRAY_BUFFER binding, then the program and the fixed-function bits. */
 void rd_overlay_end(void) {
   attrib_restore(0, &s_saved.a0);
   attrib_restore(1, &s_saved.a1);
+  glBindVertexArray((GLuint)s_saved.vao);
   glBindBuffer(GL_ARRAY_BUFFER, (GLuint)s_saved.buf);
   glUseProgram((GLuint)s_saved.prog);
   glBlendFuncSeparate((GLenum)s_saved.bs_rgb, (GLenum)s_saved.bd_rgb,
