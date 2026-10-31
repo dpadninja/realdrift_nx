@@ -5,6 +5,7 @@
  * moment. Only with debug_mem = 1: the wrappers are handed out by egl_wrap_gl.
  * glGetError reports everything since the last check, so an error may come from an earlier
  * call, and the wrappers consume it (the engine does not read GL errors in a release build).
+ * rd_gldebug_gl.h names the call that raised it.
  * No host test: mallinfo / svc / GL glue; the report is rd_memstat (tested).
  * MIT (see LICENSE). */
 #ifndef RD_MEMWATCH_H

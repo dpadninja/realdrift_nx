@@ -16,6 +16,7 @@
 #include "rd_log.h"
 #include "rd_codeaddr.h"
 #include "rd_a64.h"
+#include "rd_wdclock.h"
 #include "util.h"   /* debugPrintf */
 #include "so_util.h" /* so_find_module_by_addr for backtrace symbolication */
 
@@ -24,6 +25,7 @@
 #define DIAG_POLL_NS       (1000ull * 1000ull * 1000ull)   /* watchdog tick: 1s */
 #define DIAG_STALL_NS      (6000ull * 1000ull * 1000ull)   /* declare stall: 6s  */
 #define DIAG_REDUMP_NS     (6000ull * 1000ull * 1000ull)   /* re-dump cadence    */
+#define DIAG_SUSPEND_NS    (3000ull * 1000ull * 1000ull)   /* a 1s poll this late = process was suspended */
 
 typedef struct {
   volatile int          in_use;
@@ -339,7 +341,7 @@ static void snapshot_thread(DiagThread *t) {
  * (state, wait object, wait counters since the last dump), then each thread's CPU context and
  * frame-pointer backtrace (snapshot_thread). */
 static void dump_threads(int episode, uint64_t now) {
-  uint64_t stalled_ns = tick_to_ns(now - g_last_progress);
+  uint64_t stalled_ns = tick_to_ns(rd_wd_elapsed(now, g_last_progress));
   debugPrintf("\n[wd] ===== STALL #%d : no frame progress for %llu.%llus (last frame=%d) =====\n",
               episode, (unsigned long long)(stalled_ns / 1000000000ull),
               (unsigned long long)((stalled_ns % 1000000000ull) / 100000000ull), g_frame);
@@ -350,7 +352,7 @@ static void dump_threads(int episode, uint64_t now) {
     if (!t->in_use) continue;
     int kind = t->wait_kind;
     uint64_t since = t->wait_since;
-    uint64_t parked_ns = (kind != DIAG_W_NONE && since) ? tick_to_ns(now - since) : 0;
+    uint64_t parked_ns = kind != DIAG_W_NONE ? tick_to_ns(rd_wd_elapsed(now, since)) : 0;
     uint64_t dwait = t->waits_total - prev_waits[i];
     uint64_t dwake = t->wakes_total - prev_wakes[i];
     uint64_t dspin = t->futex_spins - prev_spins[i];
@@ -380,18 +382,26 @@ static void dump_threads(int episode, uint64_t now) {
 
 /* The watchdog thread (plain libnx thread, not through the pthread shim): polls every
  * DIAG_POLL_NS and dumps all threads once frames have not advanced for DIAG_STALL_NS, again
- * every DIAG_REDUMP_NS while the stall lasts. */
+ * every DIAG_REDUMP_NS while the stall lasts. Time the process spent suspended (HOME menu,
+ * sleep: the watchdog stops too) is not a stall: the frame clock restarts after it. */
 static void watchdog_main(void *unused) {
   (void)unused;
   int episode = 0;
   uint64_t last_dump = 0;
   /* prime so we don't false-trigger before the first frame */
   if (g_last_progress == 0) g_last_progress = now_tick();
+  uint64_t prev_poll = now_tick();
+  const uint64_t suspend_limit = armNsToTicks(DIAG_SUSPEND_NS);
   for (;;) {
     svcSleepThread(DIAG_POLL_NS);
     uint64_t now = now_tick();
-    uint64_t idle = now - g_last_progress;
-    if (tick_to_ns(idle) >= DIAG_STALL_NS) {
+    if (rd_wd_was_suspended(prev_poll, now, suspend_limit)) {
+      debugPrintf(RD_LOG_TAG_WD " process was suspended for %llus (HOME or sleep), not a stall\n",
+                  (unsigned long long)(tick_to_ns(rd_wd_elapsed(now, prev_poll)) / 1000000000ull));
+      g_last_progress = now;
+    }
+    prev_poll = now;
+    if (tick_to_ns(rd_wd_elapsed(now, g_last_progress)) >= DIAG_STALL_NS) {
       if (last_dump == 0 || tick_to_ns(now - last_dump) >= DIAG_REDUMP_NS) {
         dump_threads(++episode, now);
         last_dump = now;

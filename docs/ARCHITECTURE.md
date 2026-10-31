@@ -102,6 +102,7 @@ One line per module; each file's header comment has the details.
 | `error.{c,h}` | fatal error screen |
 | `nx_crash_handler.{c,h}` | CPU exception handler: registers and backtrace into the log |
 | `diag.{c,h}` | thread registry and stall watchdog: dumps every thread when frames stop |
+| `rd_wdclock.{c,h}` | the watchdog's time arithmetic: wait lengths, telling a suspended process from a stall |
 | `rd_loadprof_hook.{c,h}` | debug_load: samples file counters and thread CPU around long frames |
 
 ### bionic
@@ -152,6 +153,7 @@ One line per module; each file's header comment has the details.
 | `rd_etc2bc_gl.{c,h}` | texture_transcode: ETC2 texture storage and uploads turned into S3TC |
 | `third_party/etcdec.h`, `third_party/stb_dxt.h` | vendored ETC/EAC decoder (iOrange/etcdec) and DXT encoder (nothings/stb) |
 | `rd_memwatch.{c,h}` | debug_mem: `[mem]` lines and `glGetError` after GL calls that allocate |
+| `rd_gldebug.{c,h}`, `rd_gldebug_gl.{c,h}` | debug_mem: mesa's debug output, each GL error with its message and the engine's return addresses |
 | `android_log.{c,h}` | liblog and `__assert2` into `debug.log` |
 | `rd_zip.{c,h}` | read single entries of `base.apk` (stored or deflated) for the AssetManager |
 | `rd_meta.{c,h}` | `ApplicationInfo.metaData` values from the manifest |

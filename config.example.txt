@@ -97,7 +97,8 @@ debug_gl_trace=0
 #   lines, with debug_log = 1): names, parents, rectangles.
 debug_ui_nav=0
 # debug_mem: 1 logs where the memory is about every 10 s and after each load, and every
-#   GL error when a texture or buffer is created ([mem] lines, with debug_log = 1).
+#   GL error with mesa's message and the engine code that raised it ([mem] lines, with
+#   debug_log = 1).
 debug_mem=0
 # debug_load: 1 logs, for every frame of a second or more (a load), the file traffic the
 #   engine asked for and what reached the SD card, and each engine thread's CPU time

@@ -16,6 +16,7 @@
 #include "egl.h"
 #include "android_native_unity.h"
 #include "rd_perfstat.h"
+#include "rd_gldebug_gl.h"
 #include "rd_gltrace_gl.h"
 #include "rd_memwatch.h"
 #include "rd_etc2bc_gl.h"
@@ -135,7 +136,10 @@ EGLBoolean egl_SwapBuffers_log(EGLDisplay d, EGLSurface s) {
     if (++traced % RD_GLTRACE_PERIOD_FRAMES == 0) rd_gltrace_arm("every 10 s");
     rd_gltrace_frame_end();
   }
-  if (config.debug_mem) rd_memwatch_probe_once();   /* what an ETC2 texture costs */
+  if (config.debug_mem) {
+    rd_memwatch_probe_once();   /* what an ETC2 texture costs */
+    rd_gldebug_install();       /* GL errors named by the call that raised them */
+  }
   if (config.debug_fps_counter) fps_overlay_draw();
   nxp_draw();   /* on-screen cursor overlay; saves/restores all GL state */
   rd_menu_draw();   /* menu navigation focus frame */
