@@ -48,6 +48,7 @@ volatile int      g_rd_in_frame = 0;
 #include "rd_gcbridge.h"
 #include "mem_layout.h"
 #include "rd_memwatch.h"
+#include "rd_gcload.h"
 #include "rd_loadprof_hook.h"
 
 so_module main_mod, unity_mod, il2cpp_mod;
@@ -330,7 +331,8 @@ static void memwatch_gc(rd_memstat *s) {
   s->gc_state = g_il2cpp.gc_is_disabled() ? RD_MEM_GC_OFF : RD_MEM_GC_ON;
 }
 
-/* Before the first nativeRender: GC off (its stop-the-world needs signals Horizon lacks). */
+/* Before the first nativeRender: GC off (its stop-the-world needs signals Horizon lacks). It
+ * stays off in play; rd_gcload collects after each scene load instead. */
 static void boot_disable_gc(void) {
   /* CRITICAL ORDER: disable the Boehm GC + install the clock BEFORE the first
    * nativeRender. First-frame managed allocs can trigger a GC whose stop-the-world
@@ -383,6 +385,7 @@ static void run_main_loop(void) {
     {
       const uint64_t _ns = rd_now_ns() - t0;
       long _ms = (long)(_ns / RD_NS_PER_MS);
+      rd_gcload_after_frame(_ns, nx_stat_gcstop - _g0);   /* GC only after loads */
       if (config.debug_mem) rd_memwatch_frame((uint32_t)frame, _ns);   /* [mem] lines */
       if (config.debug_load) rd_loadprof_end(_ns);
       if (_ms >= RD_SLOW_FRAME_MS) {

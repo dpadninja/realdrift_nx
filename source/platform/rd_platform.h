@@ -35,6 +35,9 @@ static inline uint64_t rd_now_ns(void) {
 #define RD_LOAD_PROFILE_NS      RD_NS_PER_S        /* debug_load: frames this long are profiled */
 #define RD_MEM_LOG_FRAMES       600   /* debug_mem: a [mem] line ~every 10 s (rd_memstat.h) */
 #define RD_MEM_LOAD_NS          RD_NS_PER_S        /* debug_mem: a frame this long is a load */
+/* A frame this long in which the engine stopped the world (UnloadUnusedAssets on a scene load,
+ * also "Race again" at 0.8-0.95 s) is a load: the port collects garbage after it (rd_gcload.h). */
+#define RD_GC_LOAD_FRAME_NS     (RD_NS_PER_S / 2)
 #define RD_MEM_GL_LOG_FIRST     20    /* debug_mem: GL errors logged one by one ...        */
 #define RD_MEM_GL_LOG_EVERY     100   /* ... then every 100th                              */
 /* A per-frame hook that ran within this many frames counts as "active" (in a race). */
