@@ -117,6 +117,12 @@
 #define RD_COUNTRY_FAILED_LOOKUP  "AD"
 
 /* ---- Graphics Enhancements: SleekRender post-process (rd_sleek_hook.c) ---------------- */
+/* ---- RaceAudioManager.PlayMusic: no UnloadUnusedAssets on a track change (rd_racemusic) - */
+#define RD_CLS_RACE_AUDIO         "RaceAudioManager"
+#define RD_MTH_PLAY_MUSIC         "PlayMusic"                   /* private, no arguments */
+#define RD_CLS_RESOURCES          "Resources"                   /* UnityEngine, CoreModule */
+#define RD_MTH_UNLOAD_UNUSED      "UnloadUnusedAssets"          /* static, no arguments */
+
 #define RD_ASM_FIRSTPASS          "Assembly-CSharp-firstpass"   /* SleekRender is a plugin */
 #define RD_NS_SLEEK               "SleekRender"
 #define RD_CLS_SLEEK_POST         "SleekRenderPostProcess"

@@ -370,3 +370,15 @@ int rd_find_gc_vars(const rd_image *im, rd_gc_vars *out) {
   *out = v;
   return RD_SITE_OK;
 }
+
+int rd_find_call(const uint32_t *code, size_t n, uint64_t code_addr, uint64_t target,
+                 size_t *at) {
+  int found = 0;
+  for (size_t i = 0; i < n; i++) {
+    if (!rd_a64_is_bl(code[i]) || rd_a64_branch_target(code_addr + 4 * i, code[i]) != target)
+      continue;
+    if (found++) return RD_SITE_AMBIGUOUS;
+    *at = i;
+  }
+  return found ? RD_SITE_OK : RD_SITE_NOT_FOUND;
+}

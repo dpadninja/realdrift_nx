@@ -2,6 +2,7 @@
 /* Host unit test of rd_patchsites. MIT (see LICENSE). */
 #include <string.h>
 #include "check.h"
+#include "rd_a64.h"
 #include "rd_patchsites.h"
 
 /* A synthetic libunity fragment shaped like the real Choreographer gate (5.0.7 words).
@@ -130,6 +131,31 @@ static void test_skip_clear_refuses_other_code(void) {
   const uint32_t no_call[] = { 0xd10083ff, 0xa9017bfd, 0x910043fd, 0xaa1f03e1, 0x94000001,
                                0xd503201f, 0xa9417bfd, 0x910083ff, 0xd65f03c0 };
   CHECK(rd_find_skip_clear(no_call, 9, &from, &to) == RD_SITE_BAD_CHECK);
+}
+
+/* RaceAudioManager.PlayMusic around its one call of Resources.UnloadUnusedAssets (5.0.8:
+ * method 0x8092c4, word 103 = 0x809460 `bl 0x13a6ec8`); other calls nearby go elsewhere. */
+static void test_find_call(void) {
+  const uint64_t base = 0x809458;
+  const uint32_t code[] = {
+    rd_a64_bl(base + 0, 0x1657938),     /* bl AudioSource.set_clip */
+    0xaa1f03e0,                         /* mov x0, xzr */
+    rd_a64_bl(base + 8, 0x13a6ec8),     /* bl Resources.UnloadUnusedAssets */
+    0x90000008,                         /* adrp x8, ... */
+  };
+  size_t at = 99;
+  CHECK(rd_find_call(code, 4, base, 0x13a6ec8, &at) == RD_SITE_OK && at == 2);
+}
+
+/* No such call, or two of them (a changed method), leaves the code alone. */
+static void test_find_call_refuses(void) {
+  const uint64_t base = 0x1000;
+  uint32_t code[] = { rd_a64_bl(base, 0x2000), 0xd503201f, rd_a64_bl(base + 8, 0x2000) };
+  size_t at = 99;
+  CHECK(rd_find_call(code, 3, base, 0x3000, &at) == RD_SITE_NOT_FOUND && at == 99);
+  CHECK(rd_find_call(code, 3, base, 0x2000, &at) == RD_SITE_AMBIGUOUS);
+  code[0] = 0x14000400;                 /* b, not bl: a tail call is not this call */
+  CHECK(rd_find_call(code, 1, base, base + 0x1000, &at) == RD_SITE_NOT_FOUND);
 }
 
 /* QualitySettings::get_antiAliasing, 5.0.8 words (0x2ed034). */
@@ -264,6 +290,8 @@ int main(void) {
   RUN(test_ambiguous_and_missing);
   RUN(test_quality_aa);
   RUN(test_quality_aa_refuses_other_code);
+  RUN(test_find_call);
+  RUN(test_find_call_refuses);
   RUN(test_il2cpp_copy);
   RUN(test_splash_flag);
   return g_failures != 0;

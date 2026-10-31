@@ -214,6 +214,7 @@ One line per module; each file's header comment has the details.
 | `rd_menu.{c,h}`, `rd_menu_hook.c` | menus on the controller: focus frame, A taps, B goes back (synthetic touch) |
 | `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
 | `rd_sleek.{c,h}`, `rd_sleek_hook.c` | Graphics Enhancements (SleekRender): its redundant clears skipped; bloom / vignette per config.txt |
+| `rd_racemusic.h`, `rd_racemusic_hook.c` | no `Resources.UnloadUnusedAssets` (a stop-the-world, and a collection) when the race music changes track |
 | `rd_render.{c,h}`, `rd_render_hook.c` | min_draw_distance (main camera far plane) and ge_antialiasing (experimental) |
 | `rd_offline.{c,h}`, `rd_offline_hook.c` | offline_ui: the menus' online features hidden (shop, Google, cloud, online boards, Share, links) |
 | `rd_player.{c,h}`, `rd_player_hook.c` | the default flag, written into the prefs at boot |

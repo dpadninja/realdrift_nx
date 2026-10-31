@@ -9,6 +9,8 @@
  * dlsym; with the GC off those calls did nothing. shim_dl.c hands libunity a wrapper that
  * turns the GC on for that one collection and off again. The automatic collections Boehm
  * would start on its own while allocating stay off, so a race does not lose frames to them.
+ * The one request the game made in a race, on every music track change, is removed
+ * (rd_racemusic.h).
  *
  * The call sequence is pure (tests/c/test_rd_gcload.c); rd_gcload_hook.c is the il2cpp glue.
  * MIT (see LICENSE). */

@@ -48,6 +48,7 @@ volatile int      g_rd_in_frame = 0;
 #include "rd_gcbridge.h"
 #include "mem_layout.h"
 #include "rd_memwatch.h"
+#include "rd_racemusic.h"
 #include "rd_loadprof_hook.h"
 
 so_module main_mod, unity_mod, il2cpp_mod;
@@ -407,6 +408,7 @@ static void run_main_loop(void) {
       rd_drive_try_install();
       rd_sleek_try_install();
       rd_menu_try_install();
+      rd_racemusic_try_install();
     }
     if (config.debug_audio && (frame % RD_AUDIO_WATCH_FRAMES) == 0) opensles_audio_watch();
     frame++;
