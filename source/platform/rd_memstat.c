@@ -21,12 +21,36 @@ int rd_memstat_format(const rd_memstat *s, const rd_memstat *prev, uint64_t low,
   /* the change in whole MB, signed; 0 without a previous snapshot */
   const long long delta = prev ? ((long long)s->heap_inuse - (long long)prev->heap_inuse) / (1 << 20)
                                : 0;
-  return snprintf(buf, n,
+  int len = snprintf(buf, n,
                   "heap %llu/%llu MB (%+lld), avail %llu MB (top %llu, low %llu) | arena %llu/%llu MB | "
                   "oc %llu/%llu MB | fallback %llu MB | sys %llu/%llu MB",
                   MB(s->heap_inuse), MB(s->heap_size), delta, MB(rd_memstat_heap_avail(s)),
                   MB(rd_memstat_heap_contig(s)), MB(low), MB(s->arena_used), MB(s->arena_size), MB(s->oc_committed),
                   MB(s->oc_pool), MB(s->fallback), MB(s->sys_used), MB(s->sys_total));
+  if (s->gc_state != RD_MEM_GC_UNKNOWN && len >= 0 && (size_t)len < n)
+    len += snprintf(buf + len, n - (size_t)len, " | gc %llu/%llu MB %s", MB(s->gc_used),
+                    MB(s->gc_heap), s->gc_state == RD_MEM_GC_OFF ? "OFF" : "on");
+  return len;
+}
+
+int rd_memstat_format_globj(const rd_globj *g, const rd_globj *prev, char *buf, size_t n) {
+  static const rd_globj zero;
+  const rd_globj *p = prev ? prev : &zero;
+  const long long map_delta = ((long long)(g->map_bytes_made - p->map_bytes_made) -
+                               (long long)(g->map_bytes_freed - p->map_bytes_freed)) / (1 << 20);
+  return snprintf(buf, n,
+                  "GL objects: textures %lld live (+%llu -%llu), buffers %lld live (+%llu -%llu) | "
+                  "nvmap %llu MB live (%+lld) in %lld maps (+%llu -%llu)",
+                  (long long)(g->tex_made - g->tex_freed),
+                  (unsigned long long)(g->tex_made - p->tex_made),
+                  (unsigned long long)(g->tex_freed - p->tex_freed),
+                  (long long)(g->buf_made - g->buf_freed),
+                  (unsigned long long)(g->buf_made - p->buf_made),
+                  (unsigned long long)(g->buf_freed - p->buf_freed),
+                  MB(g->map_bytes_made - g->map_bytes_freed), map_delta,
+                  (long long)(g->maps_made - g->maps_freed),
+                  (unsigned long long)(g->maps_made - p->maps_made),
+                  (unsigned long long)(g->maps_freed - p->maps_freed));
 }
 
 const char *rd_memstat_due(uint32_t frame, uint64_t frame_ns) {

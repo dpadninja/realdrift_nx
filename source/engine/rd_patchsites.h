@@ -61,6 +61,12 @@ int rd_find_splash_flag(const rd_image *im, uint32_t *field);
  * RD_SITE_* result. */
 int rd_find_skip_clear(const uint32_t *code, size_t n, size_t *after_set, size_t *epilogue);
 
+/* The one `bl target` in code[0..n) (an il2cpp method's code at link/run address `code_addr`,
+ * calling a method at `target`): *at = its word index. More than one is RD_SITE_AMBIGUOUS, so
+ * a changed method is left alone. RD_SITE_* result. */
+int rd_find_call(const uint32_t *code, size_t n, uint64_t code_addr, uint64_t target,
+                 size_t *at);
+
 /* Where QualitySettings.antiAliasing lives, read off the engine's getter. */
 typedef struct {
   size_t   call;      /* word index of `bl GetQualitySettings` (returns the manager) */

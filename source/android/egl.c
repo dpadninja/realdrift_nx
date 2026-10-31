@@ -16,6 +16,7 @@
 #include "egl.h"
 #include "android_native_unity.h"
 #include "rd_perfstat.h"
+#include "rd_gldebug_gl.h"
 #include "rd_gltrace_gl.h"
 #include "rd_memwatch.h"
 #include "rd_etc2bc_gl.h"
@@ -135,7 +136,10 @@ EGLBoolean egl_SwapBuffers_log(EGLDisplay d, EGLSurface s) {
     if (++traced % RD_GLTRACE_PERIOD_FRAMES == 0) rd_gltrace_arm("every 10 s");
     rd_gltrace_frame_end();
   }
-  if (config.debug_mem) rd_memwatch_probe_once();   /* what an ETC2 texture costs */
+  if (config.debug_mem) {
+    rd_memwatch_probe_once();   /* what an ETC2 texture costs */
+    rd_gldebug_install();       /* GL errors named by the call that raised them */
+  }
   if (config.debug_fps_counter) fps_overlay_draw();
   nxp_draw();   /* on-screen cursor overlay; saves/restores all GL state */
   rd_menu_draw();   /* menu navigation focus frame */
@@ -179,8 +183,10 @@ static void timed_glFinish(void) { GL_TIMED(glFinish()); }
 
 void *egl_wrap_gl(const char *name, void *real) {
   void *w = config.debug_gl_trace && real ? rd_gltrace_wrap(name, real) : NULL;
-  if (!w && config.debug_mem && real) w = rd_memwatch_wrap(name, real);
   void *inner = w ? w : real;
+  /* the allocation check and object counts on top of the trace: both can be on */
+  void *m = config.debug_mem && inner ? rd_memwatch_wrap(name, inner) : NULL;
+  if (m) inner = m;
   /* ETC2 stored as S3TC (rd_etc2bc_gl.h), on top of the check so it sees what mesa gets */
   void *t = config.texture_transcode && inner ? rd_etc2bc_wrap(name, inner) : NULL;
   /* anisotropic_filtering (rd_aniso_gl.h): other functions than the transcoder's */

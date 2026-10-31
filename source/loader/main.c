@@ -48,6 +48,7 @@ volatile int      g_rd_in_frame = 0;
 #include "rd_gcbridge.h"
 #include "mem_layout.h"
 #include "rd_memwatch.h"
+#include "rd_racemusic.h"
 #include "rd_loadprof_hook.h"
 
 so_module main_mod, unity_mod, il2cpp_mod;
@@ -321,7 +322,17 @@ static void boot_start_unity(void) {
   debugPrintf("[boot] resumed + focus=true\n");
 }
 
-/* Before the first nativeRender: GC off (its stop-the-world needs signals Horizon lacks). */
+/* debug_mem: the managed (Boehm) heap for the "[mem]" line, through the il2cpp API. */
+static void memwatch_gc(rd_memstat *s) {
+  if (!g_il2cpp.gc_get_heap_size || !g_il2cpp.gc_get_used_size || !g_il2cpp.gc_is_disabled)
+    return;
+  s->gc_heap = (uint64_t)g_il2cpp.gc_get_heap_size();
+  s->gc_used = (uint64_t)g_il2cpp.gc_get_used_size();
+  s->gc_state = g_il2cpp.gc_is_disabled() ? RD_MEM_GC_OFF : RD_MEM_GC_ON;
+}
+
+/* Before the first nativeRender: GC off (its stop-the-world needs signals Horizon lacks). It
+ * stays off in play; the collections the engine asks for still run (rd_gcload.h). */
 static void boot_disable_gc(void) {
   /* CRITICAL ORDER: disable the Boehm GC + install the clock BEFORE the first
    * nativeRender. First-frame managed allocs can trigger a GC whose stop-the-world
@@ -397,6 +408,7 @@ static void run_main_loop(void) {
       rd_drive_try_install();
       rd_sleek_try_install();
       rd_menu_try_install();
+      rd_racemusic_try_install();
     }
     if (config.debug_audio && (frame % RD_AUDIO_WATCH_FRAMES) == 0) opensles_audio_watch();
     frame++;
@@ -461,6 +473,7 @@ int main(int argc, char *argv[]) {
   /* The exported il2cpp API used by the input/driving/race hooks, resolved once. */
   int il2cpp_missing = rd_il2cpp_load(&g_il2cpp, il2cpp_sym, &il2cpp_mod, il2cpp_sym_missing);
   debugPrintf("[boot] il2cpp API: %d function(s) missing\n", il2cpp_missing);
+  rd_memwatch_set_gc(memwatch_gc);
 
   /* Controller driving + race UI (rd_drive_hook.c) are installed lazily in the loop. */
   rd_start_clock_thread(config.boost_loading);

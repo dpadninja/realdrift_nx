@@ -25,6 +25,12 @@ static const struct { const char *name; size_t off; } API[] = {
   { "il2cpp_class_get_name",             offsetof(rd_il2cpp_api, class_get_name) },
   { "il2cpp_object_new",                 offsetof(rd_il2cpp_api, object_new) },
   { "il2cpp_object_get_class",           offsetof(rd_il2cpp_api, object_get_class) },
+  { "il2cpp_gc_get_heap_size",           offsetof(rd_il2cpp_api, gc_get_heap_size) },
+  { "il2cpp_gc_get_used_size",           offsetof(rd_il2cpp_api, gc_get_used_size) },
+  { "il2cpp_gc_is_disabled",             offsetof(rd_il2cpp_api, gc_is_disabled) },
+  { "il2cpp_gc_enable",                  offsetof(rd_il2cpp_api, gc_enable) },
+  { "il2cpp_gc_disable",                 offsetof(rd_il2cpp_api, gc_disable) },
+  { "il2cpp_gc_collect",                 offsetof(rd_il2cpp_api, gc_collect) },
 };
 
 int rd_il2cpp_load(rd_il2cpp_api *api, rd_sym_fn sym, void *ctx,

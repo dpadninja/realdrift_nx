@@ -41,6 +41,7 @@ int rd_a64_add_x_imm(uint32_t insn, unsigned *rd, unsigned *rn, uint32_t *imm);
 #define RD_A64_BR_X16       0xd61f0200u   /* br x16                      */
 #define RD_A64_LDP_X19_X30  0xa9417bf3u   /* ldp x19, x30, [sp, #0x10]   */
 #define RD_A64_SUB_SP_0X20  0xd10083ffu   /* sub sp, sp, #0x20           */
+#define RD_A64_NOP          0xd503201fu   /* nop                         */
 #define RD_A64_BL_OPCODE    0x94000000u   /* bl <imm26>: (insn & MASK) == OPCODE */
 #define RD_A64_BL_MASK      0xfc000000u
 

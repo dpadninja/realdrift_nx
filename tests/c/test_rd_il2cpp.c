@@ -81,7 +81,7 @@ static void on_missing(const char *name) { (void)name; g_missing_calls++; }
 static void test_load_and_helpers(void) {
   rd_il2cpp_api api;
   int missing = rd_il2cpp_load(&api, fake_sym, NULL, on_missing);
-  CHECK(missing == 14 && g_missing_calls == 14);  /* all but the six provided below */
+  CHECK(missing == 20 && g_missing_calls == 20);  /* all but the six provided below */
   CHECK(api.domain_get == f_domain_get && api.field_get_offset == f_field_offset);
   CHECK(api.class_get_method_from_name == NULL && api.string_new == NULL);
   CHECK(rd_il2cpp_class(&api, "Assembly-CSharp", "", "UIManager") == &g_klass);
@@ -93,7 +93,7 @@ static void test_load_and_helpers(void) {
   uint32_t out[1] = { 0 };
   CHECK(rd_il2cpp_fields(&api, &g_klass, names, 1, out) && out[0] == 0x18);
   rd_il2cpp_api none;
-  CHECK(rd_il2cpp_load(&none, NULL, NULL, NULL) == 20);
+  CHECK(rd_il2cpp_load(&none, NULL, NULL, NULL) == 26);
   CHECK(rd_il2cpp_class(&none, "Assembly-CSharp", "", "UIManager") == NULL);
 }
 

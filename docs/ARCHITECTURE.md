@@ -102,6 +102,7 @@ One line per module; each file's header comment has the details.
 | `error.{c,h}` | fatal error screen |
 | `nx_crash_handler.{c,h}` | CPU exception handler: registers and backtrace into the log |
 | `diag.{c,h}` | thread registry and stall watchdog: dumps every thread when frames stop |
+| `rd_wdclock.{c,h}` | the watchdog's time arithmetic: wait lengths, telling a suspended process from a stall |
 | `rd_loadprof_hook.{c,h}` | debug_load: samples file counters and thread CPU around long frames |
 
 ### bionic
@@ -152,6 +153,7 @@ One line per module; each file's header comment has the details.
 | `rd_etc2bc_gl.{c,h}` | texture_transcode: ETC2 texture storage and uploads turned into S3TC |
 | `third_party/etcdec.h`, `third_party/stb_dxt.h` | vendored ETC/EAC decoder (iOrange/etcdec) and DXT encoder (nothings/stb) |
 | `rd_memwatch.{c,h}` | debug_mem: `[mem]` lines and `glGetError` after GL calls that allocate |
+| `rd_gldebug.{c,h}`, `rd_gldebug_gl.{c,h}` | debug_mem: mesa's debug output, each GL error with its message and the engine's return addresses |
 | `android_log.{c,h}` | liblog and `__assert2` into `debug.log` |
 | `rd_zip.{c,h}` | read single entries of `base.apk` (stored or deflated) for the AssetManager |
 | `rd_meta.{c,h}` | `ApplicationInfo.metaData` values from the manifest |
@@ -173,6 +175,7 @@ One line per module; each file's header comment has the details.
 | `rd_il2cppcopy.{c,h}` | fast_boot: when Unity's per-launch il2cpp data copy can be skipped (the stamp) |
 | `rd_a64.{c,h}` | AArch64 instruction encode/decode helpers |
 | `rd_gcbridge.{c,h}`, `rd_gcbridge_hook.c` | Boehm GC stop-the-world without POSIX signals: register publishing (pure) and `pthread_kill` for the collector |
+| `rd_gcload.{c,h}`, `rd_gcload_hook.c` | the GC stays off in play; the collections the engine asks for (`il2cpp_gc_collect` via dlsym: UnloadUnusedAssets on scene loads) run with it turned on |
 | `unity_imports.{c,h}` | imports specific to the Unity/IL2CPP engine |
 | `unity_glue.c` | the fake UnityPlayer / Context / Surface objects the engine is driven with |
 | `unity_input_hook.{c,h}` | `UnityEngine.Input` icalls fed from the Switch touch screen and cursor |
@@ -211,6 +214,7 @@ One line per module; each file's header comment has the details.
 | `rd_menu.{c,h}`, `rd_menu_hook.c` | menus on the controller: focus frame, A taps, B goes back (synthetic touch) |
 | `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
 | `rd_sleek.{c,h}`, `rd_sleek_hook.c` | Graphics Enhancements (SleekRender): its redundant clears skipped; bloom / vignette per config.txt |
+| `rd_racemusic.{c,h}`, `rd_racemusic_hook.c` | race music without hitches: no `Resources.UnloadUnusedAssets` on a track change, every track loaded with the race and kept |
 | `rd_render.{c,h}`, `rd_render_hook.c` | min_draw_distance (main camera far plane) and ge_antialiasing (experimental) |
 | `rd_offline.{c,h}`, `rd_offline_hook.c` | offline_ui: the menus' online features hidden (shop, Google, cloud, online boards, Share, links) |
 | `rd_player.{c,h}`, `rd_player_hook.c` | the default flag, written into the prefs at boot |
