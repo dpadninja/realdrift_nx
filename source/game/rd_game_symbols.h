@@ -122,6 +122,12 @@
 #define RD_MTH_PLAY_MUSIC         "PlayMusic"                   /* private, no arguments */
 #define RD_CLS_RESOURCES          "Resources"                   /* UnityEngine, CoreModule */
 #define RD_MTH_UNLOAD_UNUSED      "UnloadUnusedAssets"          /* static, no arguments */
+#define RD_MTH_RES_LOAD           "Load"                        /* static Object Load(string) */
+#define RD_MTH_RACE_AUDIO_AWAKE   "Awake"                       /* private, no arguments */
+#define RD_FLD_BG_MUSICS          "backgroundMusics"            /* string[]: Resources paths */
+#define RD_CLS_OBJECT             "Object"                      /* UnityEngine, CoreModule */
+#define RD_MTH_SET_HIDE_FLAGS     "set_hideFlags"               /* (HideFlags) */
+#define RD_HIDE_DONT_UNLOAD       32   /* HideFlags.DontUnloadUnusedAsset */
 
 #define RD_ASM_FIRSTPASS          "Assembly-CSharp-firstpass"   /* SleekRender is a plugin */
 #define RD_NS_SLEEK               "SleekRender"
