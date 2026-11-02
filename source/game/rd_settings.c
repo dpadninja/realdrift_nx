@@ -152,6 +152,10 @@ static const setting SETTINGS[] = {
     "# debug_load: 1 logs, for every frame of a second or more (a load), the file traffic the\n"
     "#   engine asked for and what reached the SD card, and each engine thread's CPU time\n"
     "#   ([load] lines, with debug_log = 1).\n" },
+  { "debug_threads", T_SWITCH, F(debug_threads),
+    "# debug_threads: 1 logs every 10 s the frames, the CPU time of each engine thread on each\n"
+    "#   core with its priority, and how often threads wait and wake ([thr] lines, with\n"
+    "#   debug_log = 1).\n" },
   { "debug_audio", T_SWITCH, F(debug_audio),
     "# debug_audio: 1 logs when the sound goes silent for 3 s or comes back, when the audio\n"
     "#   callback stops, and the engine's volume / mute calls ([audio] lines, with debug_log = 1).\n" },

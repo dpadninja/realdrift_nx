@@ -35,6 +35,7 @@ static inline uint64_t rd_now_ns(void) {
 #define RD_LOAD_PROFILE_NS      RD_NS_PER_S        /* debug_load: frames this long are profiled */
 #define RD_MEM_LOG_FRAMES       600   /* debug_mem: a [mem] line ~every 10 s (rd_memstat.h) */
 #define RD_MEM_LOAD_NS          RD_NS_PER_S        /* debug_mem: a frame this long is a load */
+#define RD_THRSTAT_WINDOW_NS    (10 * RD_NS_PER_S) /* debug_threads: one [thr] report per window */
 #define RD_MEM_GL_LOG_FIRST     20    /* debug_mem: GL errors logged one by one ...        */
 #define RD_MEM_GL_LOG_EVERY     100   /* ... then every 100th                              */
 /* A per-frame hook that ran within this many frames counts as "active" (in a race). */

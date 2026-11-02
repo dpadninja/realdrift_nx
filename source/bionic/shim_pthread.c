@@ -11,6 +11,7 @@
 
 #include <errno.h>
 #include "diag.h"
+#include "rd_perfstat.h"
 
 #include "util.h"
 #include "libc_shim.h"
@@ -39,18 +40,21 @@ int pthread_rwlock_unlock_fake(void **rw) {
 typedef struct { Semaphore sem; } FakeSem;
 int sem_init_fake(void **s, int pshared, unsigned int value) { (void)pshared; FakeSem *fs = calloc(1, sizeof(*fs)); semaphoreInit(&fs->sem, value); *s = fs; return 0; }
 int sem_destroy_fake(void **s) { if (s && *s) { free(*s); *s = NULL; } return 0; }
-int sem_post_fake(void **s) { if (s && *s) semaphoreSignal(&((FakeSem *)*s)->sem); return 0; }
-int sem_wait_fake(void **s) { if (s && *s) { Semaphore *sm=&((FakeSem *)*s)->sem; diag_wait_enter(DIAG_W_SEM,sm); semaphoreWait(sm); diag_wait_exit(); } return 0; }
+int sem_post_fake(void **s) { RD_SYNC_COUNT(sem_posts, 1); if (s && *s) semaphoreSignal(&((FakeSem *)*s)->sem); return 0; }
+int sem_wait_fake(void **s) { RD_SYNC_COUNT(sem_waits, 1); if (s && *s) { Semaphore *sm=&((FakeSem *)*s)->sem; diag_wait_enter(DIAG_W_SEM,sm); semaphoreWait(sm); diag_wait_exit(); } return 0; }
 int sem_trywait_fake(void **s) { if (s && *s && semaphoreTryWait(&((FakeSem *)*s)->sem)) return 0; errno = EAGAIN; return -1; }
 int sem_getvalue_fake(void **s, int *val) { if (s && *s) *val = (int)((FakeSem *)*s)->sem.count; else *val = 0; return 0; }
 // no native timed wait on libnx Semaphore; poll with a short backoff to the
 // deadline. The engine uses it as a yield-with-timeout in its task scheduler.
 int sem_timedwait_fake(void **s, const struct timespec *abs) {
   (void)abs;
+  RD_SYNC_COUNT(sem_timedwaits, 1);
   for (int i = 0; i < 1000; i++) {
     if (sem_trywait_fake(s) == 0) return 0;
+    RD_SYNC_COUNT(sem_polls, 1);
     svcSleepThread(1000000ull); // 1 ms
   }
+  RD_SYNC_COUNT(sem_timeouts, 1);
   errno = ETIMEDOUT;
   return -1;
 }
@@ -110,6 +114,7 @@ int pthread_mutex_timedlock_fake(pthread_mutex_t **uid, const struct timespec *a
   if (ensure_mutex(uid) < 0) return -1;
   for (int i = 0; i < 1000; i++) {
     if (pthread_mutex_trylock(*uid) == 0) return 0;
+    RD_SYNC_COUNT(mutex_polls, 1);
     svcSleepThread(1000000ull);
   }
   return ETIMEDOUT;
@@ -152,8 +157,10 @@ int pthread_cond_wait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx) {
   long add = COND_WAIT_CAP_MS * 1000000L;
   cap.tv_sec  += (cap.tv_nsec + add) / 1000000000L;
   cap.tv_nsec  = (cap.tv_nsec + add) % 1000000000L;
+  RD_SYNC_COUNT(cond_waits, 1);
   int r = pthread_cond_timedwait(*cnd, *mtx, &cap);
   diag_wait_exit();
+  if (r == ETIMEDOUT) RD_SYNC_COUNT(cond_capped, 1);
   return (r == ETIMEDOUT) ? 0 : r;   // timeout -> report as spurious wakeup
 }
 // Bound every timed cond-wait to at most COND_WAIT_CAP_MS. The .so libs (libc++
@@ -179,6 +186,7 @@ int pthread_cond_timedwait_fake(pthread_cond_t **cnd, pthread_mutex_t **mtx, con
             (t->tv_sec == cap.tv_sec && t->tv_nsec <= cap.tv_nsec)))
     use = t;
   diag_wait_enter(DIAG_W_COND, *cnd);
+  RD_SYNC_COUNT(cond_waits, 1);
   int r = pthread_cond_timedwait(*cnd, *mtx, use);
   diag_wait_exit();
   return r;

@@ -9,6 +9,8 @@
 #ifndef RD_PERFSTAT_H
 #define RD_PERFSTAT_H
 
+#include "rd_thrstat.h"
+
 /* Counts: open() calls, SD commits, mmap calls, GC stop-the-world pauses. */
 extern unsigned nx_stat_open, nx_stat_commit, nx_stat_mmap, nx_stat_gcstop;
 /* Bytes / time spent in read() + fread() (loading profile). */
@@ -30,5 +32,9 @@ extern volatile unsigned long long nx_stat_readlog_hit;
 extern volatile unsigned long long nx_stat_swap_ns, nx_stat_glwait_ns;
 /* Time mesa waits for a free window buffer / for GPU fences (platform/rd_gpuwait.c). */
 extern volatile unsigned long long nx_stat_dequeue_ns, nx_stat_fence_ns;
+/* debug_threads (rd_thrstat.h): waits and wakes in the pthread / futex shims (bionic/), bumped
+ * with RD_SYNC_COUNT from any thread. */
+extern rd_thrstat_sync nx_stat_sync;
+#define RD_SYNC_COUNT(field, n) __atomic_add_fetch(&nx_stat_sync.field, (n), __ATOMIC_RELAXED)
 
 #endif

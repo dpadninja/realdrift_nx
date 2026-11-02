@@ -18,6 +18,7 @@
 #define DIAG_H
 
 #include "rd_loadprof.h"   /* rd_loadprof_thread */
+#include "rd_thrstat.h"    /* rd_thrstat_thread */
 
 #include <stdint.h>
 
@@ -64,6 +65,11 @@ void diag_watchdog_start(void);
 /* debug_load (rd_loadprof.h): fills out[0..max) with every registered engine thread's id, name
  * and CPU time so far (svcGetInfo ThreadTickCount); returns how many. Any thread. */
 int diag_thread_cpu(rd_loadprof_thread *out, int max);
+
+/* debug_threads (rd_thrstat.h): fills out[0..max) with every registered engine thread's id,
+ * name, priority, ideal core, affinity mask and CPU time on each core so far; returns how
+ * many. Any thread; takes no lock (a thread that registers meanwhile may be missed). */
+int diag_thread_sample(rd_thrstat_thread *out, int max);
 
 /* Horizon handle of the registered thread `want` (lock-free), or 0. */
 #include <pthread.h>

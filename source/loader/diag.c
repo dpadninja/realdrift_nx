@@ -17,6 +17,7 @@
 #include "rd_codeaddr.h"
 #include "rd_a64.h"
 #include "rd_wdclock.h"
+#include "rd_thrstat.h"
 #include "util.h"   /* debugPrintf */
 #include "so_util.h" /* so_find_module_by_addr for backtrace symbolication */
 
@@ -316,6 +317,34 @@ int diag_thread_cpu(rd_loadprof_thread *out, int max) {
     snprintf(out[n].name, sizeof out[n].name, "%s", t->name[0] ? t->name : "?");
     out[n].cpu_ns = tick_to_ns(ticks);
     n++;
+  }
+  return n;
+}
+
+int diag_thread_sample(rd_thrstat_thread *out, int max) {
+  const u32 info = hosversionAtLeast(13, 0, 0) ? InfoType_ThreadTickCount
+                                               : InfoType_ThreadTickCountDeprecated;
+  int n = 0;
+  for (int i = 0; i < DIAG_MAX_THREADS && n < max; i++) {
+    const DiagThread *t = &g_threads[i];
+    if (!t->in_use || !t->handle) continue;
+    rd_thrstat_thread *o = &out[n];
+    memset(o, 0, sizeof *o);
+    o->tid = t->tid;
+    snprintf(o->name, sizeof o->name, "%s", t->name[0] ? t->name : "?");
+    s32 prio = -1, ideal = -1;
+    u64 mask = 0;
+    if (R_FAILED(svcGetThreadPriority(&prio, t->handle))) prio = -1;
+    if (R_FAILED(svcGetThreadCoreMask(&ideal, &mask, t->handle))) { ideal = -1; mask = 0; }
+    o->prio = prio;
+    o->ideal = ideal;
+    o->mask = mask;
+    int ok = 0;
+    for (int c = 0; c < RD_THRSTAT_CORES; c++) {
+      u64 ticks = 0;
+      if (R_SUCCEEDED(svcGetInfo(&ticks, info, t->handle, (u64)c))) { o->core_ns[c] = tick_to_ns(ticks); ok = 1; }
+    }
+    if (ok) n++;
   }
   return n;
 }

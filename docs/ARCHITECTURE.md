@@ -104,6 +104,7 @@ One line per module; each file's header comment has the details.
 | `diag.{c,h}` | thread registry and stall watchdog: dumps every thread when frames stop |
 | `rd_wdclock.{c,h}` | the watchdog's time arithmetic: wait lengths, telling a suspended process from a stall |
 | `rd_loadprof_hook.{c,h}` | debug_load: samples file counters and thread CPU around long frames |
+| `rd_thrstat_hook.{c,h}` | debug_threads: samples engine threads (priority, cores, CPU per core) and the sync shims' counters every 10 s -> `[thr]` lines |
 
 ### bionic
 
@@ -196,6 +197,7 @@ One line per module; each file's header comment has the details.
 | `rd_gpuwait.{c,h}` | time mesa waits for the display and the GPU; real clock rates in the log |
 | `rd_sdstat.c` | debug_load: FS file opens and reads under newlib (what reaches the SD card) |
 | `rd_loadprof.{c,h}` | debug_load: the `[load]` lines (file traffic, CPU per thread) |
+| `rd_thrstat.{c,h}` | debug_threads: the `[thr]` lines (per-core load, busiest threads, wait/wake rates); host-tested |
 | `rd_jobs.{c,h}` | worker threads on cores 1 and 2, which the engine leaves idle |
 | `rd_audioout.{c,h}` | the sound output: libnx audout fed by our thread (in place of SDL's Switch audio, which could hang) |
 | `rd_memstat.{c,h}` | the debug_mem report: memory snapshot, its log line, when to take one |

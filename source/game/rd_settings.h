@@ -70,6 +70,7 @@ typedef struct {
   int         fast_boot;             /* 1: il2cpp data copied once, Unity splash off */
   int         debug_mem;
   int         debug_load;            /* 1: where long (loading) frames spend their time (rd_loadprof.h) */
+  int         debug_threads;         /* 1: CPU per thread and core, sync waits (rd_thrstat.h) */
   int         debug_audio;           /* 1: silences and the OpenSL players' state (rd_audiowatch.h) */             /* 1: memory report and GL allocation errors (rd_memwatch.h) */
 } rd_settings;
 
@@ -108,6 +109,7 @@ typedef struct {
   .archive_cache = 1,                                                 \
   .fast_boot = 1,                                                     \
   .debug_load = 0,                                                    \
+  .debug_threads = 0,                                                 \
   .debug_audio = 0,                                                   \
   .debug_mem = 0,                                                     \
 }
