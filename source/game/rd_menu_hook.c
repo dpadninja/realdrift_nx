@@ -3,7 +3,8 @@
  * Runs from the main loop between engine frames (rd_menu_frame), so the il2cpp calls of the
  * scan never interleave with the game's C#. Everything it touches outside its own files is an
  * entry point: the pad state (nxp_pad_held), the synthetic finger (nx_input_hook_synth), the
- * driving state (rd_drive_active), the race state (its own RaceManager lookup, by name) and the
+ * driving state (rd_drive_active), the race state (its own RaceManager lookup, by name), the
+ * replay's slider press / release (rd_slider_grab) and the
  * focus frame drawn from the eglSwapBuffers wrapper (rd_menu_draw) and the scene-load icall it
  * wraps (the frame goes the moment a load starts). With menu_navigation = 0
  * every entry point returns at once. Main thread. */
@@ -18,6 +19,7 @@
 #include "rd_il2cpp.h"
 #include "rd_game_symbols.h"
 #include "rd_overlay.h"
+#include "rd_slider_grab.h"
 #include "rd_platform.h"
 #include "unity_input_hook.h"
 #include "nx_pointer.h"
@@ -92,6 +94,12 @@ static uint32_t g_uim_frame;
 static struct { uint8_t (*fn)(void *self, const void *mi); const void *mi; } g_is_playing;
 
 #define FIELD(obj, off, type) (*(type *)((char *)(obj) + (off)))
+
+/* Ends editing a slider (if any) and lets go of it (rd_slider_grab.h). */
+static void edit_stop(void) {
+  g_edit.on = 0;
+  rd_slider_grab(NULL, 0);
+}
 
 /* Input.GetKeyDownInt wrapper: Escape is down during the frame after B found no back button. */
 typedef uint8_t (*fn_key)(int32_t key);
@@ -257,7 +265,7 @@ static void scan(void) {
   }
   if (g_edit.on && (g_focus < 0 || g_t[g_focus].t.id != g_focus_id ||
                     g_t[g_focus].kind != RD_UGUI_SLIDER))
-    g_edit.on = 0;                       /* the edited slider is gone */
+    edit_stop();                         /* the edited slider is gone */
   if (g_focus >= 0) {
     g_focus_id = g_t[g_focus].t.id;
     g_focus_rect = g_t[g_focus].t.r;
@@ -280,9 +288,13 @@ static void tap(int i) {
  * press by the fine step, its auto-repeats (direction held) by the coarse one --, A keeps it,
  * B restores the value from before. */
 static void edit_frame(int dir, uint64_t pressed) {
-  if (!rd_ugui_alive((void *)g_focus_id)) { g_edit.on = 0; return; }   /* the slider is gone */
-  if (pressed & config.ui_select) { rd_menu_edit_end(&g_edit, 0); return; }
-  if (pressed & config.ui_back) { rd_ugui_slider_set(g_focus_id, rd_menu_edit_end(&g_edit, 1)); return; }
+  if (!rd_ugui_alive((void *)g_focus_id)) { edit_stop(); return; }    /* the slider is gone */
+  if (pressed & config.ui_select) { rd_menu_edit_end(&g_edit, 0); edit_stop(); return; }
+  if (pressed & config.ui_back) {
+    rd_ugui_slider_set(g_focus_id, rd_menu_edit_end(&g_edit, 1));
+    edit_stop();                         /* after the old value is back: the replay resumes there */
+    return;
+  }
   if (dir == RD_UINAV_NONE || !rd_uinav_repeat(g_dir_frames)) return;
   rd_ugui_slider s;
   rd_ugui_slider_get(g_focus_id, &s);
@@ -381,7 +393,7 @@ void rd_menu_frame(void) {
       g_focus = -1;
       g_focus_id = 0;
       g_has_rect = 0;
-      g_edit.on = 0;
+      edit_stop();
       g_scroll.id = 0;
       g_race_manager = g_ui_manager = NULL;   /* the race scene goes away with the loading */
       g_since_scan = RD_MENU_SCAN_FRAMES;  /* rescan as soon as the loading is over */
@@ -416,6 +428,7 @@ void rd_menu_frame(void) {
     rd_ugui_slider s;
     rd_ugui_slider_get(g_focus_id, &s);
     rd_menu_edit_begin(&g_edit, s.value, s.min, s.max, s.whole);
+    rd_slider_grab((void *)g_focus_id, 1);   /* the replay follows its slider only while held */
   } else if ((pressed & config.ui_select) && g_focus >= 0) {
     tap(g_focus);
   } else if (pressed & config.ui_back) {
