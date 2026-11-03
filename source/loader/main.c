@@ -181,11 +181,15 @@ static void boot_read_config(void) {
 }
 
 /* Render resolution (config.txt render_resolution, rd_perf.h): auto = 720p handheld /
- * 1080p docked, chosen once at boot. Touch follows it (nx_pointer scales the panel). */
+ * 1080p docked, chosen once at boot. Touch follows it (nx_pointer scales the panel). The same
+ * mode picks the *_handheld / *_docked graphics keys (rd_settings_use_mode). */
 static void boot_pick_resolution(void) {
-  rd_pick_resolution(config.render_res,
-                     appletGetOperationMode() == AppletOperationMode_Console,
-                     &screen_width, &screen_height);
+  const int docked = appletGetOperationMode() == AppletOperationMode_Console;
+  rd_pick_resolution(config.render_res, docked, &screen_width, &screen_height);
+  rd_settings_use_mode(&config, docked);                 /* *_handheld / *_docked keys */
+  debugPrintf("[gfx] graphics (%s keys): anisotropic %d, bloom %d, vignette %d, MSAA %d\n",
+              docked ? "docked" : "handheld", config.anisotropic_filtering, config.ge_bloom,
+              config.ge_vignette, config.ge_antialiasing);
   debugPrintf("[gfx] boot mode=%s render=%dx%d (render_resolution); touch x%.2f/%.2f\n",
               appletGetOperationMode() == AppletOperationMode_Console ? "DOCKED" : "HANDHELD",
               screen_width, screen_height,
