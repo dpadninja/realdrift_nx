@@ -10,6 +10,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <dirent.h>
 
 #include "rd_platform.h"
@@ -22,6 +23,7 @@
 #include "fakefd.h"
 #include "diag.h"
 #include "rd_perfstat.h"
+#include "rd_log.h"
 
 
 // ---------------------------------------------------------------------------
@@ -420,6 +422,12 @@ static long read_fake_inner(int fd, void *buf, size_t count) {
 }
 long write_fake(int fd, const void *buf, size_t count) {
   if (fakefd_is_fake(fd)) return fakefd_write(fd, buf, count);
+  /* The engine's stdout/stderr (Boehm writes its fatal messages to fd 2) go nowhere on the
+   * Switch; log them, flushed at once, like the stdio FILE streams (shim_stdio.c). */
+  if (fd == STDOUT_FILENO || fd == STDERR_FILENO) {
+    debugPrintf(RD_LOG_TAG_STDIO " %.*s", (int)count, (const char *)buf);
+    return (long)count;
+  }
   const uint64_t t0 = rd_now_ns();                                   /* debug_load */
   const long r = write(fd, buf, count);
   __atomic_add_fetch(&nx_stat_write, 1, __ATOMIC_RELAXED);

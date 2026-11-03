@@ -26,6 +26,9 @@
 #include <setjmp.h>
 #include <dirent.h>
 #include "diag.h"
+#include "rd_exitlog.h"
+#include "rd_exitwhy.h"
+#include "rd_log.h"
 
 #include "util.h"
 #include "libc_shim.h"
@@ -45,7 +48,7 @@ extern int *__errno(void);              // newlib
 // ---------------------------------------------------------------------------
 
 uint64_t __stack_chk_guard_fake = 0x0ull; /* match install_bionic_tls's zeroed tpidr+0x28 slot */
-static void __stack_chk_fail_fake(void) { debugPrintf("__stack_chk_fail\n"); abort(); }
+static void __stack_chk_fail_fake(void) { debugPrintf(RD_LOG_TAG_CRASH " __stack_chk_fail\n"); abort(); }
 
 static int  __cxa_atexit_fake(void (*fn)(void *), void *arg, void *dso) { (void)fn; (void)arg; (void)dso; return 0; }
 static void __cxa_finalize_fake(void *dso) { (void)dso; }
@@ -115,7 +118,10 @@ static int utimensat_stub(int d, const char *p, const void *t, int f) { (void)d;
 static long sendfile_stub(int o, int i, long *off, size_t c) { (void)o; (void)i; (void)off; (void)c; return -1; }
 static void *fdopendir_stub(int fd) { (void)fd; return NULL; }
 static char *inet_ntoa_stub(uint32_t in) { (void)in; static char s[] = "0.0.0.0"; return s; }
-static void _exit_fake(int code) { (void)code; extern void NX_NORETURN __libnx_exit(int rc); __libnx_exit(0); }
+static void _exit_fake(int code) {
+  rd_exitlog_report(RD_EXIT_QUICK, code);
+  extern void NX_NORETURN __libnx_exit(int rc); __libnx_exit(0);
+}
 
 /* NULL-safe string ops. Unity's SystemInfo device-detection feeds the device
  * model/manufacturer (NULL in our fake JNI) straight into compare/search libc

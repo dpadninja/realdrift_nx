@@ -81,6 +81,8 @@ LDFLAGS  += -Wl,--wrap=nwindowDequeueBuffer -Wl,--wrap=nvFenceWait -Wl,--wrap=nw
 LDFLAGS  += -Wl,--wrap=memalign -Wl,--wrap=nvMapCreate -Wl,--wrap=nvAddressSpaceMap -Wl,--wrap=nvMapClose
 # debug_load: what reaches the SD card, counted in source/platform/rd_sdstat.c
 LDFLAGS  += -Wl,--wrap=fsFsOpenFile -Wl,--wrap=fsFileRead
+# the calls that end the process without an error screen, logged in source/loader/rd_exitlog.c
+LDFLAGS  += -Wl,--wrap=abort -Wl,--wrap=exit -Wl,--wrap=_exit -Wl,--wrap=raise
 
 # mesa GLES3 + EGL + nouveau (force the GLES path); SDL2 for window/HID/audio; zlib.
 LIBS := -lSDL2 -lGLESv2 -lEGL -lglapi -ldrm_nouveau -lpng -lz -lnx -lm

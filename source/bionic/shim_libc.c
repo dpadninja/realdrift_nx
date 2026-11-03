@@ -20,6 +20,7 @@
 #include "libc_shim.h"
 #include "diag.h"
 #include "rd_perfstat.h"
+#include "rd_log.h"
 
 
 // ---------------------------------------------------------------------------
@@ -266,7 +267,7 @@ long syscall_fake(long number, ...) {
 void sincosf_fake(float x, float *s, float *c) { *s = sinf(x); *c = cosf(x); }
 int sched_get_priority_max_fake(int policy) { (void)policy; return 0; }
 int sched_get_priority_min_fake(int policy) { (void)policy; return 0; }
-void android_set_abort_message_fake(const char *msg) { debugPrintf("abort message: %s\n", msg ? msg : "(null)"); }
+void android_set_abort_message_fake(const char *msg) { debugPrintf(RD_LOG_TAG_CRASH " abort message: %s\n", msg ? msg : "(null)"); }
 size_t __ctype_get_mb_cur_max_fake(void) { return 1; }
 int __register_atfork_fake(void) { return 0; }
 int __cxa_thread_atexit_impl_fake(void (*fn)(void *), void *arg, void *dso) { (void)fn; (void)arg; (void)dso; return 0; }
