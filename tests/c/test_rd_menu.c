@@ -1,5 +1,7 @@
 /* sources: source/game/rd_menu.c source/engine/rd_uinav.c */
+/* libs: -lm */
 /* Host unit test of rd_menu (menu navigation rules). MIT (see LICENSE). */
+#include <math.h>
 #include <string.h>
 #include "check.h"
 #include "rd_menu.h"
@@ -72,19 +74,68 @@ static void test_signature(void) {
   CHECK(rd_menu_signature(a, 1) != rd_menu_signature(a, 2));
 }
 
-/* Editing a slider: integer sliders step by 1, others by a twentieth of the range, the value
- * stays in range, A keeps it and B restores the value from before editing. */
+/* Editing a slider: a press moves a non-integer slider by 1/100 of its range (issue #18: 1/20
+ * was too coarse to tune a car), a held direction by 1/20; the value stays in range, A keeps
+ * it and B restores the value from before editing. */
 static void test_slider_edit(void) {
   rd_menu_edit e;
   rd_menu_edit_begin(&e, 0.5f, 0.0f, 1.0f, 0);
-  CHECK(e.on && e.step == 0.05f);
-  CHECK(rd_menu_edit_move(&e, 1) == 0.55f);
-  for (int i = 0; i < 30; i++) rd_menu_edit_move(&e, 1);
+  CHECK(e.on && e.step == 0.05f && e.fine == 0.01f);
+  CHECK(fabsf(rd_menu_edit_move(&e, 1, 0) - 0.51f) < 1e-6f);
+  CHECK(fabsf(rd_menu_edit_move(&e, -1, 0) - 0.50f) < 1e-6f);
+  CHECK(fabsf(rd_menu_edit_move(&e, 1, 1) - 0.55f) < 1e-6f);
+  for (int i = 0; i < 30; i++) rd_menu_edit_move(&e, 1, 1);
   CHECK(e.value == 1.0f);                                   /* clamped */
+  for (int i = 0; i < 300; i++) rd_menu_edit_move(&e, -1, 0);
+  CHECK(e.value == 0.0f);
   CHECK(rd_menu_edit_end(&e, 1) == 0.5f && !e.on);          /* B: back to the old value */
+}
+
+/* A held move after fine presses lands on the coarse grid (counted from min): from 0.53 up to
+ * 0.55, down to 0.50, so holding reaches round values instead of 0.58, 0.63. */
+static void test_slider_coarse_grid(void) {
+  rd_menu_edit e;
+  rd_menu_edit_begin(&e, 0.5f, 0.0f, 1.0f, 0);
+  for (int i = 0; i < 3; i++) rd_menu_edit_move(&e, 1, 0);
+  CHECK(fabsf(e.value - 0.53f) < 1e-6f);
+  CHECK(fabsf(rd_menu_edit_move(&e, 1, 1) - 0.55f) < 1e-6f);
+  CHECK(fabsf(rd_menu_edit_move(&e, 1, 1) - 0.60f) < 1e-6f);
+  rd_menu_edit_begin(&e, 0.53f, 0.0f, 1.0f, 0);
+  CHECK(fabsf(rd_menu_edit_move(&e, -1, 1) - 0.50f) < 1e-6f);
+  /* A value the game set off the fine grid (a touch drag) goes to the next fine point. */
+  rd_menu_edit_begin(&e, 0.537f, 0.0f, 1.0f, 0);
+  CHECK(fabsf(rd_menu_edit_move(&e, 1, 0) - 0.54f) < 1e-6f);
+  rd_menu_edit_begin(&e, 0.537f, 0.0f, 1.0f, 0);
+  CHECK(fabsf(rd_menu_edit_move(&e, -1, 0) - 0.53f) < 1e-6f);
+  /* The grid starts at min, not at 0. */
+  rd_menu_edit_begin(&e, -0.98f, -1.0f, 1.0f, 0);
+  CHECK(fabsf(rd_menu_edit_move(&e, 1, 1) - (-0.9f)) < 1e-6f);
+}
+
+/* A value a hair off a grid point (float error) counts as on it: the move neither stays put
+ * nor skips a point. */
+static void test_slider_float_error(void) {
+  rd_menu_edit e;
+  rd_menu_edit_begin(&e, 0.3f - 1e-7f, 0.0f, 1.0f, 0);
+  CHECK(fabsf(rd_menu_edit_move(&e, 1, 1) - 0.35f) < 1e-6f);
+  rd_menu_edit_begin(&e, 0.3f + 1e-7f, 0.0f, 1.0f, 0);
+  CHECK(fabsf(rd_menu_edit_move(&e, -1, 1) - 0.25f) < 1e-6f);
+  rd_menu_edit_begin(&e, 0.0f, 0.0f, 1.0f, 0);              /* 100 presses add up to max */
+  for (int i = 0; i < 100; i++) rd_menu_edit_move(&e, 1, 0);
+  CHECK(e.value == 1.0f);
+  CHECK(rd_menu_edit_move(&e, 0, 0) == 1.0f);               /* no direction: unchanged */
+}
+
+/* An integer slider: a press moves 1, a held direction 1/20 of the range rounded (at least 1). */
+static void test_slider_whole(void) {
+  rd_menu_edit e;
   rd_menu_edit_begin(&e, 3.0f, 1.0f, 10.0f, 1);
-  CHECK(e.step == 1.0f && rd_menu_edit_move(&e, -1) == 2.0f && rd_menu_edit_move(&e, -5) == 1.0f);
+  CHECK(e.step == 1.0f && e.fine == 1.0f);
+  CHECK(rd_menu_edit_move(&e, -1, 0) == 2.0f && rd_menu_edit_move(&e, -5, 1) == 1.0f);
   CHECK(rd_menu_edit_end(&e, 0) == 1.0f);                   /* A: keep the new value */
+  rd_menu_edit_begin(&e, 7.0f, 0.0f, 100.0f, 1);
+  CHECK(e.step == 5.0f && e.fine == 1.0f);
+  CHECK(rd_menu_edit_move(&e, 1, 0) == 8.0f && rd_menu_edit_move(&e, 1, 1) == 10.0f);
   rd_menu_edit_begin(&e, 0.0f, 5.0f, -5.0f, 1);             /* reversed range is normalised */
   CHECK(e.min == -5.0f && e.max == 5.0f);
 }
@@ -243,6 +294,9 @@ int main(void) {
   RUN(test_wanted);
   RUN(test_signature);
   RUN(test_slider_edit);
+  RUN(test_slider_coarse_grid);
+  RUN(test_slider_float_error);
+  RUN(test_slider_whole);
   RUN(test_slider_delta);
   RUN(test_pause_rule);
   RUN(test_prev_next);

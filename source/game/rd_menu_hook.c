@@ -276,8 +276,9 @@ static void tap(int i) {
   tap_at(g_t[i].tap_x, g_t[i].tap_y);
 }
 
-/* A frame while the focused slider is edited: the direction along it changes the value (with
- * auto-repeat), A keeps it, B restores the value from before. */
+/* A frame while the focused slider is edited: the direction along it changes the value -- a
+ * press by the fine step, its auto-repeats (direction held) by the coarse one --, A keeps it,
+ * B restores the value from before. */
 static void edit_frame(int dir, uint64_t pressed) {
   if (!rd_ugui_alive((void *)g_focus_id)) { g_edit.on = 0; return; }   /* the slider is gone */
   if (pressed & config.ui_select) { rd_menu_edit_end(&g_edit, 0); return; }
@@ -286,7 +287,7 @@ static void edit_frame(int dir, uint64_t pressed) {
   rd_ugui_slider s;
   rd_ugui_slider_get(g_focus_id, &s);
   const int delta = rd_menu_edit_delta(dir, s.direction);
-  if (delta) rd_ugui_slider_set(g_focus_id, rd_menu_edit_move(&g_edit, delta));
+  if (delta) rd_ugui_slider_set(g_focus_id, rd_menu_edit_move(&g_edit, delta, g_dir_frames > 1));
 }
 
 /* Moves the focus in `dir`; may_scroll = 1 lets a list scroll when the focus reaches its edge

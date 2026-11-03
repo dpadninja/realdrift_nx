@@ -32,7 +32,8 @@
 #define RD_MENU_FRAME_RGBA    1.0f, 0.78f, 0.1f, 0.95f
 #define RD_MENU_EDIT_RGBA     0.1f, 0.9f, 0.95f, 0.95f  /* the frame while a slider is edited */
 #define RD_MENU_EDIT_PX_SCALE 1.6f    /* ...and it is this much thicker */
-#define RD_MENU_SLIDER_STEPS  20      /* a non-integer slider moves 1/20 of its range a press */
+#define RD_MENU_SLIDER_STEPS  20      /* held: a non-integer slider moves 1/20 of its range */
+#define RD_MENU_SLIDER_FINE_STEPS 100 /* pressed once: 1/100 of its range */
 #define RD_MENU_SCROLL_FRAMES 8       /* a list scrolls one step over this many frames */
 #define RD_MENU_SCROLL_EPS    0.001f  /* a normalized position this close to an end is at it */
 #define RD_MENU_LOAD_MAX_FRAMES 600   /* a scene load hides the frame at most this long */
@@ -80,21 +81,28 @@ int rd_menu_wanted(int enabled, int loading, int driving, int paused, int race_e
 uint32_t rd_menu_signature(const rd_ugui_target *t, int n);
 
 /* Editing a slider ("focus inside the focus"): A on a slider starts it, the direction along the
- * slider changes the value, A keeps the new value, B puts the old one back. */
+ * slider changes the value, A keeps the new value, B puts the old one back. A press moves the
+ * value by the fine step; holding the direction then moves it by the coarse step, landing on
+ * multiples of it (counted from min), so a held move after a few presses reaches round values. */
 typedef struct {
   int   on;
-  float orig, value, min, max, step;
+  float orig, value, min, max;
+  float step;                        /* coarse step (direction held) */
+  float fine;                        /* fine step (one press) */
 } rd_menu_edit;
 
-/* Starts editing a slider at `value` in [min, max]; integer sliders step by 1, others by
- * (max - min) / RD_MENU_SLIDER_STEPS. */
+/* Starts editing a slider at `value` in [min, max]. Fine step: 1 for an integer slider, else
+ * (max - min) / RD_MENU_SLIDER_FINE_STEPS; coarse step: (max - min) / RD_MENU_SLIDER_STEPS,
+ * rounded to a whole number of at least 1 for an integer slider. */
 void rd_menu_edit_begin(rd_menu_edit *e, float value, float min, float max, int whole);
 /* The value change a direction means for a slider of Slider.Direction `direction` (0 left to
  * right, 1 right to left, 2 bottom to top, 3 top to bottom): +1, -1, or 0 for a direction
  * across the slider. */
 int rd_menu_edit_delta(int dir, int direction);
-/* Moves the value by delta steps within [min, max]; returns the new value. */
-float rd_menu_edit_move(rd_menu_edit *e, int delta);
+/* Moves the value |delta| grid points in the direction of delta's sign, within [min, max]: on
+ * the fine grid (coarse = 0) or the coarse one (coarse = 1), both counted from min. A value
+ * between grid points goes to the next one in that direction. Returns the new value. */
+float rd_menu_edit_move(rd_menu_edit *e, int delta, int coarse);
 /* Stops editing; returns the value the slider should keep (the original one if cancel). */
 float rd_menu_edit_end(rd_menu_edit *e, int cancel);
 

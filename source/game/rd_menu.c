@@ -1,6 +1,7 @@
 /* rd_menu.c -- see rd_menu.h. MIT (see LICENSE). */
 #include <string.h>
 #include <strings.h>
+#include <math.h>
 #include "rd_menu.h"
 
 #define AT_END (1.0f - RD_MENU_SCROLL_EPS)
@@ -92,10 +93,16 @@ uint32_t rd_menu_signature(const rd_ugui_target *t, int n) {
   return sum;
 }
 
+#define EDIT_GRID_EPS 0.001f   /* of a step: closer than this to a grid point is on it */
+
 void rd_menu_edit_begin(rd_menu_edit *e, float value, float min, float max, int whole) {
   if (max < min) { const float t = min; min = max; max = t; }
+  const float range = max - min;
+  float coarse = range / (float)RD_MENU_SLIDER_STEPS;
+  if (whole) coarse = coarse < 1.5f ? 1.0f : floorf(coarse + 0.5f);
   *e = (rd_menu_edit){ .on = 1, .orig = value, .value = value, .min = min, .max = max,
-                       .step = whole ? 1.0f : (max - min) / (float)RD_MENU_SLIDER_STEPS };
+                       .step = coarse,
+                       .fine = whole ? 1.0f : range / (float)RD_MENU_SLIDER_FINE_STEPS };
 }
 
 int rd_menu_edit_delta(int dir, int direction) {
@@ -108,8 +115,15 @@ int rd_menu_edit_delta(int dir, int direction) {
   }
 }
 
-float rd_menu_edit_move(rd_menu_edit *e, int delta) {
-  float v = e->value + (float)delta * e->step;
+float rd_menu_edit_move(rd_menu_edit *e, int delta, int coarse) {
+  const float step = coarse ? e->step : e->fine;
+  if (!delta || step <= 0.0f) return e->value;
+  /* Position on the grid; a value within EDIT_GRID_EPS of a point counts as on it, so float
+   * error never makes a move stay put or skip a point. */
+  const float k = (e->value - e->min) / step;
+  const float n = delta > 0 ? floorf(k + EDIT_GRID_EPS) + (float)delta
+                            : ceilf(k - EDIT_GRID_EPS) + (float)delta;
+  float v = e->min + n * step;
   if (v < e->min) v = e->min;
   if (v > e->max) v = e->max;
   e->value = v;
