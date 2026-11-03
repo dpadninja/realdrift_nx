@@ -8,15 +8,15 @@
 #define MS_ RD_NS_PER_MS
 #define S_  RD_NS_PER_S
 
-static rd_thrstat_thread th(uint64_t tid, const char *name, int prio, uint64_t c0, uint64_t c1) {
-  rd_thrstat_thread t = { .tid = tid, .prio = prio, .ideal = 0, .mask = 1,
-                          .core_ns = { c0, c1, 0, 0 } };
+static rd_thrstat_thread th(uint64_t tid, const char *name, int prio, uint64_t mask,
+                            uint64_t cpu) {
+  rd_thrstat_thread t = { .tid = tid, .prio = prio, .ideal = 0, .mask = mask, .cpu_ns = cpu };
   strcpy(t.name, name);
   return t;
 }
 
 /* Frames: count, sum, longest, and the slow ones (RD_SLOW_FRAME_MS and up) feed the window
- * line, with core 0's busy share from its idle time. */
+ * line. */
 static void test_window(void) {
   rd_thrstat_frames f = { 0 };
   rd_thrstat_frame_add(&f, 10 * MS_);
@@ -24,40 +24,59 @@ static void test_window(void) {
   rd_thrstat_frame_add(&f, 23 * MS_);
   CHECK(f.frames == 3 && f.slow == 1 && f.max_ns == 23 * MS_ && f.sum_ns == 45 * MS_);
   char buf[256];
-  rd_thrstat_format_window(10 * S_, &f, 2500 * MS_, buf, sizeof buf);
-  CHECK(strstr(buf, "10.0 s: 3 frames, avg 15.0 ms, max 23 ms, 1 slow") != NULL);
-  CHECK(strstr(buf, "core 0 busy 75.0%") != NULL);
-}
-
-/* An idle time that was not measured (above the window) leaves the core 0 part out instead of
- * printing a negative load. */
-static void test_window_no_idle(void) {
-  rd_thrstat_frames f = { 0 };
-  char buf[256];
-  rd_thrstat_format_window(10 * S_, &f, 11 * S_, buf, sizeof buf);
+  rd_thrstat_format_window(10 * S_, &f, buf, sizeof buf);
+  CHECK(strcmp(buf, "10.0 s: 3 frames, avg 15.0 ms, max 23 ms, 1 slow") == 0);
+  rd_thrstat_frames none = { 0 };
+  rd_thrstat_format_window(10 * S_, &none, buf, sizeof buf);
   CHECK(strstr(buf, "0 frames, avg 0.0 ms") != NULL);
-  CHECK(strstr(buf, "core 0") == NULL);
 }
 
-/* Per-core load sums each thread's CPU time on that core since the previous sample; a thread
- * that appeared in the window counts from zero. */
+/* Each core of the process shows its busy share from its idle time; cores outside the mask are
+ * left out, and a core that was not measured (no sampler answer, or an idle time above the
+ * window) shows "-" instead of a wrong or negative load -- the first log printed nothing at all
+ * for the cores the main thread was not on. */
 static void test_cores(void) {
-  const rd_thrstat_thread b[] = { th(1, "UnityMain", 0x2c, 1 * S_, 0),
-                                  th(2, "UnityGfxDevice", 0x3b, 2 * S_, 0) };
-  const rd_thrstat_thread a[] = { th(1, "UnityMain", 0x2c, 7 * S_, 0),
-                                  th(2, "UnityGfxDevice", 0x3b, 4 * S_, 0),
-                                  th(3, "Job.Worker 0", 0x3b, 0, 1 * S_) };
+  const uint64_t idle[RD_THRSTAT_CORES] = { 2500 * MS_, 10 * S_, RD_THRSTAT_NO_IDLE, 0 };
   char buf[256];
-  rd_thrstat_format_cores(b, 2, a, 3, 10 * S_, buf, sizeof buf);
-  CHECK(strstr(buf, "core 0 80.0%, core 1 10.0%, core 2 0.0%, core 3 0.0%") != NULL);
+  rd_thrstat_format_cores(0x7, idle, 10 * S_, buf, sizeof buf);
+  CHECK(strcmp(buf, "cores busy (all threads): core 0 75.0%, core 1 0.0%, core 2 -") == 0);
+  const uint64_t over[RD_THRSTAT_CORES] = { 11 * S_, 0, 0, 0 };
+  rd_thrstat_format_cores(0x9, over, 10 * S_, buf, sizeof buf);
+  CHECK(strcmp(buf, "cores busy (all threads): core 0 -, core 3 100.0%") == 0);
+}
+
+/* The engine threads' CPU since the previous sample, in total and per affinity mask in order of
+ * first appearance: this is what shows whether the work piles up on the threads bound to core
+ * 0. A thread new in the window counts from zero. */
+static void test_masks(void) {
+  const rd_thrstat_thread b[] = { th(1, "UnityMain", 0x2c, 0x1, 1 * S_),
+                                  th(2, "UnityGfxDevice", 0x3b, 0x1, 2 * S_) };
+  const rd_thrstat_thread a[] = { th(1, "UnityMain", 0x2c, 0x1, 7 * S_),
+                                  th(2, "UnityGfxDevice", 0x3b, 0x1, 4 * S_),
+                                  th(3, "Job.Worker 0", 0x3b, 0x6, 1 * S_) };
+  char buf[256];
+  rd_thrstat_format_masks(b, 2, a, 3, 10 * S_, buf, sizeof buf);
+  CHECK(strcmp(buf, "engine threads: 3, CPU 90.0% of one core (mask 0x1 80.0%, "
+                    "mask 0x6 10.0%)") == 0);
+}
+
+/* Masks beyond RD_THRSTAT_MASKS are summed as "other" instead of overflowing the table. */
+static void test_masks_other(void) {
+  rd_thrstat_thread a[RD_THRSTAT_MASKS + 2];
+  for (int i = 0; i < RD_THRSTAT_MASKS + 2; i++)
+    a[i] = th((uint64_t)i + 1, "T", 0x3b, (uint64_t)i + 1, 1 * S_);
+  char buf[512];
+  rd_thrstat_format_masks(NULL, 0, a, RD_THRSTAT_MASKS + 2, 100 * S_, buf, sizeof buf);
+  CHECK(strstr(buf, "engine threads: 10, CPU 10.0% of one core (mask 0x1 1.0%") == buf);
+  CHECK(strstr(buf, "mask 0x8 1.0%, other 2.0%)") != NULL);
 }
 
 /* The busiest threads come first; under 1% of the window is left out; max caps the list. */
 static void test_busiest(void) {
-  const rd_thrstat_thread b[] = { th(1, "A", 0x2c, 0, 0), th(2, "B", 0x3b, 0, 0),
-                                  th(3, "C", 0x3b, 0, 0), th(4, "D", 0x3b, 0, 0) };
-  const rd_thrstat_thread a[] = { th(1, "A", 0x2c, 1 * S_, 0), th(2, "B", 0x3b, 50 * MS_, 0),
-                                  th(3, "C", 0x3b, 3 * S_, 0), th(4, "D", 0x3b, 2 * S_, 0) };
+  const rd_thrstat_thread b[] = { th(1, "A", 0x2c, 1, 0), th(2, "B", 0x3b, 1, 0),
+                                  th(3, "C", 0x3b, 1, 0), th(4, "D", 0x3b, 1, 0) };
+  const rd_thrstat_thread a[] = { th(1, "A", 0x2c, 1, 1 * S_), th(2, "B", 0x3b, 1, 50 * MS_),
+                                  th(3, "C", 0x3b, 1, 3 * S_), th(4, "D", 0x3b, 1, 2 * S_) };
   int order[4];
   CHECK(rd_thrstat_busiest(b, 4, a, 4, 10 * S_, order, 4) == 3);
   CHECK(order[0] == 2 && order[1] == 3 && order[2] == 0);
@@ -65,18 +84,19 @@ static void test_busiest(void) {
   CHECK(order[0] == 2 && order[1] == 3);
 }
 
-/* A thread's line names its scheduling (the facts the analysis is about) and its share per
- * core; a counter that went back (a reused tid) does not underflow. */
+/* A thread's line names its scheduling (the facts the analysis is about) and its CPU share; a
+ * counter that went back (a reused tid) does not underflow. */
 static void test_thread(void) {
-  const rd_thrstat_thread b = th(2, "UnityGfxDevice", 0x3b, 2 * S_, 5 * S_);
-  const rd_thrstat_thread a = th(2, "UnityGfxDevice", 0x3b, 4 * S_, 1 * S_);
+  const rd_thrstat_thread b = th(2, "UnityGfxDevice", 0x3b, 0x1, 2 * S_);
+  const rd_thrstat_thread a = th(2, "UnityGfxDevice", 0x3b, 0x1, 4 * S_);
   char buf[256];
   rd_thrstat_format_thread(&b, &a, 10 * S_, buf, sizeof buf);
   CHECK(strstr(buf, "UnityGfxDevice") == buf);
-  CHECK(strstr(buf, "prio 0x3b ideal 0 mask 0x1: 20.0% c0 20.0%") != NULL);
-  CHECK(strstr(buf, " c1") == NULL);
+  CHECK(strstr(buf, "prio 0x3b ideal 0 mask 0x1: 20.0%") != NULL);
   rd_thrstat_format_thread(NULL, &a, 10 * S_, buf, sizeof buf);
-  CHECK(strstr(buf, ": 50.0% c0 40.0% c1 10.0%") != NULL);
+  CHECK(strstr(buf, ": 40.0%") != NULL);
+  rd_thrstat_format_thread(&a, &b, 10 * S_, buf, sizeof buf);
+  CHECK(strstr(buf, ": 0.0%") != NULL);
 }
 
 /* The sync counters are shown per second of the window. */
@@ -104,8 +124,9 @@ static void test_truncates(void) {
 
 int main(void) {
   RUN(test_window);
-  RUN(test_window_no_idle);
   RUN(test_cores);
+  RUN(test_masks);
+  RUN(test_masks_other);
   RUN(test_busiest);
   RUN(test_thread);
   RUN(test_sync);

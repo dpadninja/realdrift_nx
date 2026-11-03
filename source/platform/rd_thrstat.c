@@ -28,17 +28,15 @@ static const rd_thrstat_thread *find(const rd_thrstat_thread *v, int n, uint64_t
   return NULL;
 }
 
-/* CPU time on core c between b (or none) and a; 0 if the counter went back. */
-static uint64_t used(const rd_thrstat_thread *b, const rd_thrstat_thread *a, int c) {
-  const uint64_t from = b ? b->core_ns[c] : 0;
-  return a->core_ns[c] > from ? a->core_ns[c] - from : 0;
+/* CPU time between b (or none: a thread new in the window) and a; 0 if the counter went back
+ * (a reused tid). */
+static uint64_t used(const rd_thrstat_thread *b, const rd_thrstat_thread *a) {
+  const uint64_t from = b ? b->cpu_ns : 0;
+  return a->cpu_ns > from ? a->cpu_ns - from : 0;
 }
 
-static uint64_t used_total(const rd_thrstat_thread *b, const rd_thrstat_thread *a) {
-  uint64_t s = 0;
-  for (int c = 0; c < RD_THRSTAT_CORES; c++) s += used(b, a, c);
-  return s;
-}
+/* "12.3%": tenths of a percent. */
+#define PCT(p) (p) / 10, (p) % 10
 
 void rd_thrstat_frame_add(rd_thrstat_frames *f, uint64_t frame_ns) {
   f->frames++;
@@ -54,8 +52,8 @@ void rd_thrstat_sync_diff(const rd_thrstat_sync *a, const rd_thrstat_sync *b,
   for (size_t i = 0; i < sizeof *d / sizeof(uint64_t); i++) pd[i] = pb[i] - pa[i];
 }
 
-int rd_thrstat_format_window(uint64_t window_ns, const rd_thrstat_frames *f, uint64_t idle_ns,
-                             char *buf, size_t n) {
+int rd_thrstat_format_window(uint64_t window_ns, const rd_thrstat_frames *f, char *buf,
+                             size_t n) {
   size_t len = 0;
   buf[0] = 0;
   const uint64_t avg = f->frames ? f->sum_ns / f->frames : 0;
@@ -65,29 +63,58 @@ int rd_thrstat_format_window(uint64_t window_ns, const rd_thrstat_frames *f, uin
       (unsigned long long)(avg / RD_NS_PER_MS),
       (unsigned long long)(avg % RD_NS_PER_MS / (RD_NS_PER_MS / 10)),
       (unsigned long long)(f->max_ns / RD_NS_PER_MS), f->slow);
-  if (idle_ns <= window_ns) {
-    const unsigned busy = 1000u - permille(idle_ns, window_ns);
-    put(buf, n, &len, " | core 0 busy %u.%u%% (all threads of the process)", busy / 10,
-        busy % 10);
+  return (int)len;
+}
+
+int rd_thrstat_format_cores(uint64_t mask, const uint64_t idle_ns[RD_THRSTAT_CORES],
+                            uint64_t window_ns, char *buf, size_t n) {
+  size_t len = 0;
+  buf[0] = 0;
+  put(buf, n, &len, "cores busy (all threads):");
+  int first = 1;
+  for (int c = 0; c < RD_THRSTAT_CORES; c++) {
+    if (!(mask & (1ull << c))) continue;
+    put(buf, n, &len, "%s core %d ", first ? "" : ",", c);
+    first = 0;
+    if (idle_ns[c] == RD_THRSTAT_NO_IDLE || idle_ns[c] > window_ns) {
+      put(buf, n, &len, "-");
+      continue;
+    }
+    const unsigned busy = 1000u - permille(idle_ns[c], window_ns);
+    put(buf, n, &len, "%u.%u%%", PCT(busy));
   }
   return (int)len;
 }
 
-int rd_thrstat_format_cores(const rd_thrstat_thread *before, int nb,
+int rd_thrstat_format_masks(const rd_thrstat_thread *before, int nb,
                             const rd_thrstat_thread *after, int na, uint64_t window_ns,
                             char *buf, size_t n) {
-  uint64_t core[RD_THRSTAT_CORES] = { 0 };
+  uint64_t masks[RD_THRSTAT_MASKS], per_mask[RD_THRSTAT_MASKS] = { 0 };
+  uint64_t total = 0, other = 0;
+  int nm = 0;
   for (int i = 0; i < na; i++) {
-    const rd_thrstat_thread *b = find(before, nb, after[i].tid);
-    for (int c = 0; c < RD_THRSTAT_CORES; c++) core[c] += used(b, &after[i], c);
+    const uint64_t u = used(find(before, nb, after[i].tid), &after[i]);
+    total += u;
+    int m = 0;
+    while (m < nm && masks[m] != after[i].mask) m++;
+    if (m == nm && nm < RD_THRSTAT_MASKS) masks[nm++] = after[i].mask;
+    if (m < nm) per_mask[m] += u;
+    else other += u;
   }
   size_t len = 0;
   buf[0] = 0;
-  put(buf, n, &len, "engine threads by core:");
-  for (int c = 0; c < RD_THRSTAT_CORES; c++) {
-    const unsigned p = permille(core[c], window_ns);
-    put(buf, n, &len, "%s core %d %u.%u%%", c ? "," : "", c, p / 10, p % 10);
+  const unsigned p = permille(total, window_ns);
+  put(buf, n, &len, "engine threads: %d, CPU %u.%u%% of one core (", na, PCT(p));
+  for (int m = 0; m < nm; m++) {
+    const unsigned q = permille(per_mask[m], window_ns);
+    put(buf, n, &len, "%smask 0x%llx %u.%u%%", m ? ", " : "", (unsigned long long)masks[m],
+        PCT(q));
   }
+  if (other) {
+    const unsigned q = permille(other, window_ns);
+    put(buf, n, &len, "%sother %u.%u%%", nm ? ", " : "", PCT(q));
+  }
+  put(buf, n, &len, ")");
   return (int)len;
 }
 
@@ -97,7 +124,7 @@ int rd_thrstat_busiest(const rd_thrstat_thread *before, int nb, const rd_thrstat
   uint64_t u[RD_THRSTAT_MAX_THREADS];
   int k = 0;
   for (int i = 0; i < na && k < RD_THRSTAT_MAX_THREADS; i++) {
-    const uint64_t t = used_total(find(before, nb, after[i].tid), &after[i]);
+    const uint64_t t = used(find(before, nb, after[i].tid), &after[i]);
     if (permille(t, window_ns) < 10) continue;
     int at = k++;
     for (; at > 0 && u[at - 1] < t; at--) { u[at] = u[at - 1]; idx[at] = idx[at - 1]; }
@@ -113,16 +140,9 @@ int rd_thrstat_format_thread(const rd_thrstat_thread *before, const rd_thrstat_t
                              uint64_t window_ns, char *buf, size_t n) {
   size_t len = 0;
   buf[0] = 0;
-  const unsigned p = permille(used_total(before, after), window_ns);
+  const unsigned p = permille(used(before, after), window_ns);
   put(buf, n, &len, "%-20s prio 0x%02x ideal %d mask 0x%llx: %u.%u%%", after->name,
-      (unsigned)after->prio, (int)after->ideal, (unsigned long long)after->mask, p / 10,
-      p % 10);
-  for (int c = 0; c < RD_THRSTAT_CORES; c++) {
-    const uint64_t u = used(before, after, c);
-    if (!u) continue;
-    const unsigned q = permille(u, window_ns);
-    put(buf, n, &len, " c%d %u.%u%%", c, q / 10, q % 10);
-  }
+      (unsigned)after->prio, (int)after->ideal, (unsigned long long)after->mask, PCT(p));
   return (int)len;
 }
 

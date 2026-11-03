@@ -339,12 +339,11 @@ int diag_thread_sample(rd_thrstat_thread *out, int max) {
     o->prio = prio;
     o->ideal = ideal;
     o->mask = mask;
-    int ok = 0;
-    for (int c = 0; c < RD_THRSTAT_CORES; c++) {
-      u64 ticks = 0;
-      if (R_SUCCEEDED(svcGetInfo(&ticks, info, t->handle, (u64)c))) { o->core_ns[c] = tick_to_ns(ticks); ok = 1; }
-    }
-    if (ok) n++;
+    /* Total only: a core number is accepted only for the caller's own core */
+    u64 ticks = 0;
+    if (R_FAILED(svcGetInfo(&ticks, info, t->handle, TickCountInfo_Total))) continue;
+    o->cpu_ns = tick_to_ns(ticks);
+    n++;
   }
   return n;
 }
