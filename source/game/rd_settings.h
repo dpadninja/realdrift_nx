@@ -43,6 +43,16 @@
 #define RD_DEADZONE_MAX      0.9f
 #define RD_COUNTRY_SIZE      3      /* "JP" + terminator (ISO 3166-1 alpha-2) */
 
+/* The graphics keys that come in a handheld and a docked variant (config.txt *_handheld,
+ * *_docked); the mode at launch picks one (rd_settings_use_mode). */
+enum { RD_MODE_HANDHELD, RD_MODE_DOCKED, RD_MODES };
+typedef struct {
+  int anisotropic_filtering;         /* RD_ANISO_OFF, 2, 4, 8, 16 (rd_aniso.h) */
+  int ge_bloom;                      /* Graphics Enhancements' bloom: 1 = on (rd_sleek.h) */
+  int ge_vignette;                   /* Graphics Enhancements' vignette: 1 = on (rd_sleek.h) */
+  int ge_antialiasing;               /* MSAA samples: 0, 2, 4, 8 (rd_render.h) */
+} rd_graphics;
+
 typedef struct {
   rd_bindings binds;                 /* driving: buttons per action, steering, deadzone */
   uint64_t    pause;                 /* toggles the race pause menu (rd_race_hook.c) */
@@ -57,6 +67,8 @@ typedef struct {
   int         smoke_size;            /* percent of the smoke puffs' size (rd_smoke.h) */
   int         smoke_amount;          /* percent of the smoke puffs emitted (rd_smoke.h) */
   int         min_draw_distance;     /* metres, RD_DRAW_DISTANCE_GAME = the scene's (rd_render.h) */
+  rd_graphics graphics[RD_MODES];    /* config.txt: per mode, RD_MODE_HANDHELD / _DOCKED */
+  /* In use: graphics[] of the mode at launch, set by rd_settings_use_mode (not in config.txt). */
   int         ge_antialiasing;       /* MSAA samples: 0, 2, 4, 8 (rd_render.h) */
   int         anisotropic_filtering; /* RD_ANISO_OFF, 2, 4, 8, 16 (rd_aniso.h) */
   int         ge_bloom;              /* Graphics Enhancements' bloom: 1 = on (rd_sleek.h) */
@@ -97,6 +109,12 @@ typedef struct {
   .smoke_size = RD_SMOKE_PERCENT_ORIG,                                \
   .smoke_amount = RD_SMOKE_PERCENT_ORIG,                              \
   .min_draw_distance = RD_DRAW_DISTANCE_GAME,                         \
+  .graphics = {                     /* MSAA 2x costs too much at 1080p */ \
+    [RD_MODE_HANDHELD] = { .anisotropic_filtering = 8, .ge_bloom = 1,  \
+                           .ge_vignette = 1, .ge_antialiasing = 2 },  \
+    [RD_MODE_DOCKED]   = { .anisotropic_filtering = 8, .ge_bloom = 1,  \
+                           .ge_vignette = 1, .ge_antialiasing = 0 },  \
+  },                                                                  \
   .ge_antialiasing = 0,                                               \
   .anisotropic_filtering = RD_ANISO_OFF,                              \
   .ge_bloom = 1,                                                      \
@@ -136,5 +154,10 @@ int rd_settings_read(rd_settings *s, FILE *f);
 
 /* Writes every key with its help text. */
 void rd_settings_write(const rd_settings *s, FILE *f);
+
+/* Puts the graphics of the handheld (docked = 0) or docked (1) mode in use: copies
+ * s->graphics[mode] into s->anisotropic_filtering, ge_bloom, ge_vignette, ge_antialiasing.
+ * Called once at launch, with the mode that also picks render_resolution auto. */
+void rd_settings_use_mode(rd_settings *s, int docked);
 
 #endif

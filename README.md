@@ -20,6 +20,7 @@ Known issues:
 
 Limitations:
 - the game runs offline: its online features (coin shop, Google sign-in, cloud save, online leaderboards, Share, links to web pages) are hidden, and the leaderboard button reads STATISTICS and shows this console's records (`offline_ui`)
+- the render resolution and the graphics keys (`*_handheld` / `*_docked`) are chosen when the game starts: docking or undocking during play does not switch them, restart the game to apply the other mode's settings. Started docked and then undocked, the game keeps rendering 1080p and the frame rate may drop
 
 ## Features
 - **Full controller support:**
@@ -126,16 +127,21 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 
 | Key | Values | Default | Meaning |
 |---|---|---|---|
-| `anisotropic_filtering` | `0` / `2` / `4` / `8` / `16` | `0` | keeps the road and other textures sharp into the distance instead of blurring at a grazing angle; `0` = as the game. Nearly free; `8` recommended |
 | `min_draw_distance` | `0`–`5000` | `0` | the race camera sees at least this far, in meters; a track that already sees farther keeps its own; `0` = as the game. Only the two mountain tracks (360 m) see less than 1000 m; `1000` costs almost nothing, much farther may show the edge of the mountain model |
+
+The keys below come in pairs, `<key>_handheld` and `<key>_docked` (e.g. `ge_antialiasing_handheld`, `ge_antialiasing_docked`): the mode the game starts in picks one of them (see Limitations).
+
+| Key | Values | Default handheld / docked | Meaning |
+|---|---|---|---|
+| `anisotropic_filtering_*` | `0` / `2` / `4` / `8` / `16` | `8` / `8` | keeps the road and other textures sharp into the distance instead of blurring at a grazing angle; `0` = as the game. Nearly free |
 
 The `ge_*` keys work only while the game's own **Graphics Enhancements** option is on; without it they change nothing.
 
-| Key | Values | Default | Meaning |
+| Key | Values | Default handheld / docked | Meaning |
 |---|---|---|---|
-| `ge_bloom` | `0` / `1` | `1` | the glow; the game's makes the whole picture hazy. `0` = off |
-| `ge_vignette` | `0` / `1` | `1` | darkened screen corners. `0` = off |
-| `ge_antialiasing` | `0` / `2` / `4` / `8` | `0` | MSAA: smooths the edges of the car, road and rails (not foliage). `2` keeps 60 fps handheld on Mountain Downhill; `4` already drops frames there at stock clocks |
+| `ge_bloom_*` | `0` / `1` | `1` / `1` | the glow; the game's makes the whole picture hazy. `0` = off |
+| `ge_vignette_*` | `0` / `1` | `1` / `1` | darkened screen corners. `0` = off |
+| `ge_antialiasing_*` | `0` / `2` / `4` / `8` | `2` / `0` | MSAA: smooths the edges of the car, road and rails (not foliage). `2` keeps 60 fps handheld; docked (1080p) it drops frames, hence `0`. `4` already drops frames handheld at stock clocks |
 
 ### Debugging
 

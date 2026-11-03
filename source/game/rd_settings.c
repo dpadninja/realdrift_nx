@@ -106,20 +106,27 @@ static const setting SETTINGS[] = {
     "#   %d .. %d; a track that already sees farther keeps its own; 0 = as the game. Only\n"
     "#   the two mountain tracks (360 m) are shorter than 1000 m. Their trees are flat cards\n"
     "#   (cheap); beyond ~1000 m the edge of the mountain model may show.\n" },
-  { "anisotropic_filtering", T_ANISO, F(anisotropic_filtering),
+  { "anisotropic_filtering_handheld", T_ANISO, F(graphics[RD_MODE_HANDHELD].anisotropic_filtering),
+    "# Graphics keys come in pairs: *_handheld and *_docked. The mode at launch picks the\n"
+    "#   pair's value (like render_resolution auto); docking later does not switch it.\n"
     "# anisotropic_filtering (experimental): 0 (as the game), 2, 4, 8 or 16. Keeps the road\n"
     "#   sharp into the distance instead of blurring at a grazing angle. Nearly free; try 8.\n" },
-  { "ge_bloom", T_SWITCH, F(ge_bloom),
+  { "anisotropic_filtering_docked", T_ANISO, F(graphics[RD_MODE_DOCKED].anisotropic_filtering),
+    "" },
+  { "ge_bloom_handheld", T_SWITCH, F(graphics[RD_MODE_HANDHELD].ge_bloom),
     "# ge_*: only while Graphics Enhancements (the game's option) is on. It is bloom +\n"
     "#   vignette, each can be turned off; it also carries ge_antialiasing.\n"
     "# ge_bloom: 1 = the glow (the game's makes the whole picture hazy), 0 = off.\n" },
-  { "ge_vignette", T_SWITCH, F(ge_vignette),
+  { "ge_bloom_docked", T_SWITCH, F(graphics[RD_MODE_DOCKED].ge_bloom), "" },
+  { "ge_vignette_handheld", T_SWITCH, F(graphics[RD_MODE_HANDHELD].ge_vignette),
     "# ge_vignette: 1 = darkened screen corners, 0 = off.\n" },
-  { "ge_antialiasing", T_AA, F(ge_antialiasing),
+  { "ge_vignette_docked", T_SWITCH, F(graphics[RD_MODE_DOCKED].ge_vignette), "" },
+  { "ge_antialiasing_handheld", T_AA, F(graphics[RD_MODE_HANDHELD].ge_antialiasing),
     "# ge_antialiasing (experimental): MSAA samples, 0 (off), 2, 4 or 8: smooth edges of the\n"
     "#   car, road and rails (not foliage). The effect's picture is multisampled; the screen\n"
-    "#   itself cannot be (mesa), so without Graphics Enhancements nothing changes. 4 costs\n"
-    "#   ~4 ms GPU on Mountain Downhill handheld (too much at stock clocks): try 2.\n" },
+    "#   itself cannot be (mesa), so without Graphics Enhancements nothing changes. 2 keeps\n"
+    "#   60 fps handheld; docked (1080p) it drops frames, so docked is 0 by default.\n" },
+  { "ge_antialiasing_docked", T_AA, F(graphics[RD_MODE_DOCKED].ge_antialiasing), "" },
   { "texture_transcode", T_SWITCH, F(texture_transcode),
     "# texture_transcode: 1 stores the game's ETC2 textures as S3TC, which the GPU reads\n"
     "#   directly; 0 leaves them to mesa, which unpacks each one to 4-8x the memory, so after\n"
@@ -338,4 +345,12 @@ void rd_settings_write(const rd_settings *s, FILE *f) {
     }
     fprintf(f, "%s=%s\n", SETTINGS[i].key, buf);
   }
+}
+
+void rd_settings_use_mode(rd_settings *s, int docked) {
+  const rd_graphics *g = &s->graphics[docked ? RD_MODE_DOCKED : RD_MODE_HANDHELD];
+  s->anisotropic_filtering = g->anisotropic_filtering;
+  s->ge_bloom = g->ge_bloom;
+  s->ge_vignette = g->ge_vignette;
+  s->ge_antialiasing = g->ge_antialiasing;
 }
