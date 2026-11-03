@@ -129,19 +129,19 @@ Each `bind_*` key accepts one or more of `A B X Y L R ZL ZR PLUS MINUS UP DOWN L
 |---|---|---|---|
 | `min_draw_distance` | `0`–`5000` | `0` | the race camera sees at least this far, in meters; a track that already sees farther keeps its own; `0` = as the game. Only the two mountain tracks (360 m) see less than 1000 m; `1000` costs almost nothing, much farther may show the edge of the mountain model |
 
-The keys below come in pairs, `<key>_handheld` and `<key>_docked` (e.g. `ge_antialiasing_handheld`, `ge_antialiasing_docked`): the mode the game starts in picks one of them (see Limitations).
+The keys below come in pairs, `<key>_handheld` and `<key>_docked`: the mode the game starts in picks one of them (see Limitations).
 
 | Key | Values | Default handheld / docked | Meaning |
 |---|---|---|---|
-| `anisotropic_filtering_*` | `0` / `2` / `4` / `8` / `16` | `8` / `8` | keeps the road and other textures sharp into the distance instead of blurring at a grazing angle; `0` = as the game. Nearly free |
+| `anisotropic_filtering_handheld`, `anisotropic_filtering_docked` | `0` / `2` / `4` / `8` / `16` | `8` / `8` | keeps the road and other textures sharp into the distance instead of blurring at a grazing angle; `0` = as the game. Nearly free |
 
 The `ge_*` keys work only while the game's own **Graphics Enhancements** option is on; without it they change nothing.
 
 | Key | Values | Default handheld / docked | Meaning |
 |---|---|---|---|
-| `ge_bloom_*` | `0` / `1` | `1` / `1` | the glow; the game's makes the whole picture hazy. `0` = off |
-| `ge_vignette_*` | `0` / `1` | `1` / `1` | darkened screen corners. `0` = off |
-| `ge_antialiasing_*` | `0` / `2` / `4` / `8` | `2` / `0` | MSAA: smooths the edges of the car, road and rails (not foliage). `2` keeps 60 fps handheld; docked (1080p) it drops frames, hence `0`. `4` already drops frames handheld at stock clocks |
+| `ge_bloom_handheld`, `ge_bloom_docked` | `0` / `1` | `1` / `1` | the glow; the game's makes the whole picture hazy. `0` = off |
+| `ge_vignette_handheld`, `ge_vignette_docked` | `0` / `1` | `1` / `1` | darkened screen corners. `0` = off |
+| `ge_antialiasing_handheld`, `ge_antialiasing_docked` | `0` / `2` / `4` / `8` | `2` / `0` | MSAA: smooths the edges of the car, road and rails (not foliage). `2` keeps 60 fps handheld; docked (1080p) it drops frames, hence `0`. `4` already drops frames handheld at stock clocks |
 
 ### Debugging
 
@@ -153,6 +153,7 @@ The `ge_*` keys work only while the game's own **Graphics Enhancements** option 
 | `debug_ui_nav` | `0` / `1` | `0` | log what menu navigation finds on each screen, what it skips and why, and every move (with `debug_log=1`) |
 | `debug_mem` | `0` / `1` | `0` | log where the memory is about every 10 s and after each load, and every GL error when a texture or buffer is created (with `debug_log=1`) |
 | `debug_load` | `0` / `1` | `0` | for every frame of a second or more (a load): the file traffic the engine asked for against what reached the SD card, cache hits, writes, the time since start, and each engine thread's CPU time (with `debug_log=1`) |
+| `debug_threads` | `0` / `1` | `0` | log every 10 s the frames, how busy each CPU core is, each engine thread's CPU time with its priority and cores, and how often threads wait and wake (with `debug_log=1`) |
 | `debug_audio` | `0` / `1` | `0` | log when the sound goes silent for 3 s or comes back, when the audio output stops, and the game's volume / mute calls (with `debug_log=1`) |
 
 ### Other
