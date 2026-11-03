@@ -50,6 +50,7 @@ volatile int      g_rd_in_frame = 0;
 #include "rd_memwatch.h"
 #include "rd_racemusic.h"
 #include "rd_loadprof_hook.h"
+#include "rd_thrstat_hook.h"
 
 so_module main_mod, unity_mod, il2cpp_mod;
 
@@ -387,6 +388,7 @@ static void run_main_loop(void) {
       long _ms = (long)(_ns / RD_NS_PER_MS);
       if (config.debug_mem) rd_memwatch_frame((uint32_t)frame, _ns);   /* [mem] lines */
       if (config.debug_load) rd_loadprof_end(_ns);
+      if (config.debug_threads) rd_thrstat_frame(_ns);                 /* [thr] lines */
       if (_ms >= RD_SLOW_FRAME_MS) {
         debugPrintf("[perf] frame %d took %ldms  open=%u sd=%u mmap=%u gc=%u  touch=%d  "
                     "read=%lluKB/%llums swap=%llums gl=%llums deq=%llums fence=%llums\n",

@@ -19,6 +19,7 @@
 #include "imports.h"
 #include "libc_shim.h"
 #include "diag.h"
+#include "rd_perfstat.h"
 
 
 // ---------------------------------------------------------------------------
@@ -157,18 +158,22 @@ static long futex_impl(volatile int32_t *uaddr, int op, int val, const struct ti
     if (*uaddr != val) {
       errno = EAGAIN; ret = -1;
     } else if (to) {
+      RD_SYNC_COUNT(futex_waits, 1);
       const u64 ns = (u64)to->tv_sec * 1000000000ULL + (u64)to->tv_nsec;
       if (R_FAILED(condvarWaitTimeout(&futex_cond[h], &futex_lock[h], ns))) {
         errno = ETIMEDOUT; ret = -1;
       }
     } else {
       diag_futex_spin((const void *)(uintptr_t)uaddr); // beacon: alive-but-spinning if value never flips
-      condvarWaitTimeout(&futex_cond[h], &futex_lock[h], 16000000ULL); // capped infinite wait
+      RD_SYNC_COUNT(futex_waits, 1);
+      if (R_FAILED(condvarWaitTimeout(&futex_cond[h], &futex_lock[h], 16000000ULL))) // capped infinite wait
+        RD_SYNC_COUNT(futex_capped, 1);
     }
     mutexUnlock(&futex_lock[h]);
     return ret;
   }
   if (cmd == FUTEX_WAKE || cmd == FUTEX_WAKE_BITSET) {
+    RD_SYNC_COUNT(futex_wakes, 1);
     mutexLock(&futex_lock[h]);
     condvarWakeAll(&futex_cond[h]);
     mutexUnlock(&futex_lock[h]);
@@ -370,7 +375,7 @@ int execvp_fake(const char *f, char *const argv[]) { (void)f; (void)argv; errno 
 int waitpid_fake(int pid, int *status, int opts) { (void)pid; (void)opts; if (status) *status = 0; errno = ECHILD; return -1; }
 int kill_fake(int pid, int sig) { (void)pid; (void)sig; return 0; }
 int getpid_fake(void) { return 1; }
-int sched_yield_fake(void) { svcSleepThread(0); return 0; }
+int sched_yield_fake(void) { RD_SYNC_COUNT(yields, 1); svcSleepThread(0); return 0; }
 // bionic struct passwd layout (pw_dir at +0x20, as the engine derefs).
 struct bionic_passwd {
   char *pw_name;     /* 0x00 */

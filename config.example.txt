@@ -104,6 +104,10 @@ debug_mem=0
 #   engine asked for and what reached the SD card, and each engine thread's CPU time
 #   ([load] lines, with debug_log = 1).
 debug_load=0
+# debug_threads: 1 logs every 10 s the frames, how busy each core is, the CPU time of
+#   each engine thread with its priority and cores, and how often threads wait and wake
+#   ([thr] lines, with debug_log = 1).
+debug_threads=0
 # debug_audio: 1 logs when the sound goes silent for 3 s or comes back, when the audio
 #   callback stops, and the engine's volume / mute calls ([audio] lines, with debug_log = 1).
 debug_audio=0
