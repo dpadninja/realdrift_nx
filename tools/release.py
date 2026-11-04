@@ -1,10 +1,11 @@
-"""Assemble the release package: realdrift_nx.nro + a standalone stage_sd.py.
+"""Assemble the release package: realdrift_nx.nro + standalone stage_sd.py and make_icon.py.
 
     python -m tools.release realdrift_nx.nro dist/realdrift_nx-v1.0.0
 
 The released stage_sd.py must run on the user's PC with plain Python (no repository, no
 packages), so the `tools.game` import block is replaced by the game identity as literal
-values -- still taken from source/game/rd_game.h, at release time.
+values -- still taken from source/game/rd_game.h, at release time. make_icon.py needs no game
+identity and is copied as is.
 
 MIT (see LICENSE).
 """
@@ -21,6 +22,7 @@ from pathlib import Path
 from tools import game
 
 STAGE_SD = Path(__file__).with_name("stage_sd.py")
+MAKE_ICON = Path(__file__).with_name("make_icon.py")
 BEGIN = "# >>> game identity"
 END = "# <<< game identity"
 
@@ -42,10 +44,11 @@ def standalone_stage_sd(source: str | None = None) -> str:
 
 
 def build(nro: Path, out: Path) -> None:
-    """Writes the release folder `out`: the .nro, standalone stage_sd.py, config.example.txt."""
+    """Writes the release folder `out`: the .nro, the two scripts and config.example.txt."""
     out.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(nro, out / nro.name)
     (out / "stage_sd.py").write_text(standalone_stage_sd())
+    shutil.copyfile(MAKE_ICON, out / MAKE_ICON.name)
     shutil.copyfile(game.ROOT / "config.example.txt", out / "config.example.txt")
 
 

@@ -1,7 +1,7 @@
 # Builds realdrift_nx and publishes a release when a version tag (v1.2.3) is pushed:
 #   git tag v1.0.0 && git push origin v1.0.0
 # The release contains realdrift_nx.nro, stage_sd.py (prepares the SD folder from the user's
-# own APK + OBB) and config.example.txt. No game files are involved at any point.
+# own APK + OBB), make_icon.py (the Switch icon from that APK) and config.example.txt. No game files are involved at any point.
 # MIT (see LICENSE).
 name: release
 

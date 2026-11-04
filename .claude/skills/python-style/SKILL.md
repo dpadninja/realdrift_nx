@@ -16,8 +16,8 @@ Full rules: `docs/PYTHON_STYLE.md`. Checklist:
 - `pathlib.Path` and `Path.open`, f-strings, `subprocess.run([...], check=...)` without `shell=True`.
 - Game identity comes from `tools/game.py` (which reads `rd_game.h`); never a literal package
   name, versionCode or file name.
-- `tools/stage_sd.py` ships to players: standard library only, Python 3.8 compatible, keep the
-  `# >>> game identity` block for `tools/release.py`.
+- `tools/stage_sd.py` and `tools/make_icon.py` ship to players: standard library only, Python 3.8
+  compatible; keep stage_sd's `# >>> game identity` block for `tools/release.py`.
 - Tests: pytest in `tests/`, `tmp_path`, `parametrize`; skip with a reason when `analysis/` files
   are missing; a docstring on every test, fixture and helper: the case and why it matters.
 - Before finishing: `make lint`, `make test`, `make coverage`.
