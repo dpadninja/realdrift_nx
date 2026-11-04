@@ -42,6 +42,14 @@
 /* RaceManager fields; the order is the rd_rm_field enum. */
 #define RD_RM_FIELD_NAMES      { "pausePanel", "isRaceEnded", "isPhotoMode" }
 
+/* ---- replay: ReplayManager.replaySlider (rd_slider_grab.c). The replay moves the slider
+ * with the playback each frame unless isReplaySliderPressed, which the slider's touch
+ * handlers set (OnReplaySliderPress) and clear (OnReplaySliderRelease). */
+#define RD_CLS_REPLAY_MANAGER  "ReplayManager"
+#define RD_FLD_REPLAY_SLIDER   "replaySlider"
+#define RD_MTH_REPLAY_PRESS    "OnReplaySliderPress"
+#define RD_MTH_REPLAY_RELEASE  "OnReplaySliderRelease"
+
 /* ---- UnityEngine.GameObject -------------------------------------------------------- */
 #define RD_CLS_GAME_OBJECT     "GameObject"
 #define RD_MTH_GET_ACTIVE_SELF "get_activeSelf"

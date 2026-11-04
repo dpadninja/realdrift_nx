@@ -216,6 +216,7 @@ One line per module; each file's header comment has the details.
 | `rd_race.{c,h}`, `rd_race_hook.c` | race HUD: hide touch controls, pause button |
 | `rd_smoke.{c,h}`, `rd_smoke_hook.c` | lighter tyre smoke through the particle Emit icall |
 | `rd_menu.{c,h}`, `rd_menu_hook.c` | menus on the controller: focus frame, A taps, B goes back (synthetic touch) |
+| `rd_slider_grab.{c,h}` | a slider edited on the controller is held like a finger holds it: the replay's slider press / release handlers, so the replay follows it |
 | `rd_prefs.{c,h}` | `SharedPreferences` semantics and the `prefs.kv` save file |
 | `rd_sleek.{c,h}`, `rd_sleek_hook.c` | Graphics Enhancements (SleekRender): its redundant clears skipped; bloom / vignette per config.txt |
 | `rd_racemusic.{c,h}`, `rd_racemusic_hook.c` | race music without hitches: no `Resources.UnloadUnusedAssets` on a track change, every track loaded with the race and kept |
