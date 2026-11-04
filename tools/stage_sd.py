@@ -7,9 +7,7 @@ creates ./switch/realdrift_nx/ (copy the `switch` folder to the root of the SD c
     libmain.so libunity.so libil2cpp.so  (lib/arm64-v8a/ from the APK)
     base.apk                           (the APK itself: the game data is read from it)
     main.<versionCode>.<package>.obb
-
-and icon.png next to the `switch` folder: the game's launcher icon from the APK as an opaque
-256x256 PNG, for a home-screen forwarder (it is not copied to the SD card).
+    icon.png                           (the game's icon from the APK, 256x256, for a forwarder)
 
 The APK and OBB must be the game version the loader supports; anything else is refused.
 Needs Python 3.8+ and nothing else.
@@ -144,7 +142,7 @@ def find_obb_member(names: list[str], version_code: int) -> str:
 # ---- forwarder icon from the APK's launcher icon (PNG in, PNG out, stdlib only) ------------
 
 ICON_SIZE = 256  # the Switch's application icon is 256x256
-ICON_FILE = "icon.png"  # written next to the `switch` folder, not onto the SD card
+ICON_FILE = "icon.png"  # written into the game folder with the rest
 APP_ICONS = [  # the game's launcher icon, largest first
     f"res/mipmap-{d}/app_icon.png" for d in ("xxxhdpi", "xxhdpi", "xhdpi", "hdpi", "mdpi")
 ]
@@ -411,7 +409,7 @@ def main(argv: list[str] | None = None) -> int:
         f"done: {args.out}"
         + ("" if nro else f"  (no {args.nro.name} found: copy it there yourself)")
     )
-    icon = args.out.parent.parent / ICON_FILE
+    icon = args.out / ICON_FILE
     try:  # a nicety: the SD folder is ready either way
         member = make_icon(args.apk, icon)
         print(f"icon: {icon} ({ICON_SIZE}x{ICON_SIZE}, from {member}) for a forwarder")

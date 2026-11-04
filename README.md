@@ -72,16 +72,17 @@ switch/realdrift_nx/
 ├── realdrift_nx.nro
 ├── libmain.so  libunity.so  libil2cpp.so
 ├── base.apk
-└── main.76.com.realdrift.sipon.obb
+├── main.76.com.realdrift.sipon.obb
+└── icon.png
 ```
 
-It also writes `icon.png` next to the `switch` folder (not onto the SD card): the game's icon from your APK as an opaque 256×256 PNG, for an optional home-screen forwarder (see step 5).
+`icon.png` is the game's icon from your APK as an opaque 256×256 PNG, for an optional home-screen forwarder (step 5); the game itself does not use it.
 
 The loader adds a few files of its own there at run time: `config.txt`, `prefs.kv` (saves), `il2cpp/` (Unity's data copied from the APK) and `.realdrift_nx-reads` (the start-up prefetch, about 120 KB). Deleting `il2cpp/` or `.realdrift_nx-reads` is safe; they are recreated on the next start.
 
 **4. Copy the `switch` folder to the root of the SD card** and start *Real Drift* from the Homebrew Menu in title-takeover mode (hold `R` while starting any game). Applet mode (from the Album) has not been tested and most likely does not give the game enough memory.
 
-**5. Optional: a home-screen forwarder.** To start the game from the HOME menu, make a forwarder for `sdmc:/switch/realdrift_nx/realdrift_nx.nro` with any NRO forwarder tool and give it the `icon.png` from step 3.
+**5. Optional: a home-screen forwarder.** To start the game from the HOME menu, make a forwarder for `sdmc:/switch/realdrift_nx/realdrift_nx.nro` with any NRO forwarder tool and give it `switch/realdrift_nx/icon.png` from step 3.
 
 ## Controls and configuration
 

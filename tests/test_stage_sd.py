@@ -258,9 +258,8 @@ def test_main_end_to_end(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     assert main([str(apk), str(obb), "--nro", str(tmp_path / "none.nro")]) == 0
     assert (tmp_path / "switch/realdrift_nx" / OBB).exists()
-    w, h, _ = read_png((tmp_path / "icon.png").read_bytes())  # next to switch/, not on the SD
+    w, h, _ = read_png((tmp_path / "switch/realdrift_nx/icon.png").read_bytes())
     assert (w, h) == (ICON_SIZE, ICON_SIZE)
-    assert not (tmp_path / "switch/realdrift_nx/icon.png").exists()
     bad = write_apk(tmp_path / "lite.apk", [LITE_PACKAGE, LITE_BUILD_ID])
     assert main([str(bad), str(obb)]) == 1
 
@@ -273,7 +272,7 @@ def test_main_without_icon_still_stages(tmp_path: Path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     assert main([str(apk), str(obb), "--out", "sd/switch/realdrift_nx"]) == 0
     assert (tmp_path / "sd/switch/realdrift_nx" / OBB).exists()
-    assert not (tmp_path / "sd/icon.png").exists()
+    assert not (tmp_path / "sd/switch/realdrift_nx/icon.png").exists()
     assert "warning: no icon" in capsys.readouterr().err
 
 
