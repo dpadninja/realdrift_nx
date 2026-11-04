@@ -49,7 +49,7 @@ def test_released_script_runs_standalone(tmp_path: Path):
     assert r.returncode == 0, r.stderr
     out = work / "switch" / Path(GAME.home_dir).name
     assert sorted(p.name for p in out.iterdir()) == sorted(
-        [*GAME.libs, GAME.base_apk, OBB, "realdrift_nx.nro"]
+        [*GAME.libs, GAME.base_apk, OBB, "realdrift_nx.nro", "icon.png"]
     )
 
 

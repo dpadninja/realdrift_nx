@@ -19,14 +19,15 @@ enum { RD_LOG_MINIMAL = 0, RD_LOG_FULL = 1 };   /* config.txt debug_log=0|1 */
 #define RD_LOG_TAG_BANNER "[boot] ==="   /* start banner + build stamp: kept at debug_log=0 */
 #define RD_LOG_TAG_JNI    "[jni]"        /* per-method JNI trace: only if RD_LOG_JNI */
 
-/* 1 if a line starting with `fmt` is written at `level`. */
-int rd_log_wanted(int level, const char *fmt);
+/* 1 if the rendered `line` (not its format: a tag passed as "%s" must count) is written at
+ * `level`. */
+int rd_log_wanted(int level, const char *line);
 
 /* 1 for the high-frequency loader chatter that is never logged (dlsym/dlopen/JNI lookups;
  * the "[jni]" trace too unless keep_jni). */
 int rd_log_noisy(const char *fmt, int keep_jni);
 
-/* 1 if a line starting with `fmt` must be flushed to the SD card right away. */
-int rd_log_urgent(const char *fmt);
+/* 1 if the rendered `line` must be flushed to the SD card right away. */
+int rd_log_urgent(const char *line);
 
 #endif
