@@ -48,10 +48,21 @@ static void test_noisy(void) {
   CHECK(!rd_log_noisy(NULL, 0));
 }
 
+/* The lines diag.c renders from "%s ===== %s on thread %s" (abort, stall) are urgent and kept
+ * at debug_log=0 once rendered: debugPrintf filters the rendered line, because the format's
+ * leading "%s" hid the tag and an abort() lost the report in the buffer (2026-11-03). */
+static void test_rendered_diag_lines(void) {
+  CHECK(!rd_log_urgent("%s ===== %s on thread %s, frame %d =====\n"));
+  CHECK(rd_log_urgent(RD_LOG_TAG_CRASH " ===== abort() on thread UnityMain, frame 94770 =====\n"));
+  CHECK(rd_log_wanted(RD_LOG_MINIMAL, RD_LOG_TAG_CRASH "     bt[0] libil2cpp.so+0x754bc4\n"));
+  CHECK(rd_log_urgent(RD_LOG_TAG_WD "   UnityMain  PC=libunity.so+0x1234\n"));
+}
+
 int main(void) {
   RUN(test_noisy);
   RUN(test_full_keeps_everything);
   RUN(test_minimal_keeps_only_important);
   RUN(test_urgent);
+  RUN(test_rendered_diag_lines);
   return g_failures != 0;
 }

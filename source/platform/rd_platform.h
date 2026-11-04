@@ -43,6 +43,7 @@ static inline uint64_t rd_now_ns(void) {
 
 /* ---- I/O buffers ----------------------------------------------------------------------- */
 #define RD_LOG_BUFFER_BYTES            (64 * 1024)   /* debug.log, flushed ~1/s (rd_log.h) */
+#define RD_LOG_LINE_BYTES              512           /* debugPrintf: a line rendered on the stack */
 #define RD_ARCHIVE_STDIO_BUFFER_BYTES  (128 * 1024)  /* fopen of base.apk / the OBB, archive_cache=0 */
 #define RD_ARCHIVE_CACHED_STDIO_BYTES  (16 * 1024)   /* the same with archive_cache: refills from RAM */
 #define RD_ARCHIVE_CACHE_BLOCK         (128 * 1024)  /* archive_cache: unit kept (rd_archcache.h) */
