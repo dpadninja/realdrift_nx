@@ -1,8 +1,7 @@
 # Python style
 
 The Python code is the developer tooling in `tools/` and the tests in `tests/`. It runs on
-Python 3.13 through uv (`uv run ...`), except `tools/stage_sd.py` and `tools/make_icon.py`,
-which ship to players.
+Python 3.13 through uv (`uv run ...`), except `tools/stage_sd.py`, which ships to players.
 
 We follow the community standards and let tools check them:
 
@@ -46,11 +45,11 @@ in `pyproject.toml`.
 - Small pure functions that tests can call directly; I/O at the edges.
 - `@dataclass(frozen=True)` for plain records; constants in `UPPER_CASE` at module level.
 
-## stage_sd.py and make_icon.py (run on players' PCs)
+## stage_sd.py (runs on players' PCs)
 
 - Standard library only, Python 3.8 compatible: `from __future__ import annotations`, no `match`,
   no 3.9+ library calls. Its ruff target version is `py38` (`pyproject.toml` per-file setting).
-- `tools/release.py` inlines the game identity into stage_sd.py; keep the marked block intact.
+- `tools/release.py` inlines the game identity into it; keep the marked block intact.
 
 ## Tests
 

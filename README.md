@@ -48,7 +48,7 @@ Other versions do not work as is. Real Drift Lite (`com.realdriftportnew.sipon`)
 
 You need a Switch with homebrew (Homebrew Menu), a PC with Python 3.8+, and Real Drift **5.0.8** installed on an Android phone and started at least once (the first start downloads the OBB).
 
-**1. Download** `realdrift_nx-vX.Y.Z.zip` from [Releases](../../releases) and unpack it. It contains `realdrift_nx.nro`, `stage_sd.py`, `make_icon.py` and `config.example.txt`.
+**1. Download** `realdrift_nx-vX.Y.Z.zip` from [Releases](../../releases) and unpack it. It contains `realdrift_nx.nro`, `stage_sd.py` and `config.example.txt`.
 
 **2. Copy two files from the phone** into the unpacked folder:
 
@@ -75,17 +75,13 @@ switch/realdrift_nx/
 └── main.76.com.realdrift.sipon.obb
 ```
 
+It also writes `icon.png` next to the `switch` folder (not onto the SD card): the game's icon from your APK as an opaque 256×256 PNG, for an optional home-screen forwarder (see step 5).
+
 The loader adds a few files of its own there at run time: `config.txt`, `prefs.kv` (saves), `il2cpp/` (Unity's data copied from the APK) and `.realdrift_nx-reads` (the start-up prefetch, about 120 KB). Deleting `il2cpp/` or `.realdrift_nx-reads` is safe; they are recreated on the next start.
 
 **4. Copy the `switch` folder to the root of the SD card** and start *Real Drift* from the Homebrew Menu in title-takeover mode (hold `R` while starting any game). Applet mode (from the Album) has not been tested and most likely does not give the game enough memory.
 
-**5. Optional: an icon for a home-screen forwarder.** If you want to start the game from the HOME menu, make a forwarder for `sdmc:/switch/realdrift_nx/realdrift_nx.nro` with any NRO forwarder tool. The game's own icon for it comes from your APK:
-
-```sh
-python3 make_icon.py base.apk icon.png
-```
-
-This writes the game's launcher icon as an opaque 256×256 PNG (the transparent rounded corners are filled from the picture's edges), the size and format forwarder tools expect.
+**5. Optional: a home-screen forwarder.** To start the game from the HOME menu, make a forwarder for `sdmc:/switch/realdrift_nx/realdrift_nx.nro` with any NRO forwarder tool and give it the `icon.png` from step 3.
 
 ## Controls and configuration
 
@@ -200,7 +196,7 @@ These targets need a host C compiler and uv, not devkitPro. Tests that need extr
 | Path | Contents |
 |---|---|
 | `source/` | the loader, one directory per layer: `loader`, `bionic`, `android`, `engine`, `platform`, `game` (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Our modules are `rd_*`. Named values live in one place: `rd_game.h` (game identity and files), `rd_game_symbols.h` (C# names), `rd_platform.h`, `rd_device.h`, `rd_settings.c` (config keys) |
-| `tools/` | `stage_sd.py`, `make_icon.py` (forwarder icon from the APK), `release.py` (release package), `game.py`, `import_coverage.py`, `jni_natives.py`, `il2cpp_symbolize.py`, `find_patch_sites.c`, `hostc.py`, `doc_check.py`; research tools `il2cpp_dump.py`, `il2cpp_find.py`, `il2cpp_disasm.py`, `unity_ref.py` |
+| `tools/` | `stage_sd.py`, `release.py` (release package), `game.py`, `import_coverage.py`, `jni_natives.py`, `il2cpp_symbolize.py`, `find_patch_sites.c`, `hostc.py`, `doc_check.py`; research tools `il2cpp_dump.py`, `il2cpp_find.py`, `il2cpp_disasm.py`, `unity_ref.py` |
 | `.github/workflows/ci.yml` | on every push / pull request: lint, tests with coverage floors, the Switch build |
 | `.github/workflows/release.yml` | on a `vX.Y.Z` tag: builds the `.nro`, runs the tests, publishes the release zip |
 | `tests/` | pytest suite; `tests/c/` host-side C unit tests |

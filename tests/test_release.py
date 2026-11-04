@@ -7,10 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from tests.test_make_icon import write_icon_apk
 from tests.test_stage_sd import OBB, write_apk, write_obb
 from tools.game import GAME
-from tools.make_icon import APP_ICONS
 from tools.release import build, main, standalone_stage_sd
 
 
@@ -24,9 +22,8 @@ def test_identity_block_is_replaced_by_literals():
 
 
 def test_released_script_runs_standalone(tmp_path: Path):
-    """The release folder holds exactly the .nro, stage_sd.py, make_icon.py and
-    config.example.txt, and both scripts run in isolated Python (no repository, no packages),
-    as on a player's PC.
+    """The release folder holds exactly the .nro, stage_sd.py and config.example.txt, and the
+    script runs in isolated Python (no repository, no packages), as on a player's PC.
     """
     nro = tmp_path / "realdrift_nx.nro"
     nro.write_bytes(b"NRO")
@@ -34,7 +31,6 @@ def test_released_script_runs_standalone(tmp_path: Path):
     build(nro, rel)
     assert sorted(p.name for p in rel.iterdir()) == [
         "config.example.txt",
-        "make_icon.py",
         "realdrift_nx.nro",
         "stage_sd.py",
     ]
@@ -55,17 +51,7 @@ def test_released_script_runs_standalone(tmp_path: Path):
     assert sorted(p.name for p in out.iterdir()) == sorted(
         [*GAME.libs, GAME.base_apk, OBB, "realdrift_nx.nro"]
     )
-
-    icon_apk = work / "icon.apk"
-    write_icon_apk(icon_apk, APP_ICONS[0])
-    r = subprocess.run(
-        [sys.executable, "-I", str(rel / "make_icon.py"), "icon.apk"],
-        cwd=work,
-        capture_output=True,
-        text=True,
-    )
-    assert r.returncode == 0, r.stderr
-    assert (work / "icon.png").is_file()
+    assert (work / "icon.png").is_file()  # the forwarder icon, next to switch/
 
 
 def test_command_line(tmp_path: Path, capsys):
