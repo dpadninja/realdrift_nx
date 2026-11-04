@@ -15,7 +15,6 @@
 #include <wctype.h>
 
 #include "rd_device.h"
-#include "rd_env.h"
 #include "util.h"
 #include "imports.h"
 #include "libc_shim.h"
@@ -398,8 +397,7 @@ void *getpwuid_fake(int uid) {
 }
 
 // Unity computes its home/cache dir via getenv("HOME") (then getpwuid fallback).
-// Serve the writable game root for HOME/TMPDIR and the port's fixed values (rd_env.h);
-// delegate everything else to newlib.
+// Serve the writable game root for HOME/TMPDIR; delegate everything else to newlib.
 const char *managed_path(const char *p) {
   if (!p) return p;
   const char *c = strchr(p, ':');
@@ -409,8 +407,6 @@ char *getenv_fake(const char *name) {
   if (name) {
     if (!strcmp(name, "HOME"))   return (char *)managed_path(RD_GAME_HOME);
     if (!strcmp(name, "TMPDIR")) return (char *)managed_path(RD_GAME_HOME);
-    const char *fixed = rd_env_fixed(name);
-    if (fixed) return (char *)fixed;
   }
   return getenv(name);
 }

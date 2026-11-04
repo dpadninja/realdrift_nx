@@ -18,6 +18,7 @@
 #include "libc_shim.h"
 #include "shim_fs.h"
 #include "rd_perfstat.h"
+#include "rd_platform.h"
 #include "shim_mmap.h"
 
 // ---------------------------------------------------------------------------
@@ -177,7 +178,15 @@ static void mapcache_put(uint64_t ino, long off, size_t len, void *ptr) {
 
 void *mmap_fake(void *addr, size_t length, int prot, int flags, int fd, long offset) {
   nx_stat_mmap++;
-  (void)addr;
+  /* Boehm GC's unmap of a free heap block: decommit in place, it aborts on any other address
+   * (rd_mmapflags.h). Logged at first and then every RD_MMAP_DECOMMIT_LOG_EVERY. */
+  if (rd_mmap_is_decommit(addr, prot, flags)) {
+    static unsigned n = 0;
+    if (++n == 1 || n % RD_MMAP_DECOMMIT_LOG_EVERY == 0)
+      debugPrintf("[mmap] MAP_FIXED PROT_NONE %p %zu KB -> kept in place (decommit #%u)\n",
+                  addr, length >> 10, n);
+    return addr;
+  }
   if (length == 0) length = 1;
 
   /* READ-ONLY FILE MAP DEDUP -- checked FIRST, before we allocate or touch the SD card.

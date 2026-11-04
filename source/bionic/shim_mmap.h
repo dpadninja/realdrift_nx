@@ -12,14 +12,12 @@
 #include <stdint.h>
 #include <switch.h>
 #include "mem_layout.h"   /* g_mmap_arena_base/size */
+#include "rd_mmapflags.h" /* BIONIC_MAP_* / BIONIC_PROT_* */
 
 
-#define BIONIC_MAP_ANONYMOUS 0x20
 #define MMAP_PAGE       0x1000u
 #define MMAP_BIG_ALIGN  MMAP_ARENA_ALIGN
 #define MMAP_BIG_THRESH ((size_t)64 * 1024 * 1024)
-#define BIONIC_PROT_NONE 0x0
-#define BIONIC_PROT_WRITE 0x2
 #define BIONIC_MADV_DONTNEED 4
 
 /* Serialises the arena and the overcommit window (zero-initialised = unlocked libnx mutex). */

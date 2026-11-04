@@ -38,6 +38,7 @@ static inline uint64_t rd_now_ns(void) {
 #define RD_THRSTAT_WINDOW_NS    (10 * RD_NS_PER_S) /* debug_threads: one [thr] report per window */
 #define RD_MEM_GL_LOG_FIRST     20    /* debug_mem: GL errors logged one by one ...        */
 #define RD_MEM_GL_LOG_EVERY     100   /* ... then every 100th                              */
+#define RD_MMAP_DECOMMIT_LOG_EVERY 100 /* [mmap] GC decommit in place: the first, then every 100th */
 /* A per-frame hook that ran within this many frames counts as "active" (in a race). */
 #define RD_ACTIVE_WINDOW_FRAMES 10u
 
